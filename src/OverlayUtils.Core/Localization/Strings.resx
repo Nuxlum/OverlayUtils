@@ -72,6 +72,15 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Notify.StartupOn" xml:space="preserve"><value>OverlayUtils will start with Windows.</value></data>
   <data name="Notify.SwitcherFailed" xml:space="preserve"><value>Could not start MonitorSwitcher.</value></data>
   <data name="Notify.SwitcherMissing" xml:space="preserve"><value>MonitorSwitcher not found: download it or choose where it is from the tray menu (Monitor).</value></data>
+  <data name="Overlay.Footer.Back" xml:space="preserve"><value>Back</value></data>
+  <data name="Overlay.Footer.Change" xml:space="preserve"><value>Change</value></data>
+  <data name="Overlay.Footer.Close" xml:space="preserve"><value>Close</value></data>
+  <data name="Overlay.Footer.Confirm" xml:space="preserve"><value>Confirm</value></data>
+  <data name="Overlay.Footer.Open" xml:space="preserve"><value>Open</value></data>
+  <data name="Overlay.Footer.OpenClose" xml:space="preserve"><value>Close / open</value></data>
+  <data name="Overlay.Footer.Select" xml:space="preserve"><value>Select</value></data>
+  <data name="Overlay.Footer.Settings" xml:space="preserve"><value>Settings</value></data>
+  <data name="Overlay.Footer.Toggle" xml:space="preserve"><value>Turn on/off</value></data>
   <data name="Tooltip.Mode.Full" xml:space="preserve"><value>Full mode</value></data>
   <data name="Tooltip.Mode.Standard" xml:space="preserve"><value>Standard mode</value></data>
   <data name="Tooltip.Monitor" xml:space="preserve"><value>Monitor: {0}</value></data>

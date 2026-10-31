@@ -72,6 +72,15 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Notify.StartupOn" xml:space="preserve"><value>OverlayUtils partirà all'avvio di Windows.</value></data>
   <data name="Notify.SwitcherFailed" xml:space="preserve"><value>Impossibile avviare MonitorSwitcher.</value></data>
   <data name="Notify.SwitcherMissing" xml:space="preserve"><value>MonitorSwitcher non trovato: scaricalo o indica dove si trova dal menu dell'icona (Monitor).</value></data>
+  <data name="Overlay.Footer.Back" xml:space="preserve"><value>Indietro</value></data>
+  <data name="Overlay.Footer.Change" xml:space="preserve"><value>Cambia</value></data>
+  <data name="Overlay.Footer.Close" xml:space="preserve"><value>Chiudi</value></data>
+  <data name="Overlay.Footer.Confirm" xml:space="preserve"><value>Conferma</value></data>
+  <data name="Overlay.Footer.Open" xml:space="preserve"><value>Apri</value></data>
+  <data name="Overlay.Footer.OpenClose" xml:space="preserve"><value>Chiudi / apri</value></data>
+  <data name="Overlay.Footer.Select" xml:space="preserve"><value>Seleziona</value></data>
+  <data name="Overlay.Footer.Settings" xml:space="preserve"><value>Impostazioni</value></data>
+  <data name="Overlay.Footer.Toggle" xml:space="preserve"><value>Attiva/disattiva</value></data>
   <data name="Tooltip.Mode.Full" xml:space="preserve"><value>Modalità completa</value></data>
   <data name="Tooltip.Mode.Standard" xml:space="preserve"><value>Modalità standard</value></data>
   <data name="Tooltip.Monitor" xml:space="preserve"><value>Monitor: {0}</value></data>

@@ -195,6 +195,200 @@ string RepoRoot()
         "monitors left of the primary have negative coordinates");
 }
 
+// --- Overlay navigator ------------------------------------------------------
+{
+    var clock = new TestClock { Now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) };
+    var log = new List<string>();
+    var hiddenRow = true;
+    var desktopHidden = false;
+    OverlayItem[] controls =
+    [
+        new() { Kind = ItemKind.Action, Label = () => "Hidden", Visible = () => !hiddenRow, Action = () => log.Add("hidden") },
+        new() { Kind = ItemKind.Action, Label = () => "Desktop", Description = () => "desktop-desc",
+                Visible = () => !desktopHidden, Action = () => log.Add("desktop") },
+        new() { Kind = ItemKind.Segmented, Label = () => "Power", Description = () => "power-desc", Confirm = true,
+                Options = () =>
+                [
+                    new OverlayOption(() => "Sleep", () => log.Add("Sleep")),
+                    new OverlayOption(() => "Restart", () => log.Add("Restart")),
+                    new OverlayOption(() => "Off", () => log.Add("Off")),
+                ] },
+        new() { Kind = ItemKind.Choice, Label = () => "Pick", Description = () => "pick-desc", Step = d => log.Add("step" + d) },
+    ];
+    OverlayItem[] games = [new() { Kind = ItemKind.Action, Label = () => "Game", Action = () => log.Add("game") }];
+    OverlayItem[] settings =
+    [
+        new() { Kind = ItemKind.Toggle, Label = () => "T", Toggle = () => log.Add("toggle") },
+        new() { Kind = ItemKind.Expander, Label = () => "E", Toggle = () => log.Add("expand") },
+    ];
+    OverlayItem[] info =
+    [
+        new() { Kind = ItemKind.Info, Label = () => "NoAction" },
+        new() { Kind = ItemKind.Info, Label = () => "WithAction", Action = () => log.Add("info") },
+    ];
+    var nav = new OverlayNavigator(
+        [new OverlayTab("Controlli", () => "Controls", () => controls), new OverlayTab("Giochi", () => "Games", () => games)],
+        () => settings, () => info, clock);
+
+    void Run(NavResult r) => r.Action?.Invoke();
+
+    nav.Reset([]);
+    Check(nav.Page == OverlayPage.Tabs && nav.Index == 1 && nav.Description() == "desktop-desc",
+        "reset selects the first selectable row");
+    nav.Reset(["Controlli", "Giochi"]);
+    Check(nav.VisibleTabs.Count == 1 && nav.VisibleTabs[0].Id == "Controlli", "Controlli is never hidden");
+    nav.Reset([]);
+    Check(nav.VisibleTabs.Count == 2, "no hidden tabs keeps both");
+
+    Check(nav.Handle(OverlayCommand.Down).Effect == NavEffect.Redraw && nav.Index == 2, "Down selects Power");
+    nav.Handle(OverlayCommand.Down);
+    Check(nav.Index == 3, "Down selects Pick");
+    nav.Handle(OverlayCommand.Down);
+    Check(nav.Index == 1, "Down wraps skipping the hidden row");
+    nav.Handle(OverlayCommand.Up);
+    Check(nav.Index == 3, "Up wraps backwards");
+    nav.Handle(OverlayCommand.Up);
+
+    Check(nav.Index == 2 && nav.Segment == 0, "on Power at the first option");
+    nav.Handle(OverlayCommand.Right);
+    nav.Handle(OverlayCommand.Right);
+    Check(nav.Segment == 2, "Right twice moves to option 2");
+    nav.Handle(OverlayCommand.Right);
+    Check(nav.Segment == 2, "segment cursor is clamped");
+
+    var r1 = nav.Handle(OverlayCommand.A);
+    Check(r1.Effect == NavEffect.Redraw && nav.IsPending(2, 2) && log.Count == 0, "first A arms the confirm");
+    nav.Handle(OverlayCommand.Left);
+    Check(!nav.IsPending(2, 2) && nav.Segment == 1, "moving the cursor clears the confirm");
+    nav.Handle(OverlayCommand.Right);
+    nav.Handle(OverlayCommand.A);
+    clock.Now += TimeSpan.FromSeconds(2.9);
+    var r2 = nav.Handle(OverlayCommand.A);
+    Check(r2.Effect == NavEffect.HideAndRun, "second A within 3 s runs and hides");
+    Run(r2);
+    Check(log.SequenceEqual(["Off"]), "the confirmed option ran");
+    log.Clear();
+
+    nav.Handle(OverlayCommand.A);
+    clock.Now += TimeSpan.FromSeconds(3.1);
+    var r3 = nav.Handle(OverlayCommand.A);
+    Check(r3.Effect == NavEffect.Redraw && nav.IsPending(2, 2) && log.Count == 0, "late second A re-arms instead of running");
+
+    nav.Handle(OverlayCommand.Down);
+    Check(!nav.IsPending(2, 2), "moving rows clears the confirm");
+    nav.Handle(OverlayCommand.Up);
+    nav.Handle(OverlayCommand.A);
+    Check(!nav.ExpirePending(), "ExpirePending is false before the deadline");
+    clock.Now += TimeSpan.FromSeconds(3.1);
+    Check(nav.ExpirePending() && !nav.IsPending(2, 2) && !nav.ExpirePending(), "ExpirePending clears once after the deadline");
+
+    // The segment cursor starts on the active option.
+    var activeNav = new OverlayNavigator(
+        [new OverlayTab("Controlli", () => "C", () =>
+        [
+            new OverlayItem
+            {
+                Kind = ItemKind.Segmented, Label = () => "S",
+                Options = () =>
+                [
+                    new OverlayOption(() => "a", () => { }),
+                    new OverlayOption(() => "b", () => { }, Active: () => true),
+                ],
+            },
+        ])], () => [], () => [], clock);
+    activeNav.Reset([]);
+    Check(activeNav.Segment == 1, "segment cursor starts on the active option");
+
+    nav.Handle(OverlayCommand.Down);
+    Check(nav.Index == 3, "on Pick");
+    var rl = nav.Handle(OverlayCommand.Left);
+    Check(rl.Effect == NavEffect.RunHere && log.Count == 0, "Left on a choice is deferred");
+    Run(rl);
+    Check(log.SequenceEqual(["step-1"]), "Left steps -1");
+    log.Clear();
+    Run(nav.Handle(OverlayCommand.A));
+    Check(log.SequenceEqual(["step1"]), "A on a choice without Apply steps +1");
+    log.Clear();
+
+    var rs = nav.Handle(OverlayCommand.Settings);
+    Check(rs.Effect == NavEffect.Redraw && nav.Page == OverlayPage.Settings && nav.Index == 0, "Settings opens the settings page");
+    Check(nav.Handle(OverlayCommand.WheelDown).Effect == NavEffect.Redraw && nav.Index == 1, "WheelDown moves on Settings");
+    Check(nav.Handle(OverlayCommand.NextTab).Effect == NavEffect.None, "NextTab does nothing on Settings");
+    Check(nav.Handle(OverlayCommand.Right).Effect == NavEffect.RunHere && nav.Handle(OverlayCommand.Left).Effect == NavEffect.None,
+        "closed expander: Right opens, Left does nothing");
+    nav.Handle(OverlayCommand.B);
+    Check(nav.Page == OverlayPage.Tabs && nav.Index == 3, "B returns to the same tab row");
+    Check(nav.Handle(OverlayCommand.WheelDown).Effect == NavEffect.None, "WheelDown does nothing on Tabs");
+    Check(nav.Handle(OverlayCommand.B).Effect == NavEffect.Hide, "B on Tabs hides");
+
+    nav.Reset([]);
+    Check(nav.Handle(OverlayCommand.NextTab).Effect == NavEffect.Redraw && nav.CurrentTab.Id == "Giochi", "NextTab goes to Giochi");
+    nav.Handle(OverlayCommand.NextTab);
+    Check(nav.CurrentTab.Id == "Controlli" && nav.Index == 1, "NextTab wraps to Controlli");
+    nav.Handle(OverlayCommand.PrevTab);
+    Check(nav.CurrentTab.Id == "Giochi", "PrevTab wraps backwards");
+    nav.Reset([]);
+
+    nav.Handle(OverlayCommand.Settings);
+    Run(nav.Handle(OverlayCommand.A));
+    Check(log.SequenceEqual(["toggle"]), "A on a toggle runs it");
+    log.Clear();
+    nav.Handle(OverlayCommand.Settings);
+    Check(nav.Page == OverlayPage.Tabs, "Settings command returns to Tabs");
+
+    var infoNav = new OverlayNavigator(
+        [new OverlayTab("Controlli", () => "C", () =>
+        [
+            new OverlayItem { Kind = ItemKind.Action, Label = () => "About", OpensInfo = true, Action = () => log.Add("never") },
+        ])], () => [], () => info, clock);
+    infoNav.Reset([]);
+    var ri = infoNav.Handle(OverlayCommand.A);
+    Check(ri.Effect == NavEffect.Redraw && infoNav.Page == OverlayPage.Info && infoNav.Index == 1,
+        "OpensInfo opens the Info page on the selectable row");
+    infoNav.Handle(OverlayCommand.Down);
+    Check(infoNav.Index == 1, "the info row without an action is never selected");
+    Check(infoNav.Handle(OverlayCommand.A).Effect == NavEffect.HideAndRun, "A on an info row with an action runs it");
+    infoNav.Handle(OverlayCommand.B);
+    Check(infoNav.Page == OverlayPage.Settings, "B on Info goes to Settings");
+
+    // A visibility change moves the selection.
+    nav.Reset([]);
+    Check(nav.Index == 1, "back on Desktop");
+    desktopHidden = true;
+    nav.Refresh();
+    Check(nav.Index == 2 && nav.Description() == "power-desc", "hidden selection moves to the nearest selectable row");
+    desktopHidden = false;
+    hiddenRow = false;
+    nav.Reset([]);
+    Check(nav.Index == 0, "a visible first row is selected on reset");
+    hiddenRow = true;
+    nav.Refresh();
+    Check(nav.Index == 1, "Refresh moves below when nothing is selectable above");
+    nav.Handle(OverlayCommand.Down);
+    nav.Handle(OverlayCommand.Down);
+    Check(nav.Index == 3, "on Pick again");
+
+    // Mouse.
+    var rc = nav.Click(2, 1);
+    Check(nav.Index == 2 && nav.Segment == 1 && rc.Effect == NavEffect.Redraw && nav.IsPending(2, 1),
+        "Click selects the row and segment, then acts as A");
+
+    // Footer.
+    var footer = nav.Footer();
+    Check(footer.Any(f => f.Keys == "Esc" && f.Label == Loc.T("Overlay.Footer.Close")), "footer: Esc closes on Tabs");
+    Check(footer.Any(f => f.Keys == "← →" && f.Label == Loc.T("Overlay.Footer.Change")), "footer: arrows change on a segmented row");
+    Check(footer.Any(f => f.Keys == "F2" && f.Label == Loc.T("Overlay.Footer.Settings")), "footer: F2 opens settings");
+    Check(footer[0].Keys == "Enter" && footer[0].Label == Loc.T("Overlay.Footer.Confirm"), "footer: Enter confirms");
+    nav.Handle(OverlayCommand.Settings);
+    Check(nav.Footer().Any(f => f.Keys == "Esc" && f.Label == Loc.T("Overlay.Footer.Back")), "footer: Esc goes back on Settings");
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;
+
+sealed class TestClock : TimeProvider
+{
+    public DateTimeOffset Now;
+    public override DateTimeOffset GetUtcNow() => Now;
+}
