@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.IO;
-using System.Reflection;
 using System.Windows.Forms;
+using OverlayUtils.App.Overlay;
 using OverlayUtils.Core;
 using OverlayUtils.Core.Config;
 using OverlayUtils.Core.Diagnostics;
@@ -10,6 +10,7 @@ using OverlayUtils.Core.Interop;
 using OverlayUtils.Core.Legacy;
 using OverlayUtils.Core.Localization;
 using OverlayUtils.Core.Monitors;
+using OverlayUtils.Core.Overlay;
 using OverlayUtils.Core.Platform;
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
@@ -22,12 +23,13 @@ namespace OverlayUtils.App.Tray;
 /// <summary>
 /// Owns the tray icon and its menu, and wires stage-1 features together:
 /// monitor profiles, Home key remapping, global hotkeys, language, start-up,
-/// full mode. Lives on the WPF UI thread; hotkey callbacks are marshalled here.
+/// full mode, and the overlay (Shift+F1 or a left click on the icon), whose host it is.
+/// Lives on the WPF UI thread; hotkey callbacks are marshalled here.
 /// </summary>
-internal sealed class TrayController : IDisposable
+internal sealed class TrayController : IOverlayHost, IDisposable
 {
     private const int HotkeyHome = 1;
-    // 2 is reserved for the overlay toggle (Shift+F1), ported in stage 2.
+    private const int HotkeyOverlay = 2;
     private const int HotkeyDesk = 3;
     private const int HotkeyTv = 4;
 
@@ -39,6 +41,7 @@ internal sealed class TrayController : IDisposable
     private readonly NotifyIcon _icon;
     private readonly ContextMenuStrip _menu = new();
     private HotkeyService? _hotkeys;
+    private OverlayController? _overlay;
     private System.Drawing.Icon? _currentIcon;
     private bool _busy; // a mode switch is in progress
 
@@ -54,11 +57,8 @@ internal sealed class TrayController : IDisposable
         _menu.Opening += (_, _) => BuildMenu();
         _icon.MouseUp += (_, e) =>
         {
-            // Until the overlay exists (stage 2) a left click opens the menu too.
-            // NotifyIcon only exposes this privately; it positions the menu correctly.
-            if (e.Button == MouseButtons.Left)
-                typeof(NotifyIcon).GetMethod("ShowContextMenu", BindingFlags.Instance | BindingFlags.NonPublic)
-                    ?.Invoke(_icon, null);
+            // Left click opens the overlay; right click keeps the menu.
+            if (e.Button == MouseButtons.Left) _overlay?.Toggle();
         };
 
         _config.Changed += OnConfigChanged;
@@ -66,11 +66,19 @@ internal sealed class TrayController : IDisposable
     }
 
     /// <summary>True when this process really is the full-mode exe with UIAccess granted.</summary>
-    private bool InFullMode => _kind == LauncherKind.UIAccess && ProcessInfo.HasUIAccess;
+    public bool InFullMode => _kind == LauncherKind.UIAccess && ProcessInfo.HasUIAccess;
 
     public void Start(bool migrated, bool finishDisableFullMode)
     {
         _locator.StartSearch();
+        try
+        {
+            _overlay = new OverlayController(_app, _config, _monitors, new OverlayContent(_config, _monitors, _locator, this));
+        }
+        catch (Exception e)
+        {
+            Log.Error("Overlay start", e); // the tray keeps working without it
+        }
         _hotkeys = new HotkeyService();
         _hotkeys.Pressed += OnHotkey;
         _ = RegisterHotkeysAsync();
@@ -88,6 +96,8 @@ internal sealed class TrayController : IDisposable
     private async Task RegisterHotkeysAsync()
     {
         if (_hotkeys is null) return;
+        if (!await _hotkeys.RegisterAsync(HotkeyOverlay, Native.MOD_SHIFT, Native.VK_F1))
+            Notify(Loc.T("Notify.HotkeyBusy", "Shift+F1"));
         if (!await _hotkeys.RegisterAsync(HotkeyDesk, Native.MOD_CONTROL | Native.MOD_ALT, Native.VK_DOWN))
             Notify(Loc.T("Notify.HotkeyBusy", "Ctrl+Alt+↓"));
         if (!await _hotkeys.RegisterAsync(HotkeyTv, Native.MOD_CONTROL | Native.MOD_ALT, Native.VK_UP))
@@ -118,6 +128,9 @@ internal sealed class TrayController : IDisposable
                 var mode = _config.Current.HomeKeyMode;
                 if (mode == HomeKeyModes.Windows) KeySender.WindowsKey();
                 else if (mode == HomeKeyModes.AltTab) KeySender.AltTab();
+                break;
+            case HotkeyOverlay:
+                _overlay?.Toggle();
                 break;
             case HotkeyDesk:
                 SwitchMonitor(() => _monitors.SwitchTo(MonitorRole.Desk));
@@ -172,9 +185,10 @@ internal sealed class TrayController : IDisposable
         _icon.Text = text.Length > 127 ? text[..127] : text; // Windows limit
     }
 
-    private void Notify(string message)
+    /// <param name="force">Ignore the notifications setting (failures the user must see).</param>
+    private void Notify(string message, bool force = false)
     {
-        if (!_config.Current.NotificationsEnabled) return;
+        if (!force && !_config.Current.NotificationsEnabled) return;
         OnUi(() => _icon.ShowBalloonTip(3000, AppPaths.AppName, message, ToolTipIcon.None));
     }
 
@@ -182,6 +196,42 @@ internal sealed class TrayController : IDisposable
     {
         if (_app.Dispatcher.CheckAccess()) action();
         else _app.Dispatcher.BeginInvoke(action);
+    }
+
+    // --- overlay host ------------------------------------------------------------
+    // Actions the overlay runs after hiding arrive on a worker thread; the others on the UI thread.
+
+    public bool HasPreviousWindow => _overlay?.HasPreviousWindow ?? false;
+
+    public void SwitchMonitor(string profile) => SwitchMonitor(() => _monitors.Switch(profile));
+
+    public void ChooseMonitorSwitcher() => OnUi(() =>
+    {
+        // Owned by the overlay, or the topmost panel would cover the dialog.
+        ChooseSwitcher(_overlay is { IsOpen: true } overlay ? new WindowOwner(overlay.Handle) : null);
+        _overlay?.Refocus();
+    });
+
+    /// <summary>The overlay flow: no dialogs, failures become a notification.</summary>
+    public void SwitchFullMode() => OnUi(async () =>
+    {
+        if (_busy) return;
+        try
+        {
+            await RunSwitch(InFullMode ? ModeSwitcher.BeginDisableFullMode : ModeSwitcher.EnableFullMode,
+                exitOnSuccess: true, notifyFailure: true);
+        }
+        catch (Exception e)
+        {
+            Log.Error("Overlay full mode", e);
+        }
+    });
+
+    void IOverlayHost.Exit() => OnUi(Exit);
+
+    private sealed class WindowOwner(nint handle) : IWin32Window
+    {
+        public nint Handle => handle;
     }
 
     // --- menu -----------------------------------------------------------------
@@ -263,7 +313,7 @@ internal sealed class TrayController : IDisposable
             "" => Loc.T("Menu.Monitor.SwitcherMissing"),
             _ => Loc.T("Menu.Monitor.SwitcherFound", path),
         }));
-        menu.DropDownItems.Add(Item(Loc.T("Menu.Monitor.ChooseSwitcher"), ChooseSwitcher));
+        menu.DropDownItems.Add(Item(Loc.T("Menu.Monitor.ChooseSwitcher"), () => ChooseSwitcher()));
         if (path == "")
             menu.DropDownItems.Add(Item(Loc.T("Menu.Monitor.Download"), () => OpenUrl(MonitorSwitcherLocator.Website)));
         menu.DropDownItems.Add(Item(Loc.T("Menu.Monitor.OpenProfiles"), () => OpenFolder(_monitors.ProfilesDir)));
@@ -318,7 +368,7 @@ internal sealed class TrayController : IDisposable
 
     // --- actions ----------------------------------------------------------------
 
-    private void ToggleStartup()
+    public void ToggleStartup()
     {
         if (StartupRegistration.IsEnabled)
         {
@@ -329,7 +379,7 @@ internal sealed class TrayController : IDisposable
         Notify(StartupRegistration.Enable(exe) ? Loc.T("Notify.StartupOn") : Loc.T("Notify.StartupFailed"));
     }
 
-    private void ChooseSwitcher()
+    private void ChooseSwitcher(IWin32Window? owner = null)
     {
         using var dialog = new OpenFileDialog
         {
@@ -337,7 +387,7 @@ internal sealed class TrayController : IDisposable
             Filter = Loc.T("Dialog.ChooseSwitcher.Filter"),
             FileName = MonitorSwitcherLocator.ExeName,
         };
-        if (dialog.ShowDialog() == DialogResult.OK) _locator.Set(dialog.FileName);
+        if (dialog.ShowDialog(owner) == DialogResult.OK) _locator.Set(dialog.FileName);
     }
 
     private async void EnableFullMode()
@@ -367,7 +417,7 @@ internal sealed class TrayController : IDisposable
         else ShowFailure(result);
     }
 
-    private async Task RunSwitch(Func<ModeSwitcher.Result> step, bool exitOnSuccess)
+    private async Task RunSwitch(Func<ModeSwitcher.Result> step, bool exitOnSuccess, bool notifyFailure = false)
     {
         _busy = true;
         try
@@ -378,7 +428,8 @@ internal sealed class TrayController : IDisposable
                 if (exitOnSuccess) Exit();
                 return;
             }
-            ShowFailure(result);
+            if (notifyFailure) Notify(FailureMessage(result), force: true);
+            else ShowFailure(result);
         }
         finally
         {
@@ -386,9 +437,10 @@ internal sealed class TrayController : IDisposable
         }
     }
 
-    private static void ShowFailure(ModeSwitcher.Result result)
-    {
-        var message = result.Outcome switch
+    private static void ShowFailure(ModeSwitcher.Result result) => Show(FailureMessage(result), MessageBoxImage.Warning);
+
+    private static string FailureMessage(ModeSwitcher.Result result) =>
+        result.Outcome switch
         {
             ModeSwitcher.Outcome.Cancelled => Loc.T("Dialog.FullMode.Cancelled"),
             ModeSwitcher.Outcome.LaunchFailed => Loc.T("Dialog.FullMode.LaunchFailed", result.Detail ?? ""),
@@ -400,8 +452,6 @@ internal sealed class TrayController : IDisposable
                 _ => Loc.T("Dialog.FullMode.Failed"),
             },
         };
-        Show(message, MessageBoxImage.Warning);
-    }
 
     private static bool Confirm(string message) =>
         MessageBox.Show(message, AppPaths.AppName, MessageBoxButton.OKCancel, MessageBoxImage.Question)
@@ -421,6 +471,7 @@ internal sealed class TrayController : IDisposable
 
     private void Exit()
     {
+        _overlay?.Dispose(); // closes the overlay window for real (it refuses to close otherwise)
         _icon.Visible = false;
         _app.Shutdown();
     }
@@ -428,6 +479,7 @@ internal sealed class TrayController : IDisposable
     public void Dispose()
     {
         _hotkeys?.Dispose();
+        _overlay?.Dispose();
         _icon.Visible = false;
         _icon.Dispose();
         _menu.Dispose();

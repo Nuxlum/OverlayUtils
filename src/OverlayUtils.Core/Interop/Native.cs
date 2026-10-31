@@ -157,6 +157,25 @@ internal static partial class Native
     [LibraryImport("user32.dll", EntryPoint = "GetClassNameW")]
     public static partial int GetClassName(nint hWnd, ref ushort className, int maxCount);
 
+    // --- window placement / styles -------------------------------------------
+    public const uint WM_DPICHANGED = 0x02E0;
+    public static readonly nint HWND_TOPMOST = -1;
+    public const uint SWP_NOACTIVATE = 0x0010;
+    public const uint SWP_NOOWNERZORDER = 0x0200;
+    public const int GWL_EXSTYLE = -20;
+    public const nint WS_EX_TOOLWINDOW = 0x00000080;
+    public const nint WS_EX_APPWINDOW = 0x00040000;
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetWindowPos(nint hWnd, nint insertAfter, int x, int y, int cx, int cy, uint flags);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    public static partial nint GetWindowLongPtr(nint hWnd, int index);
+
+    [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+    public static partial nint SetWindowLongPtr(nint hWnd, int index, nint value);
+
     // --- monitors -----------------------------------------------------------
     public const uint MONITOR_DEFAULTTONEAREST = 2;
     public const int MDT_EFFECTIVE_DPI = 0;
