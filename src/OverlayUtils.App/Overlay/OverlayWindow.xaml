@@ -404,26 +404,31 @@
             <Rectangle Style="{StaticResource Separator}" Margin="14,0,14,4" />
         </StackPanel>
 
-        <!-- Footer (Python _render_footer), pinned to the bottom on every tab and page. -->
-        <ItemsControl DockPanel.Dock="Bottom" ItemsSource="{Binding Footer}" Focusable="False" Height="34"
-                      Margin="20,0,14,0">
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Top" />
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <StackPanel Orientation="Horizontal" Height="20" Margin="0,0,14,0">
-                        <Border Style="{StaticResource Keycap}">
-                            <TextBlock Style="{StaticResource KeycapText}" Text="{Binding Keys}" />
-                        </Border>
-                        <TextBlock Text="{Binding Label}" Margin="6,0,0,0" FontSize="12" VerticalAlignment="Center"
-                                   Foreground="{StaticResource Muted}" />
-                    </StackPanel>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        <!--
+          Footer (Python _render_footer), pinned to the bottom on every tab and page. The Viewbox only shrinks it
+          when a language's labels are wider than the panel.
+        -->
+        <Viewbox DockPanel.Dock="Bottom" Height="20" Margin="20,0,14,14" HorizontalAlignment="Left"
+                 Stretch="Uniform" StretchDirection="DownOnly">
+            <ItemsControl ItemsSource="{Binding Footer}" Focusable="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Height="20" Margin="0,0,12,0">
+                            <Border Style="{StaticResource Keycap}" Padding="5,0">
+                                <TextBlock Style="{StaticResource KeycapText}" Text="{Binding Keys}" />
+                            </Border>
+                            <TextBlock Text="{Binding Label}" Margin="5,0,0,0" FontSize="12"
+                                       VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Viewbox>
 
         <!-- Description of the selected row (Python _render_description): two lines, hidden when empty. -->
         <StackPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">

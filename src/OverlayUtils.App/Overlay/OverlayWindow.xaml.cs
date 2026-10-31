@@ -60,6 +60,18 @@ internal sealed partial class OverlayWindow : Window
 
     void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // Alt+F4 would close (destroy) the window, F10 / Alt+Space open the system menu.
+        if (e.Key == Key.System && e.SystemKey is Key.F4 or Key.F10 or Key.Space)
+        {
+            e.Handled = true;
+            return;
+        }
+        // A held Enter must not confirm a pending Power option by itself; Esc and F2 would flicker pages.
+        if (e.IsRepeat && e.Key is Key.Enter or Key.Escape or Key.F2)
+        {
+            e.Handled = true;
+            return;
+        }
         var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
         OverlayCommand? command = e.Key switch
         {
