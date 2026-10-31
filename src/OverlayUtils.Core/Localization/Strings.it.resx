@@ -78,6 +78,7 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.BigPicture.Open" xml:space="preserve"><value>Apri</value></data>
   <data name="Overlay.CloseWindow.Desc" xml:space="preserve"><value>Chiude la finestra che era in primo piano prima dell'overlay.</value></data>
   <data name="Overlay.CloseWindow.Label" xml:space="preserve"><value>Chiudi finestra</value></data>
+  <data name="Overlay.ConfirmPending" xml:space="preserve"><value>Conferma?</value></data>
   <data name="Overlay.Footer.Back" xml:space="preserve"><value>Indietro</value></data>
   <data name="Overlay.Footer.Change" xml:space="preserve"><value>Cambia</value></data>
   <data name="Overlay.Footer.Close" xml:space="preserve"><value>Chiudi</value></data>
@@ -107,6 +108,8 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.Monitor.Active" xml:space="preserve"><value>{0}  (attivo)</value></data>
   <data name="Overlay.Monitor.Desc" xml:space="preserve"><value>Profili salvati con MonitorSwitcher. Conferma carica quello scelto.</value></data>
   <data name="Overlay.Monitor.Label" xml:space="preserve"><value>Monitor</value></data>
+  <data name="Overlay.Page.Info" xml:space="preserve"><value>Informazioni</value></data>
+  <data name="Overlay.Page.Settings" xml:space="preserve"><value>Impostazioni</value></data>
   <data name="Overlay.Power.Desc" xml:space="preserve"><value>Sospendi, riavvia o spegni il PC. Chiede conferma con una seconda pressione.</value></data>
   <data name="Overlay.Power.Label" xml:space="preserve"><value>Energia</value></data>
   <data name="Overlay.Power.Restart" xml:space="preserve"><value>Riavvia</value></data>

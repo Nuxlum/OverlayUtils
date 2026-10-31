@@ -1,0 +1,451 @@
+<!--
+  The overlay panel (Python _Overlay.render). 420x720 is only the design size: the controller sets the real size
+  and position, and SizeFactor scales the content. Sizes are Python's, in DIPs at 96 dpi. Nothing here is
+  focusable: the window takes every key in PreviewKeyDown and turns it into an OverlayCommand.
+-->
+<Window x:Class="OverlayUtils.App.Overlay.OverlayWindow" x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:OverlayUtils.App.Overlay"
+        xmlns:core="clr-namespace:OverlayUtils.Core.Overlay;assembly=OverlayUtils.Core"
+        WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" ShowActivated="True"
+        Width="420" Height="720" Background="{DynamicResource Bg}"
+        FontFamily="{DynamicResource TextFont}" Foreground="{DynamicResource Text}"
+        UseLayoutRounding="True" KeyboardNavigation.TabNavigation="None"
+        KeyboardNavigation.DirectionalNavigation="None" KeyboardNavigation.ControlTabNavigation="None"
+        PreviewKeyDown="OnPreviewKeyDown" PreviewMouseWheel="OnPreviewMouseWheel"
+        MouseRightButtonDown="OnMouseRightButtonDown">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="OverlayTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Shown only on the selected row (tint, accent bar). -->
+            <Style x:Key="SelectedOnly" TargetType="FrameworkElement">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="Tint" TargetType="Border" BasedOn="{StaticResource SelectedOnly}">
+                <Setter Property="Background" Value="{DynamicResource Accent}" />
+                <Setter Property="Opacity" Value="{StaticResource TintOpacity}" />
+            </Style>
+            <Style x:Key="AccentBar" TargetType="Rectangle" BasedOn="{StaticResource SelectedOnly}">
+                <Setter Property="Width" Value="3" />
+                <Setter Property="Height" Value="16" />
+                <Setter Property="RadiusX" Value="1.5" />
+                <Setter Property="RadiusY" Value="1.5" />
+                <Setter Property="HorizontalAlignment" Value="Left" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Fill" Value="{DynamicResource Accent}" />
+            </Style>
+            <Style x:Key="RowIcon" TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                <Setter Property="Foreground" Value="{StaticResource Text}" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                        <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            <!-- Small chevrons of choice and action rows: brighter on the selected row. -->
+            <Style x:Key="RowChevron" TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                <Setter Property="FontSize" Value="10" />
+                <Setter Property="Foreground" Value="{StaticResource Subtle}" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                        <Setter Property="Foreground" Value="{StaticResource Text}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <!--
+              Frame of the standard rows (Python _render_rows): optional section header, 40 px row with tint and
+              accent bar, icon, label, and the kind's control (the Content) on the right.
+            -->
+            <Style x:Key="RowFrame" TargetType="ContentControl">
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ContentControl">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Section}" Margin="12,8,0,0" Height="20" FontSize="11"
+                                           FontWeight="SemiBold" Foreground="{StaticResource Muted}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Section}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <Grid Height="40" Margin="0,0,0,2" Background="Transparent"
+                                      MouseLeftButtonDown="OnRowMouseDown">
+                                    <Border Style="{StaticResource Tint}" CornerRadius="6" />
+                                    <Rectangle Style="{StaticResource AccentBar}" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="46" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Style="{StaticResource RowIcon}" Text="{Binding Icon}" FontSize="16"
+                                                   Margin="2,0,0,0" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="14"
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                   Margin="0,0,10,0" />
+                                        <ContentPresenter Grid.Column="2" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Grid>
+                            </StackPanel>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <DataTemplate x:Key="ActionRow">
+                <ContentControl Style="{StaticResource RowFrame}">
+                    <Grid>
+                        <Border Margin="0,0,4,0">
+                            <Border.Style>
+                                <Style TargetType="Border" BasedOn="{StaticResource Keycap}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Hint}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Style="{StaticResource KeycapText}" Text="{Binding Hint}" />
+                        </Border>
+                        <TextBlock Text="{x:Static core:Glyphs.ChevronRight}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource RowChevron}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasChevron}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </ContentControl>
+            </DataTemplate>
+
+            <!-- Python _render_segmented: pills in a dark capsule; cursor outlined, pending in danger red. -->
+            <DataTemplate x:Key="SegmentedRow">
+                <ContentControl Style="{StaticResource RowFrame}">
+                    <Border Height="28" Padding="3" CornerRadius="14" Background="{StaticResource SegmentBg}">
+                        <ItemsControl ItemsSource="{Binding Options}" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border x:Name="Pill" CornerRadius="11" Padding="9,0" BorderThickness="1"
+                                            BorderBrush="Transparent" Background="Transparent"
+                                            MouseLeftButtonDown="OnOptionMouseDown">
+                                        <TextBlock x:Name="PillText" Text="{Binding Label}" FontSize="12"
+                                                   FontWeight="SemiBold" VerticalAlignment="Center"
+                                                   Foreground="{StaticResource Muted}" />
+                                    </Border>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                            <Setter TargetName="Pill" Property="Background" Value="{StaticResource SegmentActive}" />
+                                            <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsCursor}" Value="True">
+                                            <Setter TargetName="Pill" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                            <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsPending}" Value="True">
+                                            <Setter TargetName="Pill" Property="Background" Value="{StaticResource Danger}" />
+                                            <Setter TargetName="Pill" Property="BorderBrush" Value="{StaticResource Danger}" />
+                                            <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                </ContentControl>
+            </DataTemplate>
+
+            <!-- Python _render_choice: ‹ value › -->
+            <DataTemplate x:Key="ChoiceRow">
+                <ContentControl Style="{StaticResource RowFrame}">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,4,0">
+                        <TextBlock Style="{StaticResource RowChevron}" Text="{x:Static core:Glyphs.ChevronLeft}" />
+                        <TextBlock Text="{Binding Value}" FontSize="13" Margin="10,0" MaxWidth="210"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource Text}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource RowChevron}" Text="{x:Static core:Glyphs.ChevronRight}" />
+                    </StackPanel>
+                </ContentControl>
+            </DataTemplate>
+
+            <!-- Python _switch: Windows 11 toggle, filled with the accent when on. -->
+            <DataTemplate x:Key="ToggleRow">
+                <ContentControl Style="{StaticResource RowFrame}">
+                    <Grid Width="40" Height="20" Margin="0,0,4,0">
+                        <Border x:Name="Track" CornerRadius="10" BorderThickness="1"
+                                BorderBrush="{StaticResource Muted}" Background="Transparent" />
+                        <Ellipse x:Name="Knob" Width="12" Height="12" Margin="4,0" HorizontalAlignment="Left"
+                                 Fill="{StaticResource Muted}" />
+                    </Grid>
+                </ContentControl>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsOn}" Value="True">
+                        <Setter TargetName="Track" Property="Background" Value="{DynamicResource Accent}" />
+                        <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                        <Setter TargetName="Knob" Property="Fill" Value="{StaticResource Bg}" />
+                        <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <!-- Info page panel header (Python _render_info): a card with a chevron that turns down when open. -->
+            <DataTemplate x:Key="ExpanderRow">
+                <Grid Height="38" Margin="0,6,0,0" Background="Transparent" MouseLeftButtonDown="OnRowMouseDown">
+                    <Border CornerRadius="8" Background="{StaticResource Surface}" />
+                    <Border Style="{StaticResource Tint}" CornerRadius="8" />
+                    <Rectangle Style="{StaticResource AccentBar}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="40" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource RowIcon}" Text="{Binding Icon}" FontSize="15" />
+                        <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="14" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="Chevron" Grid.Column="2" Style="{StaticResource Icon}" FontSize="10"
+                                   Margin="0,0,14,0" Foreground="{StaticResource Muted}"
+                                   Text="{x:Static core:Glyphs.ChevronRight}" />
+                    </Grid>
+                </Grid>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsOn}" Value="True">
+                        <!-- Python ICON_CHEVRON_DOWN -->
+                        <Setter TargetName="Chevron" Property="Text" Value="&#xE70D;" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <!-- Compact label/value row inside an open Info panel, with the action word on the right. -->
+            <DataTemplate x:Key="InfoRow">
+                <Grid Height="25" Background="Transparent" MouseLeftButtonDown="OnRowMouseDown">
+                    <Border Style="{StaticResource Tint}" CornerRadius="6" Margin="6,0" />
+                    <Rectangle Style="{StaticResource AccentBar}" Margin="6,0,0,0" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="160" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Label}" FontSize="12" Margin="16,0,6,0" VerticalAlignment="Center"
+                                   Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12.5" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="Hint" Grid.Column="2" Text="{Binding Hint}" FontSize="12"
+                                   Margin="10,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource Subtle}" />
+                    </Grid>
+                </Grid>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                        <Setter TargetName="Hint" Property="Foreground" Value="{DynamicResource Accent}" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <local:RowTemplateSelector x:Key="RowTemplates"
+                                       Action="{StaticResource ActionRow}"
+                                       Segmented="{StaticResource SegmentedRow}"
+                                       Choice="{StaticResource ChoiceRow}"
+                                       Toggle="{StaticResource ToggleRow}"
+                                       Expander="{StaticResource ExpanderRow}"
+                                       Info="{StaticResource InfoRow}" />
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <DockPanel>
+        <DockPanel.LayoutTransform>
+            <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
+        </DockPanel.LayoutTransform>
+
+        <!-- Header (Python _render_header): app name, then gear, monitor profile and clock from the right. -->
+        <StackPanel DockPanel.Dock="Top">
+            <Grid Height="28" Margin="20,14,18,10">
+                <TextBlock Text="{Binding Title}" FontFamily="{StaticResource DisplayFont}" FontSize="20"
+                           FontWeight="SemiBold" VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Border Width="24" Height="24" CornerRadius="12" VerticalAlignment="Center"
+                            MouseLeftButtonDown="OnGearMouseDown">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsOnPage}" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource Surface}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{x:Static core:Glyphs.Settings}" FontSize="15">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                                    <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsOnPage}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Border>
+                    <Border Height="24" CornerRadius="12" Margin="8,0,0,0" Padding="10,0,7,0"
+                            VerticalAlignment="Center" Background="{StaticResource Surface}">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ProfileName}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="8" Height="8" Fill="{Binding ProfileBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding ProfileName}" Margin="5,0,0,0" MaxWidth="110" FontSize="12"
+                                       FontWeight="SemiBold" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="{Binding Clock}" Margin="10,0,0,0" FontSize="14" FontWeight="SemiBold"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Tab strip, or on Settings/Info the page title with the back chevron. -->
+            <Grid Height="34">
+                <ItemsControl ItemsSource="{Binding Tabs}" Focusable="False" Margin="18,0,0,0">
+                    <ItemsControl.Style>
+                        <Style TargetType="ItemsControl">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsOnPage}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ItemsControl.Style>
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,0,18,0">
+                                <TextBlock x:Name="TabText" Text="{Binding Title}" Height="28" Padding="0,5,0,0"
+                                           FontSize="14" FontWeight="SemiBold" VerticalAlignment="Top"
+                                           Foreground="{StaticResource Subtle}" />
+                                <Rectangle x:Name="Underline" Height="3" RadiusX="1.5" RadiusY="1.5"
+                                           Margin="0,26,0,0" VerticalAlignment="Top" Visibility="Collapsed"
+                                           Fill="{DynamicResource Accent}" />
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                    <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource Text}" />
+                                    <Setter TargetName="Underline" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Grid Margin="14,0" Background="Transparent" MouseLeftButtonDown="OnBackMouseDown">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsOnPage}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <StackPanel Orientation="Horizontal" Height="28" VerticalAlignment="Top">
+                        <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.ChevronLeft}"
+                                   FontSize="11" Width="20" Foreground="{StaticResource Muted}" />
+                        <TextBlock Text="{Binding PageTitle}" Margin="4,0,0,0" FontSize="15" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
+            <Rectangle Style="{StaticResource Separator}" Margin="14,0,14,4" />
+        </StackPanel>
+
+        <!-- Footer (Python _render_footer), pinned to the bottom on every tab and page. -->
+        <ItemsControl DockPanel.Dock="Bottom" ItemsSource="{Binding Footer}" Focusable="False" Height="34"
+                      Margin="20,0,14,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Top" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal" Height="20" Margin="0,0,14,0">
+                        <Border Style="{StaticResource Keycap}">
+                            <TextBlock Style="{StaticResource KeycapText}" Text="{Binding Keys}" />
+                        </Border>
+                        <TextBlock Text="{Binding Label}" Margin="6,0,0,0" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{StaticResource Muted}" />
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Description of the selected row (Python _render_description): two lines, hidden when empty. -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
+            <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Description}" Value="">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </StackPanel.Style>
+            <Rectangle Style="{StaticResource Separator}" />
+            <TextBlock Text="{Binding Description}" Margin="20,9,20,2" Height="34" FontSize="12" LineHeight="17"
+                       LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                       Foreground="{StaticResource Muted}" />
+        </StackPanel>
+
+        <ScrollViewer x:Name="Scroller" Focusable="False" VerticalScrollBarVisibility="Hidden"
+                      HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="RowList" ItemsSource="{Binding Rows}" Focusable="False" Margin="14,0,14,8"
+                          ItemTemplateSelector="{StaticResource RowTemplates}" />
+        </ScrollViewer>
+    </DockPanel>
+</Window>
