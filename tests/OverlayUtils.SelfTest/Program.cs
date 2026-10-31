@@ -405,6 +405,183 @@ string RepoRoot()
     Check(AccentPalette.LightVariant([1, 2, 3]) is null && AccentPalette.LightVariant(null) is null, "short palette ignored");
 }
 
+// --- Overlay content --------------------------------------------------------
+{
+    var host = new FakeHost();
+    var altF4 = 0;
+    var profilesDir = Path.Combine(temp, "ovc-profiles");
+    Directory.CreateDirectory(profilesDir);
+    void SetProfiles(params string[] names)
+    {
+        foreach (var f in Directory.GetFiles(profilesDir)) File.Delete(f);
+        foreach (var n in names) File.WriteAllText(Path.Combine(profilesDir, n + ".xml"), "<x/>");
+    }
+    var store = new ConfigStore(Path.Combine(temp, "ovc", "config.json"));
+    var monitors = new MonitorProfiles(store, new MonitorSwitcherLocator(store), profilesDir);
+    var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), host, () => altF4++);
+    OverlayNavigator NewNav()
+    {
+        var n = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
+        content.ResetTransient();
+        n.Reset([]);
+        return n;
+    }
+    OverlayItem Row(IReadOnlyList<OverlayItem> items, string label) => items.First(i => i.Label() == label);
+    void RunAction(NavResult r) => r.Action?.Invoke();
+    OverlayItem FullModeRow() => content.Settings().First(i =>
+        i.Kind == ItemKind.Segmented && i.Options().Count == 1
+        && i.Options()[0].Label() is var l && (l == Loc.T("Settings.FullMode.Enable") || l == Loc.T("Settings.FullMode.Disable")));
+
+    // No profiles: Monitor hidden, Big Picture first, description follows the selection.
+    monitors.InvalidateCache();
+    var nav = NewNav();
+    var monitorRow = content.Controls()[0];
+    Check(monitorRow.Label() == Loc.T("Overlay.Monitor.Label") && !monitorRow.Visible(), "Monitor row hidden without profiles");
+    Check(nav.Selected?.Label() == Loc.T("Overlay.BigPicture.Label"), "Big Picture is selected when Monitor is hidden");
+    Check(nav.Description() == Loc.T("Overlay.BigPicture.Desc"), "description is Big Picture's, not Monitor's");
+    Check(content.Tabs.Count == 1 && content.Tabs[0].Id == OverlayContent.ControlsTabId, "only the Controls tab exists");
+
+    // Three profiles: segmented, cursor on the current profile.
+    SetProfiles("Gaming", "Main", "TV");
+    monitors.InvalidateCache();
+    store.Update(c => c.MonitorProfile = "Main");
+    nav = NewNav();
+    var mon3 = content.Controls()[0];
+    Check(mon3.Kind == ItemKind.Segmented && mon3.Options().Count == 3 && mon3.Visible(), "3 profiles: segmented with 3 options");
+    Check(nav.Selected?.Label() == Loc.T("Overlay.Monitor.Label") && nav.Segment == 1, "cursor starts on the current profile");
+    RunAction(nav.Handle(OverlayCommand.A));
+    Check(host.Calls.SequenceEqual(["SwitchMonitor:Main"]), "segment action switches the monitor");
+    host.Calls.Clear();
+
+    // Four profiles: choice with a pick that starts on the current one and wraps.
+    SetProfiles("A", "B", "C", "D");
+    monitors.InvalidateCache();
+    store.Update(c => c.MonitorProfile = "A");
+    nav = NewNav();
+    var mon4 = content.Controls()[0];
+    Check(mon4.Kind == ItemKind.Choice, "4 profiles: choice");
+    Check(mon4.Value() == Loc.T("Overlay.Monitor.Active", "A"), "pick shows the current profile as active");
+    RunAction(nav.Handle(OverlayCommand.Right));
+    var applied = nav.Handle(OverlayCommand.A);
+    Check(applied.Effect == NavEffect.HideAndRun, "A on the Monitor choice hides and runs");
+    RunAction(applied);
+    Check(host.Calls.SequenceEqual(["SwitchMonitor:B"]), "pick moved to the second profile and was applied");
+    host.Calls.Clear();
+    content.ResetTransient();
+    Check(content.Controls()[0].Value() == Loc.T("Overlay.Monitor.Active", "A"), "ResetTransient clears the pick");
+    store.Update(c => c.MonitorProfile = "");
+    Check(content.Controls()[0].Value() == "A", "pick starts on the first profile when none is current");
+    content.Controls()[0].Step!(-1);
+    Check(content.Controls()[0].Value() == "D", "pick wraps backwards");
+    content.ResetTransient();
+
+    // Close window.
+    var close = Row(content.Controls(), Loc.T("Overlay.CloseWindow.Label"));
+    Check(close.Hint?.Invoke() == "Alt+F4", "Close window shows its keycap");
+    nav = NewNav();
+    while (nav.Selected?.Label() != close.Label()) nav.Handle(OverlayCommand.Down);
+    var closeRun = nav.Handle(OverlayCommand.A);
+    Check(closeRun.Effect == NavEffect.HideAndRun, "Close window hides then runs");
+    host.HasPreviousWindow = false;
+    RunAction(closeRun);
+    Check(altF4 == 0, "no Alt+F4 without a previous window");
+    host.HasPreviousWindow = true;
+    RunAction(closeRun);
+    Check(altF4 == 1, "Alt+F4 with a previous window");
+
+    // Power.
+    var power = Row(content.Controls(), Loc.T("Overlay.Power.Label"));
+    Check(power.Kind == ItemKind.Segmented && power.Confirm && power.Options().Count == 3, "Power: 3 options with confirm");
+
+    // Settings.
+    var settings = content.Settings();
+    Check(!settings.Any(i => i.Label().Contains("Spotify") || i.Label().Contains("Discord")), "no Spotify/Discord rows yet");
+    var size = Row(settings, Loc.T("Settings.Size.Label"));
+    size.Options().First(o => o.Label() == Loc.T("Settings.Size.Large")).Action();
+    Check(store.Current.OverlaySize == "large" && size.Options().All(o => o.Stay), "Size Large is saved and stays open");
+    Check(size.Options().First(o => o.Label() == Loc.T("Settings.Size.Large")).Active!(), "active size is marked");
+    var position = Row(settings, Loc.T("Settings.Position.Label"));
+    position.Options().First(o => o.Label() == Loc.T("Settings.Position.Right")).Action();
+    Check(store.Current.OverlaySide == "right", "Position Right is saved");
+
+    host.InFullMode = false;
+    var full = FullModeRow();
+    Check(full.Confirm && full.Label().EndsWith(Loc.T("Settings.FullMode.Off")), "full mode off: confirm, label says Off");
+    full.Options()[0].Action();
+    Check(host.Calls.SequenceEqual(["SwitchFullMode"]), "full mode option calls the host once");
+    host.Calls.Clear();
+    host.InFullMode = true;
+    full = FullModeRow();
+    Check(full.Options()[0].Label() == Loc.T("Settings.FullMode.Disable")
+          && full.Label().EndsWith(Loc.T("Settings.FullMode.On")), "full mode on: Disable option, label says On");
+
+    var settingsNav = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
+    settingsNav.Reset([]);
+    settingsNav.Handle(OverlayCommand.Settings);
+    while (settingsNav.Selected?.Label() != Loc.T("Menu.Language")) settingsNav.Handle(OverlayCommand.Down);
+    Check(store.Current.Language == "auto", "language starts on auto");
+    RunAction(settingsNav.Handle(OverlayCommand.Right));
+    Check(store.Current.Language == "en", "Right on Language cycles auto to en");
+    RunAction(settingsNav.Handle(OverlayCommand.Right));
+    Check(store.Current.Language == "it", "then en to it");
+    RunAction(settingsNav.Handle(OverlayCommand.Right));
+    Check(store.Current.Language == "auto", "then back to auto");
+    Loc.SetLanguage("en");
+
+    Row(content.Settings(), Loc.T("Menu.Startup")).Toggle!();
+    Check(host.Calls.SequenceEqual(["ToggleStartup"]), "Start with Windows toggles through the host");
+    host.Calls.Clear();
+    var tabRow = content.Settings()[0];
+    tabRow.Toggle!();
+    Check(tabRow.IsOn() && store.Current.HiddenTabs.Count == 0, "the Controls tab toggle stays on");
+    Row(content.Settings(), Loc.T("Menu.Notifications")).Toggle!();
+    Check(!store.Current.NotificationsEnabled, "Notifications toggle flips the config");
+    var exit = Row(content.Settings(), Loc.T("Settings.Exit.Label"));
+    exit.Options()[0].Action();
+    Check(exit.Confirm && host.Calls.SequenceEqual(["Exit"]), "Exit asks to confirm and calls the host");
+    host.Calls.Clear();
+    Row(content.Settings(), Loc.T("Settings.Desk.Label")).Step!(1);
+    Check(monitors.ForRole(MonitorRole.Desk) == "B", "Desk choice moves the role to the next profile");
+    var switcher = Row(content.Settings(), Loc.T("Settings.MonitorSwitcher.Label", Loc.T("Settings.MonitorSwitcher.Searching")));
+    Check(switcher.Options()[0].Stay, "MonitorSwitcher row stays open");
+    switcher.Options()[0].Action();
+    Check(host.Calls.SequenceEqual(["ChooseMonitorSwitcher"]), "Choose… calls the host");
+    host.Calls.Clear();
+
+    // Information row opens the Info page.
+    var infoNav = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
+    infoNav.Reset([]);
+    infoNav.Handle(OverlayCommand.Settings);
+    while (infoNav.Selected?.Label() != Loc.T("Settings.Info.Label")) infoNav.Handle(OverlayCommand.Down);
+    infoNav.Handle(OverlayCommand.A);
+    Check(infoNav.Page == OverlayPage.Info, "A on Information opens the Info page");
+
+    // Info panels.
+    content.ResetTransient();
+    var shortcutsTitle = Loc.T("Overlay.Info.Shortcuts");
+    var monitorTitle = Loc.T("Overlay.Info.Monitor");
+    bool Open(string title) => content.Info().First(i => i.Kind == ItemKind.Expander && i.Label() == title).IsOn();
+    IEnumerable<string> ShownInfo() => content.Info().Where(i => i.Kind == ItemKind.Info && i.Visible()).Select(i => i.Label());
+    Check(Open(shortcutsTitle) && !Open(monitorTitle), "ResetTransient opens Shortcuts only");
+    Check(ShownInfo().Count() >= 8 && !ShownInfo().Contains(Loc.T("Overlay.Info.Profiles")), "only Shortcuts rows are visible");
+    content.Info().First(i => i.Label() == monitorTitle).Toggle!();
+    Check(!Open(shortcutsTitle) && Open(monitorTitle), "opening Monitor closes Shortcuts");
+    Check(ShownInfo().Contains(Loc.T("Overlay.Info.Profiles")) && !ShownInfo().Contains(Loc.T("Overlay.Info.Key.Tabs")),
+        "Monitor rows shown, Shortcuts rows hidden");
+    content.Info().First(i => i.Label() == monitorTitle).Toggle!();
+    Check(!ShownInfo().Any(), "toggling the open panel closes it");
+    content.Info().First(i => i.Label() == Loc.T("Overlay.Info.System")).Toggle!();
+    Check(ShownInfo().Count() == 3 && content.Info().Count(i => i.Kind == ItemKind.Expander) == 3, "System panel has its rows");
+
+    // Italian.
+    Loc.SetLanguage("it");
+    Check(content.Tabs[0].Title() == "Controlli" && content.Controls().Any(i => i.Label() == "Energia"), "Italian tab and Power labels");
+    Check(content.Controls().Any(i => i.Label() == "Mostra desktop") && content.Controls().Any(i => i.Label() == "Chiudi finestra"),
+        "Italian window rows");
+    Loc.SetLanguage("en");
+    Check(content.Controls().Any(i => i.Label() == "Power"), "English again");
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;
@@ -413,4 +590,16 @@ sealed class TestClock : TimeProvider
 {
     public DateTimeOffset Now;
     public override DateTimeOffset GetUtcNow() => Now;
+}
+
+sealed class FakeHost : IOverlayHost
+{
+    public List<string> Calls { get; } = [];
+    public bool InFullMode { get; set; }
+    public bool HasPreviousWindow { get; set; } = true;
+    public void SwitchMonitor(string profile) => Calls.Add("SwitchMonitor:" + profile);
+    public void ToggleStartup() => Calls.Add("ToggleStartup");
+    public void ChooseMonitorSwitcher() => Calls.Add("ChooseMonitorSwitcher");
+    public void SwitchFullMode() => Calls.Add("SwitchFullMode");
+    public void Exit() => Calls.Add("Exit");
 }

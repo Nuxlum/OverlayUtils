@@ -72,6 +72,12 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Notify.StartupOn" xml:space="preserve"><value>OverlayUtils will start with Windows.</value></data>
   <data name="Notify.SwitcherFailed" xml:space="preserve"><value>Could not start MonitorSwitcher.</value></data>
   <data name="Notify.SwitcherMissing" xml:space="preserve"><value>MonitorSwitcher not found: download it or choose where it is from the tray menu (Monitor).</value></data>
+  <data name="Overlay.BigPicture.Desc" xml:space="preserve"><value>Opens or closes Steam Big Picture.</value></data>
+  <data name="Overlay.BigPicture.Exit" xml:space="preserve"><value>Exit</value></data>
+  <data name="Overlay.BigPicture.Label" xml:space="preserve"><value>Big Picture</value></data>
+  <data name="Overlay.BigPicture.Open" xml:space="preserve"><value>Open</value></data>
+  <data name="Overlay.CloseWindow.Desc" xml:space="preserve"><value>Closes the window that was in front before the overlay.</value></data>
+  <data name="Overlay.CloseWindow.Label" xml:space="preserve"><value>Close window</value></data>
   <data name="Overlay.Footer.Back" xml:space="preserve"><value>Back</value></data>
   <data name="Overlay.Footer.Change" xml:space="preserve"><value>Change</value></data>
   <data name="Overlay.Footer.Close" xml:space="preserve"><value>Close</value></data>
@@ -81,6 +87,79 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Overlay.Footer.Select" xml:space="preserve"><value>Select</value></data>
   <data name="Overlay.Footer.Settings" xml:space="preserve"><value>Settings</value></data>
   <data name="Overlay.Footer.Toggle" xml:space="preserve"><value>Turn on/off</value></data>
+  <data name="Overlay.Info.Config" xml:space="preserve"><value>Configuration</value></data>
+  <data name="Overlay.Info.Download" xml:space="preserve"><value>Download</value></data>
+  <data name="Overlay.Info.Folder" xml:space="preserve"><value>Folder</value></data>
+  <data name="Overlay.Info.Key.Arrows" xml:space="preserve"><value>Move / change</value></data>
+  <data name="Overlay.Info.Key.Back" xml:space="preserve"><value>Back / close</value></data>
+  <data name="Overlay.Info.Key.Monitor" xml:space="preserve"><value>Monitor {0}</value></data>
+  <data name="Overlay.Info.Key.Tabs" xml:space="preserve"><value>Change tab</value></data>
+  <data name="Overlay.Info.Key.Toggle" xml:space="preserve"><value>Open / close the overlay</value></data>
+  <data name="Overlay.Info.Mode" xml:space="preserve"><value>Mode</value></data>
+  <data name="Overlay.Info.Monitor" xml:space="preserve"><value>Monitor</value></data>
+  <data name="Overlay.Info.NoProfiles" xml:space="preserve"><value>none: save them with MonitorSwitcher</value></data>
+  <data name="Overlay.Info.Profiles" xml:space="preserve"><value>Profiles</value></data>
+  <data name="Overlay.Info.Roles" xml:space="preserve"><value>Desk · TV</value></data>
+  <data name="Overlay.Info.Shortcuts" xml:space="preserve"><value>Shortcuts</value></data>
+  <data name="Overlay.Info.Switcher" xml:space="preserve"><value>MonitorSwitcher</value></data>
+  <data name="Overlay.Info.System" xml:space="preserve"><value>System</value></data>
+  <data name="Overlay.Info.Version" xml:space="preserve"><value>Version {0}</value></data>
+  <data name="Overlay.Monitor.Active" xml:space="preserve"><value>{0}  (active)</value></data>
+  <data name="Overlay.Monitor.Desc" xml:space="preserve"><value>Profiles saved with MonitorSwitcher. Confirm loads the chosen one.</value></data>
+  <data name="Overlay.Monitor.Label" xml:space="preserve"><value>Monitor</value></data>
+  <data name="Overlay.Power.Desc" xml:space="preserve"><value>Sleep, restart or shut down the PC. Asks for a second confirmation.</value></data>
+  <data name="Overlay.Power.Label" xml:space="preserve"><value>Power</value></data>
+  <data name="Overlay.Power.Restart" xml:space="preserve"><value>Restart</value></data>
+  <data name="Overlay.Power.ShutDown" xml:space="preserve"><value>Shut down</value></data>
+  <data name="Overlay.Power.Sleep" xml:space="preserve"><value>Sleep</value></data>
+  <data name="Overlay.Section.General" xml:space="preserve"><value>General</value></data>
+  <data name="Overlay.Section.Monitor" xml:space="preserve"><value>Monitor</value></data>
+  <data name="Overlay.Section.Other" xml:space="preserve"><value>Other</value></data>
+  <data name="Overlay.Section.Overlay" xml:space="preserve"><value>Overlay</value></data>
+  <data name="Overlay.Section.Screen" xml:space="preserve"><value>Screen</value></data>
+  <data name="Overlay.Section.Steam" xml:space="preserve"><value>Steam</value></data>
+  <data name="Overlay.Section.System" xml:space="preserve"><value>System</value></data>
+  <data name="Overlay.Section.Tabs" xml:space="preserve"><value>Tabs</value></data>
+  <data name="Overlay.Section.Windows" xml:space="preserve"><value>Windows</value></data>
+  <data name="Overlay.ShowDesktop.Desc" xml:space="preserve"><value>Minimises all windows (Win+D).</value></data>
+  <data name="Overlay.ShowDesktop.Label" xml:space="preserve"><value>Show desktop</value></data>
+  <data name="Overlay.Tab.Controls" xml:space="preserve"><value>Controls</value></data>
+  <data name="Settings.Desk.Desc" xml:space="preserve"><value>Profile loaded by Ctrl+Alt+Down.</value></data>
+  <data name="Settings.Desk.Label" xml:space="preserve"><value>Desk</value></data>
+  <data name="Settings.Exit.Desc" xml:space="preserve"><value>Closes OverlayUtils (and the tray icon). Asks for a second confirmation.</value></data>
+  <data name="Settings.Exit.Label" xml:space="preserve"><value>Exit OverlayUtils</value></data>
+  <data name="Settings.FullMode.Desc" xml:space="preserve"><value>Lets the overlay appear above fullscreen games. Asks for confirmation and a Windows permission prompt.</value></data>
+  <data name="Settings.FullMode.Disable" xml:space="preserve"><value>Disable</value></data>
+  <data name="Settings.FullMode.Enable" xml:space="preserve"><value>Enable</value></data>
+  <data name="Settings.FullMode.Label" xml:space="preserve"><value>Over fullscreen games · {0}</value></data>
+  <data name="Settings.FullMode.Off" xml:space="preserve"><value>Off</value></data>
+  <data name="Settings.FullMode.On" xml:space="preserve"><value>On</value></data>
+  <data name="Settings.HomeKey.Desc" xml:space="preserve"><value>What the keyboard's Home media key does (None = opens the browser).</value></data>
+  <data name="Settings.HomeKey.None" xml:space="preserve"><value>None</value></data>
+  <data name="Settings.HomeKey.Windows" xml:space="preserve"><value>Windows</value></data>
+  <data name="Settings.Info.Desc" xml:space="preserve"><value>Paths, shortcuts and how everything is set up.</value></data>
+  <data name="Settings.Info.Label" xml:space="preserve"><value>Information</value></data>
+  <data name="Settings.Language.Desc" xml:space="preserve"><value>Language of the app and the overlay.</value></data>
+  <data name="Settings.MonitorSwitcher.Choose" xml:space="preserve"><value>Choose…</value></data>
+  <data name="Settings.MonitorSwitcher.Desc" xml:space="preserve"><value>Where MonitorSwitcher.exe is (it is portable: it is found automatically, or you can point to it).</value></data>
+  <data name="Settings.MonitorSwitcher.Found" xml:space="preserve"><value>found</value></data>
+  <data name="Settings.MonitorSwitcher.Label" xml:space="preserve"><value>MonitorSwitcher · {0}</value></data>
+  <data name="Settings.MonitorSwitcher.Missing" xml:space="preserve"><value>not found</value></data>
+  <data name="Settings.MonitorSwitcher.Searching" xml:space="preserve"><value>searching…</value></data>
+  <data name="Settings.Notifications.Desc" xml:space="preserve"><value>Windows notifications when you change monitor profile.</value></data>
+  <data name="Settings.Position.Desc" xml:space="preserve"><value>Side of the screen where the overlay appears.</value></data>
+  <data name="Settings.Position.Label" xml:space="preserve"><value>Position</value></data>
+  <data name="Settings.Position.Left" xml:space="preserve"><value>Left</value></data>
+  <data name="Settings.Position.Right" xml:space="preserve"><value>Right</value></data>
+  <data name="Settings.Size.Auto" xml:space="preserve"><value>Auto</value></data>
+  <data name="Settings.Size.Desc" xml:space="preserve"><value>Size of the overlay. Auto = large on the TV profile.</value></data>
+  <data name="Settings.Size.Label" xml:space="preserve"><value>Size</value></data>
+  <data name="Settings.Size.Large" xml:space="preserve"><value>Large</value></data>
+  <data name="Settings.Size.Normal" xml:space="preserve"><value>Normal</value></data>
+  <data name="Settings.Startup.Desc" xml:space="preserve"><value>Starts OverlayUtils when you sign in to Windows.</value></data>
+  <data name="Settings.Tab.Desc" xml:space="preserve"><value>Shows or hides the {0} tab. At least one stays visible.</value></data>
+  <data name="Settings.Tv.Desc" xml:space="preserve"><value>Profile loaded by Ctrl+Alt+Up.</value></data>
+  <data name="Settings.Tv.Label" xml:space="preserve"><value>TV</value></data>
   <data name="Tooltip.Mode.Full" xml:space="preserve"><value>Full mode</value></data>
   <data name="Tooltip.Mode.Standard" xml:space="preserve"><value>Standard mode</value></data>
   <data name="Tooltip.Monitor" xml:space="preserve"><value>Monitor: {0}</value></data>
