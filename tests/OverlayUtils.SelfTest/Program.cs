@@ -7,6 +7,7 @@ using OverlayUtils.Core.Config;
 using OverlayUtils.Core.Legacy;
 using OverlayUtils.Core.Localization;
 using OverlayUtils.Core.Monitors;
+using OverlayUtils.Core.Overlay;
 using OverlayUtils.Core.Platform;
 
 var temp = Directory.CreateTempSubdirectory("overlayutils-selftest-").FullName;
@@ -167,6 +168,31 @@ string RepoRoot()
         "standard exe starts directly");
     Check(StartupRegistration.CommandFor("/apps/OverlayUtils.UIAccess.exe").Contains("ShellExec_RunDLL"),
         "UIAccess exe starts through ShellExecute");
+}
+
+// --- Overlay layout ---------------------------------------------------------
+{
+    Check(new AppConfig().OverlaySize == OverlaySizes.Auto && new AppConfig().OverlaySide == OverlaySides.Left,
+        "overlay defaults");
+    var json = JsonSerializer.Serialize(new AppConfig(), ConfigStore.JsonOptions);
+    Check(json.Contains("\"overlay_size\"") && json.Contains("\"overlay_side\""), "overlay keys are snake_case");
+
+    Check(OverlayLayout.SizeFactor("normal", "TV", "TV") == 1.0, "normal stays normal on TV");
+    Check(OverlayLayout.SizeFactor("large", "Desk", "TV") == 1.35, "large is large everywhere");
+    Check(OverlayLayout.SizeFactor("auto", "TV", "TV") == 1.35, "auto is large on the TV profile");
+    Check(OverlayLayout.SizeFactor("auto", "Desk", "TV") == 1.0, "auto is normal elsewhere");
+    Check(OverlayLayout.SizeFactor("auto", "", "") == 1.0, "auto without a TV profile is normal");
+    Check(OverlayLayout.SizeFactor("bogus", "TV", "TV") == 1.35, "unknown setting behaves as auto");
+
+    var hd = new RectI(0, 0, 1920, 1040);
+    Check(OverlayLayout.Place(hd, 1.0, 1.0, "left") == new RectI(36, 36, 456, 756), "left placement");
+    Check(OverlayLayout.Place(hd, 1.0, 1.0, "right") == new RectI(1464, 36, 1884, 756), "right placement");
+    Check(OverlayLayout.Place(new RectI(0, 0, 3840, 2100), 1.5, 1.35, "right") == new RectI(2935, 54, 3786, 1512),
+        "dpi and large factor multiply, rounded away from zero");
+    Check(OverlayLayout.Place(new RectI(0, 0, 1920, 1032), 1.0, 1.35, "left").Height == 960,
+        "height clamped to the work area minus both margins");
+    Check(OverlayLayout.Place(new RectI(-1920, 0, 0, 1040), 1.0, 1.0, "left").Left == -1884,
+        "monitors left of the primary have negative coordinates");
 }
 
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }

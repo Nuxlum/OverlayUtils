@@ -32,6 +32,12 @@ public sealed class AppConfig
     [JsonPropertyName("monitor_switcher_exe")] public string MonitorSwitcherExe { get; set; } = "";
     [JsonPropertyName("hidden_tabs")] public List<string> HiddenTabs { get; set; } = [];
 
+    /// <summary>"normal", "large" or "auto" (large on the TV profile).</summary>
+    [JsonPropertyName("overlay_size")] public string OverlaySize { get; set; } = OverlaySizes.Auto;
+
+    /// <summary>"left" or "right" edge of the work area.</summary>
+    [JsonPropertyName("overlay_side")] public string OverlaySide { get; set; } = OverlaySides.Left;
+
     [JsonExtensionData] public Dictionary<string, JsonElement>? Extra { get; set; }
 
     public AppConfig Clone() =>
@@ -44,4 +50,17 @@ public static class HomeKeyModes
     public const string Windows = "windows";
     public const string AltTab = "alttab";
     public const string None = "none";
+}
+
+public static class OverlaySizes
+{
+    public const string Normal = "normal";
+    public const string Large = "large";
+    public const string Auto = "auto";
+}
+
+public static class OverlaySides
+{
+    public const string Left = "left";
+    public const string Right = "right";
 }
