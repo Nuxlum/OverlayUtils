@@ -45,6 +45,8 @@ The stage checklist lives in `PORTING.md`.
 ## Backlog
 
 - [ ] CI: GitHub Actions on windows-latest running build + self-test
+- [ ] First-run setup for friends: guide a new user through full mode and
+  connecting Discord without reading docs. After stage 7 (Discord).
 - [ ] Python leftover to drop in the port: temporary diagnostics in
   `_Overlay.show()` (`_diag_windows`, "DIAGNOSTICA TEMPORANEA")
 
