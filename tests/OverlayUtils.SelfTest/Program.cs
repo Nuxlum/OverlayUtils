@@ -394,6 +394,17 @@ string RepoRoot()
     Check(nav.Footer().Any(f => f.Keys == "Esc" && f.Label == Loc.T("Overlay.Footer.Back")), "footer: Esc goes back on Settings");
 }
 
+// --- Overlay platform -------------------------------------------------------
+{
+    foreach (var cls in new[] { "Shell_TrayWnd", "Shell_SecondaryTrayWnd", "Progman", "WorkerW" })
+        Check(ShellWindows.IsShellClass(cls), $"{cls} is a shell window");
+    Check(!ShellWindows.IsShellClass("UnityWndClass") && !ShellWindows.IsShellClass(""), "games are not shell windows");
+
+    byte[] palette = [0x99, 0xEB, 0xFF, 0, 0x4C, 0xC2, 0xFF, 0, 0, 0x78, 0xD4, 0];
+    Check(AccentPalette.LightVariant(palette) == ((byte)0x4C, (byte)0xC2, (byte)0xFF), "light accent is entry 1");
+    Check(AccentPalette.LightVariant([1, 2, 3]) is null && AccentPalette.LightVariant(null) is null, "short palette ignored");
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;
