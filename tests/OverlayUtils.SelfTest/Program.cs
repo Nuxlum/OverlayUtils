@@ -373,6 +373,17 @@ string RepoRoot()
     Check(nav.Index == 2 && nav.Segment == 1 && rc.Effect == NavEffect.Redraw && nav.IsPending(2, 1),
         "Click selects the row and segment, then acts as A");
 
+    log.Clear();
+    var rc2 = nav.Click(2, 1);
+    Check(rc2.Effect == NavEffect.HideAndRun, "second Click on the same segment fires the confirm");
+    Run(rc2);
+    Check(log.SequenceEqual(["Restart"]), "the clicked option ran");
+    log.Clear();
+    nav.Click(2, 1);
+    var rc3 = nav.Click(2, 2);
+    Check(rc3.Effect == NavEffect.Redraw && nav.IsPending(2, 2) && !nav.IsPending(2, 1) && log.Count == 0,
+        "Click on another segment re-arms instead of running");
+
     // Footer.
     var footer = nav.Footer();
     Check(footer.Any(f => f.Keys == "Esc" && f.Label == Loc.T("Overlay.Footer.Close")), "footer: Esc closes on Tabs");

@@ -118,9 +118,17 @@ public sealed class OverlayNavigator
     {
         var items = Items;
         if (index < 0 || index >= items.Count || !IsSelectable(items[index])) return None;
-        Select(index);
+        // Re-selecting the current row would clear a pending confirm, so a second click could never fire it.
+        if (index != Index) Select(index);
         if (segment is { } s && items[index].Kind == ItemKind.Segmented)
-            Segment = Math.Clamp(s, 0, Math.Max(items[index].Options().Count - 1, 0));
+        {
+            s = Math.Clamp(s, 0, Math.Max(items[index].Options().Count - 1, 0));
+            if (s != Segment)
+            {
+                Segment = s;
+                _pending = null;
+            }
+        }
         return Activate();
     }
 
