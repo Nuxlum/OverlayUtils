@@ -23,6 +23,8 @@ names below match the banners in `app.py`).
 Status: `[x]` done, `[~]` written but not yet tested on Windows, `[ ]` to do.
 
 ### Stage 1 - tray, hotkeys, modes  `[~]`
+Builds on Windows with 0 warnings and the self-test passes; the manual
+tests below are still to do.
 - [~] Solution layout, two launchers, self-contained build, signing script
 - [~] Config compatible with the Python `config.json` (unknown keys preserved)
 - [~] Migration from `%APPDATA%\AppUtili`; detection and removal of the old install

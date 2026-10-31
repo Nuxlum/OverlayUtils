@@ -56,3 +56,7 @@ The stage checklist lives in `PORTING.md`.
   passes (Linux); App not yet compiled - needs a Windows build.
 - 2026-10-31 - Took over the fork; mapped the Python codebase, wrote the
   orientation docs and the code-map generator.
+- 2026-10-31 - First Windows build (.NET SDK 10.0.403): the only errors
+  were missing `using System.IO;` in ModeSwitcher and TrayController (WPF
+  projects leave System.IO out of the implicit usings). 0 warnings, self-test
+  159/159, app starts in standard mode with nothing logged but the start line.
