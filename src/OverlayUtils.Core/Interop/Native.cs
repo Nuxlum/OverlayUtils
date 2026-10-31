@@ -176,6 +176,26 @@ internal static partial class Native
     [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     public static partial nint SetWindowLongPtr(nint hWnd, int index, nint value);
 
+    // --- DWM (overlay look) ----------------------------------------------------
+    public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    public const int DWMWA_BORDER_COLOR = 34;
+    public const int DWMWA_SYSTEMBACKDROP_TYPE = 38;   // Windows 11 22621+
+    public const int DWMWCP_ROUND = 2;
+    public const int DWMSBT_NONE = 1;
+    public const int DWMSBT_TRANSIENTWINDOW = 3;       // acrylic
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MARGINS { public int Left, Right, Top, Bottom; }
+
+    /// <summary>Returns an HRESULT (0 = S_OK).</summary>
+    [LibraryImport("dwmapi.dll")]
+    public static partial int DwmSetWindowAttribute(nint hWnd, int attribute, ref int value, int size);
+
+    /// <summary>Returns an HRESULT (0 = S_OK).</summary>
+    [LibraryImport("dwmapi.dll")]
+    public static partial int DwmExtendFrameIntoClientArea(nint hWnd, ref MARGINS margins);
+
     // --- monitors -----------------------------------------------------------
     public const uint MONITOR_DEFAULTTONEAREST = 2;
     public const int MDT_EFFECTIVE_DPI = 0;

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using OverlayUtils.Core.Config;
 using OverlayUtils.Core.Diagnostics;
 using OverlayUtils.Core.Interop;
@@ -58,10 +59,8 @@ internal sealed class OverlayController : IDisposable
         _window.RowClicked += OnRowClicked;
         _window.Closing += OnClosing;
 
-        _hwnd = new WindowInteropHelper(_window).EnsureHandle();
-        // Out of Alt+Tab even if WPF's hidden owner changes, as Python does.
-        var style = Native.GetWindowLongPtr(_hwnd, Native.GWL_EXSTYLE);
-        Native.SetWindowLongPtr(_hwnd, Native.GWL_EXSTYLE, (style | Native.WS_EX_TOOLWINDOW) & ~Native.WS_EX_APPWINDOW);
+        _hwnd = new WindowInteropHelper(_window).EnsureHandle(); // the window applies its chrome and backdrop here
+        UpdateAccent();
         HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc);
 
         _focusTimer = Timer(FocusCheck, WatchFocus);
@@ -70,6 +69,7 @@ internal sealed class OverlayController : IDisposable
 
         _config.Changed += OnConfigChanged;
         Loc.LanguageChanged += OnLanguageChanged;
+        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
     }
 
     public bool IsOpen => _open;
@@ -105,7 +105,7 @@ internal sealed class OverlayController : IDisposable
             _navigator.Reset(cfg.HiddenTabs);
             var sizeFactor = OverlayLayout.SizeFactor(cfg.OverlaySize, _monitors.Current, _monitors.ForRole(MonitorRole.Tv));
             _vm.SizeFactor = sizeFactor;
-            if (AccentPalette.Read() is { } accent) _vm.AccentBrush = Frozen(Color.FromRgb(accent.R, accent.G, accent.B));
+            UpdateAccent();
             Render(refreshSelection: false);
 
             // Placed while still hidden, so a DPI change on the target monitor happens before the first frame.
@@ -114,12 +114,14 @@ internal sealed class OverlayController : IDisposable
             _window.Height = _placement.Height / dpiScale;
             Place();
 
+            _window.PrepareOpening(cfg.OverlaySide);
             _window.Show();
             Place(); // Show must not have moved it
             _open = true;
             WindowFocus.Force(_hwnd);
             _window.Activate();
             _window.Focus();
+            _window.RefreshBackdrop();
 
             _hadFocus = false;
             _focusTimer.Start();
@@ -269,6 +271,30 @@ internal sealed class OverlayController : IDisposable
         if (_open) Render(refreshSelection: true);
     });
 
+    void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+    {
+        // The accent and "Transparency effects" changes both arrive as General (ImmersiveColorSet).
+        if (e.Category is not (UserPreferenceCategory.General or UserPreferenceCategory.Color)) return;
+        OnUi(() =>
+        {
+            try
+            {
+                UpdateAccent();
+                _window.RefreshBackdrop();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Overlay preference change", ex);
+            }
+        });
+    }
+
+    void UpdateAccent()
+    {
+        var accent = WindowEffects.Accent();
+        if ((_vm.AccentBrush as SolidColorBrush)?.Color != accent) _vm.AccentBrush = Frozen(accent);
+    }
+
     void OnClosing(object? sender, CancelEventArgs e)
     {
         // Created once for the whole session: never destroyed while the app runs (Alt+F4 is already swallowed).
@@ -309,6 +335,7 @@ internal sealed class OverlayController : IDisposable
         _disposed = true;
         _config.Changed -= OnConfigChanged;
         Loc.LanguageChanged -= OnLanguageChanged;
+        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         _focusTimer.Stop();
         _clockTimer.Stop();
         _pendingTimer.Stop();

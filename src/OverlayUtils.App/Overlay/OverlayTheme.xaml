@@ -8,6 +8,8 @@
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
     <SolidColorBrush x:Key="Bg" Color="#202020" />
+    <!-- Panel background over the acrylic backdrop: Bg at about 70 %, so text keeps its contrast over bright games. -->
+    <SolidColorBrush x:Key="AcrylicBg" Color="#B3202020" />
     <SolidColorBrush x:Key="Surface" Color="#2D2D2D" />
     <SolidColorBrush x:Key="Line" Color="#3E3E3E" />
     <SolidColorBrush x:Key="Text" Color="#FFFFFF" />

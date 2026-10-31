@@ -287,77 +287,135 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <DockPanel>
-        <DockPanel.LayoutTransform>
-            <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
-        </DockPanel.LayoutTransform>
+    <!-- Panel: its background is Bg, or AcrylicBg over the backdrop; it slides and fades in on open. -->
+    <Border x:Name="Panel" Background="{DynamicResource PanelBg}">
+        <Border.RenderTransform>
+            <TranslateTransform x:Name="Slide" />
+        </Border.RenderTransform>
+        <DockPanel>
+            <DockPanel.LayoutTransform>
+                <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
+            </DockPanel.LayoutTransform>
 
-        <!-- Header (Python _render_header): app name, then gear, monitor profile and clock from the right. -->
-        <StackPanel DockPanel.Dock="Top">
-            <Grid Height="28" Margin="20,14,18,10">
-                <TextBlock Text="{Binding Title}" FontFamily="{StaticResource DisplayFont}" FontSize="20"
-                           FontWeight="SemiBold" VerticalAlignment="Center" />
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Border Width="24" Height="24" CornerRadius="12" VerticalAlignment="Center"
-                            MouseLeftButtonDown="OnGearMouseDown">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="Background" Value="Transparent" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsOnPage}" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource Surface}" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <TextBlock Text="{x:Static core:Glyphs.Settings}" FontSize="15">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
-                                    <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <!-- Header (Python _render_header): app name, then gear, monitor profile and clock from the right. -->
+            <StackPanel DockPanel.Dock="Top">
+                <Grid Height="28" Margin="20,14,18,10">
+                    <TextBlock Text="{Binding Title}" FontFamily="{StaticResource DisplayFont}" FontSize="20"
+                               FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Border Width="24" Height="24" CornerRadius="12" VerticalAlignment="Center"
+                                MouseLeftButtonDown="OnGearMouseDown">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="Transparent" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsOnPage}" Value="True">
-                                            <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+                                            <Setter Property="Background" Value="{StaticResource Surface}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Border>
-                    <Border Height="24" CornerRadius="12" Margin="8,0,0,0" Padding="10,0,7,0"
-                            VerticalAlignment="Center" Background="{StaticResource Surface}">
-                        <Border.Style>
-                            <Style TargetType="Border">
+                            </Border.Style>
+                            <TextBlock Text="{x:Static core:Glyphs.Settings}" FontSize="15">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                                        <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsOnPage}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Border>
+                        <Border Height="24" CornerRadius="12" Margin="8,0,0,0" Padding="10,0,7,0"
+                                VerticalAlignment="Center" Background="{StaticResource Surface}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ProfileName}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="8" Height="8" Fill="{Binding ProfileBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding ProfileName}" Margin="5,0,0,0" MaxWidth="110" FontSize="12"
+                                           FontWeight="SemiBold" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="{Binding Clock}" Margin="10,0,0,0" FontSize="14" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Tab strip, or on Settings/Info the page title with the back chevron. -->
+                <Grid Height="34">
+                    <ItemsControl ItemsSource="{Binding Tabs}" Focusable="False" Margin="18,0,0,0">
+                        <ItemsControl.Style>
+                            <Style TargetType="ItemsControl">
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ProfileName}" Value="">
+                                    <DataTrigger Binding="{Binding IsOnPage}" Value="True">
                                         <Setter Property="Visibility" Value="Collapsed" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </Border.Style>
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="8" Height="8" Fill="{Binding ProfileBrush}" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding ProfileName}" Margin="5,0,0,0" MaxWidth="110" FontSize="12"
-                                       FontWeight="SemiBold" VerticalAlignment="Center"
-                                       TextTrimming="CharacterEllipsis" />
+                        </ItemsControl.Style>
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,18,0">
+                                    <TextBlock x:Name="TabText" Text="{Binding Title}" Height="28" Padding="0,5,0,0"
+                                               FontSize="14" FontWeight="SemiBold" VerticalAlignment="Top"
+                                               Foreground="{StaticResource Subtle}" />
+                                    <Rectangle x:Name="Underline" Height="3" RadiusX="1.5" RadiusY="1.5"
+                                               Margin="0,26,0,0" VerticalAlignment="Top" Visibility="Collapsed"
+                                               Fill="{DynamicResource Accent}" />
+                                </Grid>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                        <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource Text}" />
+                                        <Setter TargetName="Underline" Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Grid Margin="14,0" Background="Transparent" MouseLeftButtonDown="OnBackMouseDown">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsOnPage}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <StackPanel Orientation="Horizontal" Height="28" VerticalAlignment="Top">
+                            <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.ChevronLeft}"
+                                       FontSize="11" Width="20" Foreground="{StaticResource Muted}" />
+                            <TextBlock Text="{Binding PageTitle}" Margin="4,0,0,0" FontSize="15" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
                         </StackPanel>
-                    </Border>
-                    <TextBlock Text="{Binding Clock}" Margin="10,0,0,0" FontSize="14" FontWeight="SemiBold"
-                               VerticalAlignment="Center" />
-                </StackPanel>
-            </Grid>
+                    </Grid>
+                </Grid>
+                <Rectangle Style="{StaticResource Separator}" Margin="14,0,14,4" />
+            </StackPanel>
 
-            <!-- Tab strip, or on Settings/Info the page title with the back chevron. -->
-            <Grid Height="34">
-                <ItemsControl ItemsSource="{Binding Tabs}" Focusable="False" Margin="18,0,0,0">
-                    <ItemsControl.Style>
-                        <Style TargetType="ItemsControl">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsOnPage}" Value="True">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ItemsControl.Style>
+            <!--
+              Footer (Python _render_footer), pinned to the bottom on every tab and page. The Viewbox only shrinks it
+              when a language's labels are wider than the panel.
+            -->
+            <Viewbox DockPanel.Dock="Bottom" Height="20" Margin="20,0,14,14" HorizontalAlignment="Left"
+                     Stretch="Uniform" StretchDirection="DownOnly">
+                <ItemsControl ItemsSource="{Binding Footer}" Focusable="False">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <StackPanel Orientation="Horizontal" />
@@ -365,92 +423,40 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Grid Margin="0,0,18,0">
-                                <TextBlock x:Name="TabText" Text="{Binding Title}" Height="28" Padding="0,5,0,0"
-                                           FontSize="14" FontWeight="SemiBold" VerticalAlignment="Top"
-                                           Foreground="{StaticResource Subtle}" />
-                                <Rectangle x:Name="Underline" Height="3" RadiusX="1.5" RadiusY="1.5"
-                                           Margin="0,26,0,0" VerticalAlignment="Top" Visibility="Collapsed"
-                                           Fill="{DynamicResource Accent}" />
-                            </Grid>
-                            <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                                    <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource Text}" />
-                                    <Setter TargetName="Underline" Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </DataTemplate.Triggers>
+                            <StackPanel Orientation="Horizontal" Height="20" Margin="0,0,12,0">
+                                <Border Style="{StaticResource Keycap}" Padding="5,0">
+                                    <TextBlock Style="{StaticResource KeycapText}" Text="{Binding Keys}" />
+                                </Border>
+                                <TextBlock Text="{Binding Label}" Margin="5,0,0,0" FontSize="12"
+                                           VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
+                            </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <Grid Margin="14,0" Background="Transparent" MouseLeftButtonDown="OnBackMouseDown">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsOnPage}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-                    <StackPanel Orientation="Horizontal" Height="28" VerticalAlignment="Top">
-                        <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.ChevronLeft}"
-                                   FontSize="11" Width="20" Foreground="{StaticResource Muted}" />
-                        <TextBlock Text="{Binding PageTitle}" Margin="4,0,0,0" FontSize="15" FontWeight="SemiBold"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
-                </Grid>
-            </Grid>
-            <Rectangle Style="{StaticResource Separator}" Margin="14,0,14,4" />
-        </StackPanel>
+            </Viewbox>
 
-        <!--
-          Footer (Python _render_footer), pinned to the bottom on every tab and page. The Viewbox only shrinks it
-          when a language's labels are wider than the panel.
-        -->
-        <Viewbox DockPanel.Dock="Bottom" Height="20" Margin="20,0,14,14" HorizontalAlignment="Left"
-                 Stretch="Uniform" StretchDirection="DownOnly">
-            <ItemsControl ItemsSource="{Binding Footer}" Focusable="False">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Orientation="Horizontal" Height="20" Margin="0,0,12,0">
-                            <Border Style="{StaticResource Keycap}" Padding="5,0">
-                                <TextBlock Style="{StaticResource KeycapText}" Text="{Binding Keys}" />
-                            </Border>
-                            <TextBlock Text="{Binding Label}" Margin="5,0,0,0" FontSize="12"
-                                       VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
-                        </StackPanel>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </Viewbox>
+            <!-- Description of the selected row (Python _render_description): two lines, hidden when empty. -->
+            <StackPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Description}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <Rectangle Style="{StaticResource Separator}" />
+                <TextBlock Text="{Binding Description}" Margin="20,9,20,2" Height="34" FontSize="12" LineHeight="17"
+                           LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                           Foreground="{StaticResource Muted}" />
+            </StackPanel>
 
-        <!-- Description of the selected row (Python _render_description): two lines, hidden when empty. -->
-        <StackPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
-            <StackPanel.Style>
-                <Style TargetType="StackPanel">
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding Description}" Value="">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </StackPanel.Style>
-            <Rectangle Style="{StaticResource Separator}" />
-            <TextBlock Text="{Binding Description}" Margin="20,9,20,2" Height="34" FontSize="12" LineHeight="17"
-                       LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
-                       Foreground="{StaticResource Muted}" />
-        </StackPanel>
-
-        <ScrollViewer x:Name="Scroller" Focusable="False" VerticalScrollBarVisibility="Hidden"
-                      HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl x:Name="RowList" ItemsSource="{Binding Rows}" Focusable="False" Margin="14,0,14,8"
-                          ItemTemplateSelector="{StaticResource RowTemplates}" />
-        </ScrollViewer>
-    </DockPanel>
+            <ScrollViewer x:Name="Scroller" Focusable="False" VerticalScrollBarVisibility="Hidden"
+                          HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl x:Name="RowList" ItemsSource="{Binding Rows}" Focusable="False" Margin="14,0,14,8"
+                              ItemTemplateSelector="{StaticResource RowTemplates}" />
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
 </Window>

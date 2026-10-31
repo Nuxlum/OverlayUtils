@@ -3,7 +3,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using OverlayUtils.Core.Config;
 using OverlayUtils.Core.Diagnostics;
 using OverlayUtils.Core.Overlay;
 
@@ -16,6 +18,9 @@ namespace OverlayUtils.App.Overlay;
 internal sealed partial class OverlayWindow : Window
 {
     const string AccentKey = "Accent";
+    const string PanelBgKey = "PanelBg";
+    static readonly Duration OpenDuration = TimeSpan.FromMilliseconds(150);
+    const double OpenSlide = 24; // DIPs
 
     OverlayViewModel? _vm;
 
@@ -23,6 +28,12 @@ internal sealed partial class OverlayWindow : Window
     {
         InitializeComponent();
         Resources[AccentKey] = new SolidColorBrush(OverlayViewModel.FallbackAccent);
+        Resources[PanelBgKey] = FindResource("Bg");
+        SourceInitialized += (_, _) =>
+        {
+            WindowEffects.ApplyChrome(this);
+            RefreshBackdrop();
+        };
     }
 
     public event Action<OverlayCommand>? CommandIssued;
@@ -47,6 +58,46 @@ internal sealed partial class OverlayWindow : Window
         else if (e.PropertyName == nameof(OverlayViewModel.Rows))
             // After the new rows are laid out, so their containers exist.
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, BringSelectedIntoView);
+    }
+
+    /// <summary>
+    /// Acrylic with a translucent panel where Windows allows it, else the solid palette. The controller calls it
+    /// after every show: DWM keeps the acrylic only if it is set while the window is visible.
+    /// </summary>
+    public void RefreshBackdrop()
+    {
+        try
+        {
+            if (WindowEffects.TryApplyAcrylic(this))
+            {
+                Resources[PanelBgKey] = FindResource("AcrylicBg");
+                return;
+            }
+            SetResourceReference(BackgroundProperty, "Bg");
+            Resources[PanelBgKey] = FindResource("Bg");
+        }
+        catch (Exception e)
+        {
+            Log.Error("Overlay backdrop", e);
+        }
+    }
+
+    /// <summary>
+    /// Call right before Show: the panel slides in from its side of the screen and fades in, unless Windows
+    /// "Animation effects" is off. Only the content moves (the window stays where the controller put it) and
+    /// nothing waits for it, so focus is not delayed. Closing is never animated.
+    /// </summary>
+    public void PrepareOpening(string side)
+    {
+        Panel.BeginAnimation(OpacityProperty, null);
+        Slide.BeginAnimation(TranslateTransform.XProperty, null);
+        if (!SystemParameters.ClientAreaAnimation) return;
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var from = side == OverlaySides.Right ? OpenSlide : -OpenSlide;
+        Panel.BeginAnimation(OpacityProperty,
+            new DoubleAnimation(0, 1, OpenDuration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
+        Slide.BeginAnimation(TranslateTransform.XProperty,
+            new DoubleAnimation(from, 0, OpenDuration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
     }
 
     void BringSelectedIntoView()
