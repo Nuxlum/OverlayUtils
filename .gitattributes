@@ -1,0 +1,14 @@
+# Normalise line endings in the repo (LF), check out per platform.
+* text=auto
+
+# Windows scripts and VS files must keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.sln text eol=crlf
+*.csproj text eol=crlf
+*.props text eol=crlf
+*.resx text eol=crlf
+
+*.ico binary
+*.png binary

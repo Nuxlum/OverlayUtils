@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The WPF application itself, as a library. It is started by one of two
+    thin launcher exes that differ only in their manifest:
+      OverlayUtils.exe           standard mode (uiAccess="false")
+      OverlayUtils.UIAccess.exe  full mode     (uiAccess="true", signed,
+                                 must live in Program Files)
+    Windows reads UIAccess from the exe manifest before any code runs, so one
+    exe cannot do both. See docs/ARCHITECTURE.md, "Two modes".
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>Library</OutputType>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>OverlayUtils.App</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OverlayUtils.Core\OverlayUtils.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WinForms and WPF both define these names; we mean the WPF ones. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+</Project>

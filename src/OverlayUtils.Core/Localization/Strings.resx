@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English (neutral). Every key must also exist in Strings.it.resx: the self-test checks it. -->
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Dialog.AlreadyRunning" xml:space="preserve"><value>OverlayUtils is already running: look for its icon near the clock.</value></data>
+  <data name="Dialog.ChooseSwitcher.Filter" xml:space="preserve"><value>MonitorSwitcher|MonitorSwitcher.exe|Programs|*.exe</value></data>
+  <data name="Dialog.FullMode.Cancelled" xml:space="preserve"><value>Administrator permission was not given, so nothing was changed.</value></data>
+  <data name="Dialog.FullMode.CopyFailed" xml:space="preserve"><value>Could not copy OverlayUtils. Details are in errors.log (tray menu → Open settings folder).</value></data>
+  <data name="Dialog.FullMode.DisableBody" xml:space="preserve"><value>OverlayUtils will go back to standard mode: it moves to your user folder, removes itself from Program Files and removes the certificate it added.
+
+The overlay will no longer appear over fullscreen games. Windows will ask for administrator permission once.</value></data>
+  <data name="Dialog.FullMode.DisableIncomplete" xml:space="preserve"><value>OverlayUtils is now in standard mode, but the full-mode copy in Program Files could not be removed. Try again from the tray menu (Overlay over fullscreen games).</value></data>
+  <data name="Dialog.FullMode.EnableBody" xml:space="preserve"><value>Full mode lets the overlay appear on top of fullscreen games.
+
+Windows allows this only for signed programs installed in Program Files, so OverlayUtils will:
+• trust the certificate it is signed with on this PC (only if Windows does not trust it already),
+• copy itself to Program Files,
+• remove the old AppUtili, if present.
+
+Trusting a certificate means Windows will accept anything signed with it: do this only if you trust whoever gave you OverlayUtils. You can undo everything later from this same menu.
+
+Windows will ask for administrator permission once.</value></data>
+  <data name="Dialog.FullMode.Failed" xml:space="preserve"><value>Something went wrong. Details are in errors.log (tray menu → Open settings folder).</value></data>
+  <data name="Dialog.FullMode.LaunchFailed" xml:space="preserve"><value>Full mode is installed, but Windows refused to start it ({0}). OverlayUtils keeps running in standard mode.</value></data>
+  <data name="Dialog.FullMode.NotSigned" xml:space="preserve"><value>This copy of OverlayUtils is not signed, so Windows does not allow full mode. Use a signed release, or build one with scripts\build.ps1.</value></data>
+  <data name="Dialog.FullMode.Untrusted" xml:space="preserve"><value>This copy is signed with a certificate that Windows does not trust and that is not a self-signed code-signing certificate. Full mode was not enabled.</value></data>
+  <data name="Dialog.Legacy.Body" xml:space="preserve"><value>This removes the old AppUtili: it stops it, deletes it from Program Files, removes its start-up task and the certificate it installed. Your settings have already been copied to OverlayUtils.
+
+Windows will ask for administrator permission once.</value></data>
+  <data name="Dialog.Legacy.Done" xml:space="preserve"><value>The old AppUtili has been removed.</value></data>
+  <data name="Language.en" xml:space="preserve"><value>English</value></data>
+  <data name="Language.it" xml:space="preserve"><value>Italiano</value></data>
+  <data name="Menu.Exit" xml:space="preserve"><value>Exit</value></data>
+  <data name="Menu.FullMode" xml:space="preserve"><value>Overlay over fullscreen games</value></data>
+  <data name="Menu.FullMode.Disable" xml:space="preserve"><value>Disable…</value></data>
+  <data name="Menu.FullMode.Enable" xml:space="preserve"><value>Enable…</value></data>
+  <data name="Menu.FullMode.StatusOff" xml:space="preserve"><value>Off (standard mode)</value></data>
+  <data name="Menu.FullMode.StatusOn" xml:space="preserve"><value>On (full mode)</value></data>
+  <data name="Menu.HomeKey" xml:space="preserve"><value>Home key</value></data>
+  <data name="Menu.HomeKey.AltTab" xml:space="preserve"><value>Alt+Tab</value></data>
+  <data name="Menu.HomeKey.None" xml:space="preserve"><value>Default (opens the browser)</value></data>
+  <data name="Menu.HomeKey.Windows" xml:space="preserve"><value>Windows key</value></data>
+  <data name="Menu.Language" xml:space="preserve"><value>Language</value></data>
+  <data name="Menu.Language.Auto" xml:space="preserve"><value>Automatic ({0})</value></data>
+  <data name="Menu.Legacy" xml:space="preserve"><value>Remove the old AppUtili…</value></data>
+  <data name="Menu.Monitor" xml:space="preserve"><value>Monitor</value></data>
+  <data name="Menu.Monitor.ChooseSwitcher" xml:space="preserve"><value>Choose MonitorSwitcher.exe…</value></data>
+  <data name="Menu.Monitor.DeskRole" xml:space="preserve"><value>Desk profile (Ctrl+Alt+↓)</value></data>
+  <data name="Menu.Monitor.Download" xml:space="preserve"><value>Download MonitorSwitcher</value></data>
+  <data name="Menu.Monitor.None" xml:space="preserve"><value>No profiles found</value></data>
+  <data name="Menu.Monitor.OpenProfiles" xml:space="preserve"><value>Open profiles folder</value></data>
+  <data name="Menu.Monitor.RoleNone" xml:space="preserve"><value>None</value></data>
+  <data name="Menu.Monitor.SwitcherFound" xml:space="preserve"><value>MonitorSwitcher: {0}</value></data>
+  <data name="Menu.Monitor.SwitcherMissing" xml:space="preserve"><value>MonitorSwitcher not found</value></data>
+  <data name="Menu.Monitor.SwitcherSearching" xml:space="preserve"><value>Looking for MonitorSwitcher…</value></data>
+  <data name="Menu.Monitor.TvRole" xml:space="preserve"><value>TV profile (Ctrl+Alt+↑)</value></data>
+  <data name="Menu.Notifications" xml:space="preserve"><value>Notifications</value></data>
+  <data name="Menu.OpenSettingsFolder" xml:space="preserve"><value>Open settings folder</value></data>
+  <data name="Menu.Startup" xml:space="preserve"><value>Start with Windows</value></data>
+  <data name="Notify.HomeKeyBusy" xml:space="preserve"><value>The Home key is already used by another program (often the keyboard's own software).</value></data>
+  <data name="Notify.HotkeyBusy" xml:space="preserve"><value>{0} is already used by another program.</value></data>
+  <data name="Notify.LegacyRunning" xml:space="preserve"><value>The old AppUtili is still running and may clash with OverlayUtils. Remove it from the tray menu.</value></data>
+  <data name="Notify.Migrated" xml:space="preserve"><value>Settings imported from AppUtili.</value></data>
+  <data name="Notify.MonitorSwitched" xml:space="preserve"><value>Monitor: {0}</value></data>
+  <data name="Notify.NoProfile" xml:space="preserve"><value>No monitor profile is assigned to this shortcut.</value></data>
+  <data name="Notify.StandardMode" xml:space="preserve"><value>OverlayUtils is now in standard mode.</value></data>
+  <data name="Notify.StartupFailed" xml:space="preserve"><value>Could not change the start-with-Windows setting.</value></data>
+  <data name="Notify.StartupOff" xml:space="preserve"><value>OverlayUtils will no longer start with Windows.</value></data>
+  <data name="Notify.StartupOn" xml:space="preserve"><value>OverlayUtils will start with Windows.</value></data>
+  <data name="Notify.SwitcherFailed" xml:space="preserve"><value>Could not start MonitorSwitcher.</value></data>
+  <data name="Notify.SwitcherMissing" xml:space="preserve"><value>MonitorSwitcher not found: download it or choose where it is from the tray menu (Monitor).</value></data>
+  <data name="Tooltip.Mode.Full" xml:space="preserve"><value>Full mode</value></data>
+  <data name="Tooltip.Mode.Standard" xml:space="preserve"><value>Standard mode</value></data>
+  <data name="Tooltip.Monitor" xml:space="preserve"><value>Monitor: {0}</value></data>
+</root>

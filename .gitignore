@@ -1,16 +1,20 @@
-# Output di PyInstaller (rigenerati da build.bat)
-build/
+# .NET build output
+bin/
+obj/
 dist/
-*.spec
+*.user
+.vs/
+*.binlog
 
-# Python
+# Python reference (reference/python)
+build/
+*.spec
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 
-# Configurazione e token: l'app li salva in %APPDATA%\AppUtili, ma se
-# finissero qui per sbaglio non vanno pubblicati
+# Settings and tokens live in %APPDATA%\OverlayUtils; never commit copies
 config.json
 spotify_token.json
 spotify_cache/
@@ -18,7 +22,7 @@ discord_token.json
 discord_recent.json
 discord_cache/
 
-# Certificati e chiavi di firma
+# Certificates and signing keys
 *.pfx
 *.p12
 *.cer

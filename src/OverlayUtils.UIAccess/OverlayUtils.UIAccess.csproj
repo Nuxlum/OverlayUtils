@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Full-mode launcher. Identical to OverlayUtils.exe except for the manifest,
+    which asks for UIAccess. Windows only starts it when it is signed with a
+    trusted certificate and lives in a protected folder (Program Files); the
+    in-app "Enable full mode" step takes care of both.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>OverlayUtils.UIAccess</AssemblyName>
+    <RootNamespace>OverlayUtils.UIAccess</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\OverlayUtils.App\Assets\app.ico</ApplicationIcon>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OverlayUtils.App\OverlayUtils.App.csproj" />
+  </ItemGroup>
+</Project>

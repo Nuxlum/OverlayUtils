@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Everything that does not need WPF: configuration, localization, Win32
+    interop, services. Plain net10.0 with no NuGet packages, so it builds on
+    any OS (handy for CI and for quick checks); it only *runs* on Windows.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>OverlayUtils.Core</RootNamespace>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OverlayUtils.SelfTest" />
+    <InternalsVisibleTo Include="OverlayUtils.App" />
+    <AssemblyAttribute Include="System.Runtime.Versioning.SupportedOSPlatformAttribute">
+      <_Parameter1>windows</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Localization\Strings.resx" LogicalName="OverlayUtils.Core.Localization.Strings.resources" />
+    <EmbeddedResource Update="Localization\Strings.it.resx" LogicalName="OverlayUtils.Core.Localization.Strings.it.resources" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,128 @@
+using System.Runtime.InteropServices;
+
+namespace OverlayUtils.Core.Interop;
+
+/// <summary>Win32 declarations used across the app. Structs are blittable on purpose.</summary>
+internal static partial class Native
+{
+    // --- messages / hotkeys -------------------------------------------------
+    public const uint WM_HOTKEY = 0x0312;
+    public const uint WM_QUIT = 0x0012;
+    public const uint WM_APP = 0x8000;
+    public const uint PM_NOREMOVE = 0x0000;
+
+    public const uint MOD_ALT = 0x0001;
+    public const uint MOD_CONTROL = 0x0002;
+    public const uint MOD_SHIFT = 0x0004;
+    public const uint MOD_WIN = 0x0008;
+    public const uint MOD_NOREPEAT = 0x4000;
+
+    public const ushort VK_TAB = 0x09;
+    public const ushort VK_MENU = 0x12; // Alt
+    public const ushort VK_UP = 0x26;
+    public const ushort VK_DOWN = 0x28;
+    public const ushort VK_LWIN = 0x5B;
+    public const ushort VK_F1 = 0x70;
+    public const ushort VK_F4 = 0x73;
+    public const ushort VK_BROWSER_HOME = 0xAC;
+    public const ushort VK_D = 0x44;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT { public int X, Y; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MSG
+    {
+        public nint hwnd;
+        public uint message;
+        public nuint wParam;
+        public nint lParam;
+        public uint time;
+        public POINT pt;
+        public uint lPrivate;
+    }
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool RegisterHotKey(nint hWnd, int id, uint fsModifiers, uint vk);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool UnregisterHotKey(nint hWnd, int id);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetMessageW", SetLastError = true)]
+    public static partial int GetMessage(out MSG msg, nint hWnd, uint min, uint max);
+
+    [LibraryImport("user32.dll", EntryPoint = "PeekMessageW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool PeekMessage(out MSG msg, nint hWnd, uint min, uint max, uint remove);
+
+    [LibraryImport("user32.dll", EntryPoint = "PostThreadMessageW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool PostThreadMessage(uint threadId, uint msg, nuint wParam, nint lParam);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial uint GetCurrentThreadId();
+
+    // --- SendInput ----------------------------------------------------------
+    public const uint INPUT_KEYBOARD = 1;
+    public const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
+    public const uint KEYEVENTF_KEYUP = 0x0002;
+    public const uint KEYEVENTF_SCANCODE = 0x0008;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KEYBDINPUT
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public nint dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MOUSEINPUT
+    {
+        public int dx, dy;
+        public uint mouseData, dwFlags, time;
+        public nint dwExtraInfo;
+    }
+
+    /// <summary>Union sized like the native one (MOUSEINPUT is the largest member).</summary>
+    [StructLayout(LayoutKind.Explicit)]
+    public struct InputUnion
+    {
+        [FieldOffset(0)] public MOUSEINPUT mi;
+        [FieldOffset(0)] public KEYBDINPUT ki;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct INPUT
+    {
+        public uint type;
+        public InputUnion u;
+    }
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    public static partial uint SendInput(uint count, [In] INPUT[] inputs, int size);
+
+    // --- process token ------------------------------------------------------
+    public const uint TOKEN_QUERY = 0x0008;
+    public const int TokenElevation = 20;
+    public const int TokenUIAccess = 26;
+
+    [LibraryImport("kernel32.dll")]
+    public static partial nint GetCurrentProcess();
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool OpenProcessToken(nint process, uint access, out nint token);
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetTokenInformation(nint token, int infoClass, out uint value, uint size, out uint returned);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool CloseHandle(nint handle);
+}

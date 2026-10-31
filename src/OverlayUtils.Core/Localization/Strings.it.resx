@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Italian. Same keys as Strings.resx. -->
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Dialog.AlreadyRunning" xml:space="preserve"><value>OverlayUtils è già in esecuzione: cerca la sua icona vicino all'orologio.</value></data>
+  <data name="Dialog.ChooseSwitcher.Filter" xml:space="preserve"><value>MonitorSwitcher|MonitorSwitcher.exe|Programmi|*.exe</value></data>
+  <data name="Dialog.FullMode.Cancelled" xml:space="preserve"><value>Non sono stati concessi i permessi di amministratore, quindi non è cambiato niente.</value></data>
+  <data name="Dialog.FullMode.CopyFailed" xml:space="preserve"><value>Impossibile copiare OverlayUtils. I dettagli sono in errors.log (menu dell'icona → Apri la cartella delle impostazioni).</value></data>
+  <data name="Dialog.FullMode.DisableBody" xml:space="preserve"><value>OverlayUtils tornerà in modalità standard: si sposta nella tua cartella utente, si rimuove da Programmi e rimuove il certificato che aveva aggiunto.
+
+L'overlay non comparirà più sopra i giochi a schermo intero. Windows chiederà una volta i permessi di amministratore.</value></data>
+  <data name="Dialog.FullMode.DisableIncomplete" xml:space="preserve"><value>OverlayUtils ora è in modalità standard, ma la copia della modalità completa in Programmi non è stata rimossa. Riprova dal menu dell'icona (Overlay sopra i giochi a schermo intero).</value></data>
+  <data name="Dialog.FullMode.EnableBody" xml:space="preserve"><value>La modalità completa permette all'overlay di comparire sopra i giochi a schermo intero.
+
+Windows lo consente solo a programmi firmati e installati in Programmi, quindi OverlayUtils:
+• renderà attendibile su questo PC il certificato con cui è firmato (solo se Windows non lo considera già attendibile),
+• si copierà in Programmi,
+• rimuoverà la vecchia AppUtili, se presente.
+
+Rendere attendibile un certificato significa che Windows accetterà qualsiasi cosa firmata con esso: fallo solo se ti fidi di chi ti ha dato OverlayUtils. Puoi annullare tutto in seguito da questo stesso menu.
+
+Windows chiederà una volta i permessi di amministratore.</value></data>
+  <data name="Dialog.FullMode.Failed" xml:space="preserve"><value>Qualcosa è andato storto. I dettagli sono in errors.log (menu dell'icona → Apri la cartella delle impostazioni).</value></data>
+  <data name="Dialog.FullMode.LaunchFailed" xml:space="preserve"><value>La modalità completa è installata, ma Windows si è rifiutato di avviarla ({0}). OverlayUtils resta in modalità standard.</value></data>
+  <data name="Dialog.FullMode.NotSigned" xml:space="preserve"><value>Questa copia di OverlayUtils non è firmata, quindi Windows non consente la modalità completa. Usa una versione firmata o creala con scripts\build.ps1.</value></data>
+  <data name="Dialog.FullMode.Untrusted" xml:space="preserve"><value>Questa copia è firmata con un certificato che Windows non considera attendibile e che non è un certificato di firma del codice autofirmato. La modalità completa non è stata attivata.</value></data>
+  <data name="Dialog.Legacy.Body" xml:space="preserve"><value>Rimuove la vecchia AppUtili: la chiude, la cancella da Programmi, toglie l'attività di avvio e il certificato che aveva installato. Le tue impostazioni sono già state copiate in OverlayUtils.
+
+Windows chiederà una volta i permessi di amministratore.</value></data>
+  <data name="Dialog.Legacy.Done" xml:space="preserve"><value>La vecchia AppUtili è stata rimossa.</value></data>
+  <data name="Language.en" xml:space="preserve"><value>English</value></data>
+  <data name="Language.it" xml:space="preserve"><value>Italiano</value></data>
+  <data name="Menu.Exit" xml:space="preserve"><value>Esci</value></data>
+  <data name="Menu.FullMode" xml:space="preserve"><value>Overlay sopra i giochi a schermo intero</value></data>
+  <data name="Menu.FullMode.Disable" xml:space="preserve"><value>Disattiva…</value></data>
+  <data name="Menu.FullMode.Enable" xml:space="preserve"><value>Attiva…</value></data>
+  <data name="Menu.FullMode.StatusOff" xml:space="preserve"><value>Disattivato (modalità standard)</value></data>
+  <data name="Menu.FullMode.StatusOn" xml:space="preserve"><value>Attivo (modalità completa)</value></data>
+  <data name="Menu.HomeKey" xml:space="preserve"><value>Tasto Home</value></data>
+  <data name="Menu.HomeKey.AltTab" xml:space="preserve"><value>Alt+Tab</value></data>
+  <data name="Menu.HomeKey.None" xml:space="preserve"><value>Predefinito (apre il browser)</value></data>
+  <data name="Menu.HomeKey.Windows" xml:space="preserve"><value>Tasto Windows</value></data>
+  <data name="Menu.Language" xml:space="preserve"><value>Lingua</value></data>
+  <data name="Menu.Language.Auto" xml:space="preserve"><value>Automatica ({0})</value></data>
+  <data name="Menu.Legacy" xml:space="preserve"><value>Rimuovi la vecchia AppUtili…</value></data>
+  <data name="Menu.Monitor" xml:space="preserve"><value>Monitor</value></data>
+  <data name="Menu.Monitor.ChooseSwitcher" xml:space="preserve"><value>Scegli MonitorSwitcher.exe…</value></data>
+  <data name="Menu.Monitor.DeskRole" xml:space="preserve"><value>Profilo Scrivania (Ctrl+Alt+↓)</value></data>
+  <data name="Menu.Monitor.Download" xml:space="preserve"><value>Scarica MonitorSwitcher</value></data>
+  <data name="Menu.Monitor.None" xml:space="preserve"><value>Nessun profilo trovato</value></data>
+  <data name="Menu.Monitor.OpenProfiles" xml:space="preserve"><value>Apri la cartella dei profili</value></data>
+  <data name="Menu.Monitor.RoleNone" xml:space="preserve"><value>Nessuno</value></data>
+  <data name="Menu.Monitor.SwitcherFound" xml:space="preserve"><value>MonitorSwitcher: {0}</value></data>
+  <data name="Menu.Monitor.SwitcherMissing" xml:space="preserve"><value>MonitorSwitcher non trovato</value></data>
+  <data name="Menu.Monitor.SwitcherSearching" xml:space="preserve"><value>Ricerca di MonitorSwitcher…</value></data>
+  <data name="Menu.Monitor.TvRole" xml:space="preserve"><value>Profilo TV (Ctrl+Alt+↑)</value></data>
+  <data name="Menu.Notifications" xml:space="preserve"><value>Notifiche</value></data>
+  <data name="Menu.OpenSettingsFolder" xml:space="preserve"><value>Apri la cartella delle impostazioni</value></data>
+  <data name="Menu.Startup" xml:space="preserve"><value>Avvia con Windows</value></data>
+  <data name="Notify.HomeKeyBusy" xml:space="preserve"><value>Il tasto Home è già usato da un altro programma (spesso il software della tastiera).</value></data>
+  <data name="Notify.HotkeyBusy" xml:space="preserve"><value>{0} è già usato da un altro programma.</value></data>
+  <data name="Notify.LegacyRunning" xml:space="preserve"><value>La vecchia AppUtili è ancora in esecuzione e può entrare in conflitto con OverlayUtils. Rimuovila dal menu dell'icona.</value></data>
+  <data name="Notify.Migrated" xml:space="preserve"><value>Impostazioni importate da AppUtili.</value></data>
+  <data name="Notify.MonitorSwitched" xml:space="preserve"><value>Monitor: {0}</value></data>
+  <data name="Notify.NoProfile" xml:space="preserve"><value>Nessun profilo monitor è assegnato a questa scorciatoia.</value></data>
+  <data name="Notify.StandardMode" xml:space="preserve"><value>OverlayUtils ora è in modalità standard.</value></data>
+  <data name="Notify.StartupFailed" xml:space="preserve"><value>Impossibile cambiare l'avvio con Windows.</value></data>
+  <data name="Notify.StartupOff" xml:space="preserve"><value>OverlayUtils non partirà più all'avvio di Windows.</value></data>
+  <data name="Notify.StartupOn" xml:space="preserve"><value>OverlayUtils partirà all'avvio di Windows.</value></data>
+  <data name="Notify.SwitcherFailed" xml:space="preserve"><value>Impossibile avviare MonitorSwitcher.</value></data>
+  <data name="Notify.SwitcherMissing" xml:space="preserve"><value>MonitorSwitcher non trovato: scaricalo o indica dove si trova dal menu dell'icona (Monitor).</value></data>
+  <data name="Tooltip.Mode.Full" xml:space="preserve"><value>Modalità completa</value></data>
+  <data name="Tooltip.Mode.Standard" xml:space="preserve"><value>Modalità standard</value></data>
+  <data name="Tooltip.Monitor" xml:space="preserve"><value>Monitor: {0}</value></data>
+</root>
