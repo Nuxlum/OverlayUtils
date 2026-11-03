@@ -21,6 +21,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Gamepad input (stage 3); loaded only from the app folder. See third_party/SDL3/README.md. -->
+    <None Include="..\..\third_party\SDL3\SDL3.dll" Link="SDL3.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- WinForms and WPF both define these names; we mean the WPF ones. -->
     <Using Remove="System.Windows.Forms" />
     <Using Remove="System.Drawing" />
