@@ -88,6 +88,14 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Overlay.Footer.Select" xml:space="preserve"><value>Select</value></data>
   <data name="Overlay.Footer.Settings" xml:space="preserve"><value>Settings</value></data>
   <data name="Overlay.Footer.SettingsHold" xml:space="preserve"><value>Settings (hold)</value></data>
+  <data name="Overlay.Footer.Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Overlay.Footer.Drop" xml:space="preserve"><value>Drop</value></data>
+  <data name="Overlay.Footer.Move" xml:space="preserve"><value>Move</value></data>
+  <data name="Overlay.Footer.Mute" xml:space="preserve"><value>Mute</value></data>
+  <data name="Overlay.Footer.PickUp" xml:space="preserve"><value>Pick up</value></data>
+  <data name="Overlay.Footer.PlayPause" xml:space="preserve"><value>Play / pause</value></data>
+  <data name="Overlay.Footer.Track" xml:space="preserve"><value>Track</value></data>
+  <data name="Overlay.Footer.Volume" xml:space="preserve"><value>Volume</value></data>
   <data name="Overlay.Footer.Toggle" xml:space="preserve"><value>Turn on/off</value></data>
   <data name="Overlay.Info.Config" xml:space="preserve"><value>Configuration</value></data>
   <data name="Overlay.Info.Download" xml:space="preserve"><value>Download</value></data>

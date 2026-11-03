@@ -1,12 +1,13 @@
 namespace OverlayUtils.Core.Overlay;
 
-public enum ItemKind { Action, Segmented, Choice, Toggle, Expander, Info }
+public enum ItemKind { Action, Segmented, Choice, Toggle, Expander, Info, Slider, Media, Reorder }
 
-public enum OverlayPage { Tabs, Settings, Info }
+public enum OverlayPage { Tabs, Settings, Info, Sub }
 
 public enum OverlayCommand
 {
     Up, Down, Left, Right, LeftRepeat, RightRepeat, A, B, PrevTab, NextTab, Settings, WheelUp, WheelDown,
+    PrevTrack, NextTrack, PlayPause, Remove,
 }
 
 /// <summary>What the view must do after a command. The navigator never runs item callbacks itself.</summary>
@@ -41,4 +42,10 @@ public sealed class OverlayItem
     public bool Confirm { get; init; }                   // Segmented: second A within 3 s
     public bool OpensInfo { get; init; }                 // Action: A opens the Info page
     public Func<string>? Hint { get; init; }             // keycap or button text on the right
+    public string? Key { get; init; }                    // identity that survives list changes (Refresh)
+    public Func<IReadOnlyList<OverlayItem>>? SubPage { get; init; } // Action: A opens these rows as OverlayPage.Sub
+    public Action<int>? Move { get; init; }              // Reorder: move this entry by +-1 in its list
+    public Action? Commit { get; init; }                 // Reorder: drop the picked-up entry
+    public Action? Cancel { get; init; }                 // Reorder: put the picked-up entry back
+    public Action? RemoveEntry { get; init; }            // any row: the Remove command (Y on the pad)
 }

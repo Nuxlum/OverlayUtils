@@ -88,6 +88,14 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.Footer.Select" xml:space="preserve"><value>Seleziona</value></data>
   <data name="Overlay.Footer.Settings" xml:space="preserve"><value>Impostazioni</value></data>
   <data name="Overlay.Footer.SettingsHold" xml:space="preserve"><value>Impostazioni (tieni)</value></data>
+  <data name="Overlay.Footer.Cancel" xml:space="preserve"><value>Annulla</value></data>
+  <data name="Overlay.Footer.Drop" xml:space="preserve"><value>Rilascia</value></data>
+  <data name="Overlay.Footer.Move" xml:space="preserve"><value>Sposta</value></data>
+  <data name="Overlay.Footer.Mute" xml:space="preserve"><value>Muto</value></data>
+  <data name="Overlay.Footer.PickUp" xml:space="preserve"><value>Prendi</value></data>
+  <data name="Overlay.Footer.PlayPause" xml:space="preserve"><value>Play / pausa</value></data>
+  <data name="Overlay.Footer.Track" xml:space="preserve"><value>Traccia</value></data>
+  <data name="Overlay.Footer.Volume" xml:space="preserve"><value>Volume</value></data>
   <data name="Overlay.Footer.Toggle" xml:space="preserve"><value>Attiva/disattiva</value></data>
   <data name="Overlay.Info.Config" xml:space="preserve"><value>Configurazione</value></data>
   <data name="Overlay.Info.Download" xml:space="preserve"><value>Scarica</value></data>

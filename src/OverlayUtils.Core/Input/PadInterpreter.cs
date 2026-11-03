@@ -7,7 +7,7 @@ public enum PadButton { A, B, X, Y, Back, Guide, Start, LeftStick, RightStick, L
 
 public enum PadAxis { LeftX, LeftY, RightX, RightY, LeftTrigger, RightTrigger }
 
-public enum PadActionKind { ToggleOverlay, MonitorTv, MonitorDesk, Command }
+public enum PadActionKind { ToggleOverlay, MonitorTv, MonitorDesk, Command, VolumeDown, VolumeUp, MicMute }
 
 public readonly record struct PadAction(PadActionKind Kind, OverlayCommand Command = default);
 
@@ -48,7 +48,7 @@ public sealed class PadInterpreter
         public DateTimeOffset? BackSince; // Back pressed with nothing else held
         public bool LtDown, RtDown;
         public int StickXDir, StickYDir;
-        public readonly Dictionary<int, (OverlayCommand Repeat, DateTimeOffset Next)> Repeats = [];
+        public readonly Dictionary<int, (PadAction Repeat, DateTimeOffset Next)> Repeats = [];
     }
 
     private readonly TimeProvider _time;
@@ -66,7 +66,11 @@ public sealed class PadInterpreter
             if (value == _overlayOpen) return;
             _overlayOpen = value;
             // A Back hold that started before the change must not open Settings.
-            foreach (var state in _pads.Values) state.BackSince = null;
+            foreach (var state in _pads.Values)
+            {
+                state.BackSince = null;
+                state.Repeats.Clear();
+            }
         }
     }
     public bool CombosEnabled { get; set; } = true;
@@ -99,17 +103,14 @@ public sealed class PadInterpreter
 
     public IReadOnlyList<PadAction> Tick()
     {
-        if (!OverlayOpen)
-        {
-            foreach (var state in _pads.Values) state.Repeats.Clear();
-            return None;
-        }
         var now = _time.GetUtcNow();
         var actions = new List<PadAction>();
         foreach (var (pad, state) in _pads)
         {
             var mine = new List<PadAction>();
-            if (state.BackSince is { } since && now - since >= SettingsHold)
+            // Closed: only the Back+D-pad volume repeat runs, and only while Back is still held.
+            if (!OverlayOpen && (!CombosEnabled || !state.Held.Contains((int)PadButton.Back))) state.Repeats.Clear();
+            if (OverlayOpen && state.BackSince is { } since && now - since >= SettingsHold)
             {
                 state.BackSince = null;
                 state.BackConsumed = true;
@@ -119,7 +120,7 @@ public sealed class PadInterpreter
             {
                 if (now < next) continue;
                 state.Repeats[source] = (repeat, now + RepeatInterval);
-                mine.Add(Command(repeat));
+                mine.Add(repeat);
             }
             actions.AddRange(Emit(pad, mine));
         }
@@ -181,9 +182,15 @@ public sealed class PadInterpreter
             {
                 (int)PadButton.DpadUp => [new PadAction(PadActionKind.MonitorTv)],
                 (int)PadButton.DpadDown => [new PadAction(PadActionKind.MonitorDesk)],
+                (int)PadButton.DpadLeft => Volume(state, key, PadActionKind.VolumeDown),
+                (int)PadButton.DpadRight => Volume(state, key, PadActionKind.VolumeUp),
+                (int)PadButton.Y => [new PadAction(PadActionKind.MicMute)],
                 _ => None,
             };
         }
+
+        // LB/RB with Back held belong to the Back+RB chord (and the Moonlight quit chord): no media then.
+        var backHeld = state.Held.Contains((int)PadButton.Back);
 
         return key switch
         {
@@ -193,6 +200,10 @@ public sealed class PadInterpreter
             (int)PadButton.DpadRight => Navigate(state, key, OverlayCommand.Right, OverlayCommand.RightRepeat),
             (int)PadButton.A => [Command(OverlayCommand.A)],
             (int)PadButton.B => [Command(OverlayCommand.B)],
+            (int)PadButton.X => [Command(OverlayCommand.PlayPause)],
+            (int)PadButton.Y => [Command(OverlayCommand.Remove)],
+            (int)PadButton.LB when !backHeld => [Command(OverlayCommand.PrevTrack)],
+            (int)PadButton.RB when !backHeld => [Command(OverlayCommand.NextTrack)],
             LT => [Command(OverlayCommand.PrevTab)],
             RT => [Command(OverlayCommand.NextTab)],
             _ => None,
@@ -208,6 +219,9 @@ public sealed class PadInterpreter
         {
             state.BackSince = null;
             state.BackConsumed = false;
+            // The Back+D-pad volume repeat stops with Back.
+            foreach (var source in state.Repeats.Where(r => r.Value.Repeat.Kind != PadActionKind.Command).Select(r => r.Key).ToList())
+                state.Repeats.Remove(source);
         }
         if (!fire) return None;
         state.Armed = false;
@@ -252,8 +266,15 @@ public sealed class PadInterpreter
 
     private IReadOnlyList<PadAction> Navigate(Pad state, int source, OverlayCommand command, OverlayCommand repeat)
     {
-        state.Repeats[source] = (repeat, _time.GetUtcNow() + RepeatDelay);
+        state.Repeats[source] = (Command(repeat), _time.GetUtcNow() + RepeatDelay);
         return [Command(command)];
+    }
+
+    private IReadOnlyList<PadAction> Volume(Pad state, int source, PadActionKind kind)
+    {
+        var action = new PadAction(kind);
+        state.Repeats[source] = (action, _time.GetUtcNow() + RepeatDelay);
+        return [action];
     }
 
     private static PadAction Command(OverlayCommand command) => new(PadActionKind.Command, command);

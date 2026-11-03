@@ -816,6 +816,227 @@ string RepoRoot()
         && reloaded.AudioVolumeCaps["o1"] == 60 && !reloaded.AudioAutoInput, "Audio config round-trips through ConfigStore");
 }
 
+// --- Navigator: slider, media, sub-pages, reorder; pad media and volume --------
+{
+    var log = new List<string>();
+    var media = new FakeMedia(log);
+    var visible = true;
+    var order = new List<string> { "a", "b", "c" };
+    List<OverlayItem> Rows() =>
+        order.Select(k => new OverlayItem
+        {
+            Kind = ItemKind.Reorder, Key = k, Label = () => k,
+            Move = d =>
+            {
+                var i = order.IndexOf(k);
+                var j = i + d;
+                if (j < 0 || j >= order.Count) return;
+                order.RemoveAt(i); order.Insert(j, k); log.Add($"move {k} {d}");
+            },
+            Commit = () => log.Add("commit"),
+            Cancel = () => log.Add("cancel"),
+            RemoveEntry = () => log.Add($"remove {k}"),
+        }).ToList();
+    var slider = new OverlayItem { Kind = ItemKind.Slider, Label = () => "Vol", Step = d => log.Add("vol" + d), Toggle = () => log.Add("mute") };
+    var mic = new OverlayItem { Kind = ItemKind.Choice, Label = () => "Input", Step = d => log.Add("in" + d), Toggle = () => log.Add("micmute") };
+    var mediaRow = new OverlayItem { Kind = ItemKind.Media, Label = () => "Media", Visible = () => visible };
+    var tail = new OverlayItem { Kind = ItemKind.Action, Label = () => "Tail", Action = () => log.Add("tail") };
+    var sub = new OverlayItem { Kind = ItemKind.Action, Label = () => "SubRow", Key = "sub", SubPage = () => Rows() };
+    OverlayItem[] settings = [new() { Kind = ItemKind.Toggle, Label = () => "T", Toggle = () => { } }, sub];
+    var nav = new OverlayNavigator(
+        [new OverlayTab("Controlli", () => "C", () => new[] { slider, mic, mediaRow, tail }),
+         new OverlayTab("Audio", () => "Au", () => Rows())],
+        () => settings, () => [], media: media);
+    void Run(NavResult r) => r.Action?.Invoke();
+
+    nav.Reset([]);
+    Check(nav.Selected == slider, "slider selected first");
+    Run(nav.Handle(OverlayCommand.Right)); Run(nav.Handle(OverlayCommand.RightRepeat));
+    Run(nav.Handle(OverlayCommand.Left)); Run(nav.Handle(OverlayCommand.LeftRepeat));
+    Check(log.SequenceEqual(["vol1", "vol1", "vol-1", "vol-1"]), "slider steps with Left/Right and repeats");
+    log.Clear();
+    var ra = nav.Handle(OverlayCommand.A);
+    Check(ra.Effect == NavEffect.RunHere, "slider A stays open"); Run(ra);
+    Check(log.SequenceEqual(["mute"]), "slider A mutes");
+    log.Clear();
+    var f = nav.Footer();
+    Check(f.Contains(new FooterHint("← →", Loc.T("Overlay.Footer.Volume"))) && f[0] == new FooterHint("Enter", Loc.T("Overlay.Footer.Mute")),
+        "slider footer: arrows Volume, A Mute");
+
+    nav.Handle(OverlayCommand.Down);
+    Run(nav.Handle(OverlayCommand.A));
+    Check(log.SequenceEqual(["micmute"]), "Choice with Toggle: A toggles");
+    log.Clear();
+    Run(nav.Handle(OverlayCommand.Right));
+    Check(log.SequenceEqual(["in1"]), "Choice with Toggle: Right still steps");
+    log.Clear();
+
+    nav.Handle(OverlayCommand.Down);
+    Check(nav.Selected == mediaRow, "media row selectable");
+    Run(nav.Handle(OverlayCommand.Left)); Run(nav.Handle(OverlayCommand.Right)); Run(nav.Handle(OverlayCommand.A));
+    Check(log.SequenceEqual(["prev", "next", "playpause"]), "media row: Left/Right/A");
+    log.Clear();
+    foreach (var c in new[] { OverlayCommand.PrevTrack, OverlayCommand.NextTrack, OverlayCommand.PlayPause }) Run(nav.Handle(c));
+    Check(log.SequenceEqual(["prev", "next", "playpause"]), "global media commands on Tabs");
+    log.Clear();
+    nav.Handle(OverlayCommand.Settings);
+    Run(nav.Handle(OverlayCommand.NextTrack)); Run(nav.Handle(OverlayCommand.PlayPause));
+    Check(nav.Page == OverlayPage.Settings && log.SequenceEqual(["next", "playpause"]), "global media commands on Settings");
+    log.Clear();
+
+    // Sub-page
+    nav.Handle(OverlayCommand.Down);
+    Check(nav.Selected == sub, "SubRow selected in Settings");
+    Check(nav.Handle(OverlayCommand.A).Effect == NavEffect.Redraw && nav.Page == OverlayPage.Sub, "A opens the sub-page");
+    Check(nav.SubTitle == "SubRow" && nav.Items.Count == 3, "sub-page title and items");
+    nav.Handle(OverlayCommand.B);
+    Check(nav.Page == OverlayPage.Settings && nav.Selected == sub, "B returns to Settings at the same row");
+
+    // Reorder
+    nav.Handle(OverlayCommand.A);
+    Check(nav.Index == 0 && !nav.Holding, "sub-page starts on first entry");
+    nav.Handle(OverlayCommand.A);
+    Check(nav.Holding, "A picks up");
+    Check(nav.Footer().Any(h => h.Label == Loc.T("Overlay.Footer.Drop")), "footer shows Drop while holding");
+    Check(nav.Handle(OverlayCommand.Up).Effect == NavEffect.None, "cannot move above first entry");
+    Run(nav.Handle(OverlayCommand.Down));
+    Check(nav.Index == 1 && order.SequenceEqual(["b", "a", "c"]) && nav.Selected!.Key == "a", "Down moves entry, selection follows");
+    nav.Refresh();
+    Check(nav.Index == 1 && nav.Selected!.Key == "a", "Refresh keeps the held entry");
+    Run(nav.Handle(OverlayCommand.Down));
+    Check(order.SequenceEqual(["b", "c", "a"]) && nav.Index == 2, "moves to the end");
+    Check(nav.Handle(OverlayCommand.Down).Effect == NavEffect.None && nav.Index == 2, "Down cannot leave the list while holding");
+    Check(nav.Handle(OverlayCommand.Left).Effect == NavEffect.None && nav.Handle(OverlayCommand.Remove).Effect == NavEffect.None, "other commands ignored while holding");
+    log.Clear();
+    var commit = nav.Handle(OverlayCommand.A);
+    Check(commit.Effect == NavEffect.RunHere && !nav.Holding, "A drops"); Run(commit);
+    Check(log.SequenceEqual(["commit"]), "A calls Commit");
+    log.Clear();
+
+    // cancel paths: B, Settings, tab change, Reset
+    nav.Handle(OverlayCommand.Up);
+    Check(nav.Index == 1, "Up navigates when not holding");
+    nav.Handle(OverlayCommand.A);
+    Run(nav.Handle(OverlayCommand.Down));
+    var rb = nav.Handle(OverlayCommand.B);
+    Check(rb.Effect == NavEffect.RunHere && !nav.Holding && nav.Page == OverlayPage.Sub, "B while holding cancels, stays on the page");
+    Run(rb);
+    Check(log.SequenceEqual(["move c 1", "cancel"]), "B observed Move then Cancel");
+    log.Clear();
+    nav.Handle(OverlayCommand.A);
+    var rs = nav.Handle(OverlayCommand.Settings);
+    Check(rs.Effect == NavEffect.RunHere && !nav.Holding && nav.Page == OverlayPage.Tabs, "Settings while holding cancels and changes page");
+    Run(rs);
+    Check(log.SequenceEqual(["cancel"]), "page change called Cancel");
+    log.Clear();
+    nav.Handle(OverlayCommand.NextTab);
+    Check(nav.CurrentTab.Id == "Audio", "on Audio tab");
+    nav.Handle(OverlayCommand.A);
+    Check(nav.Holding, "holding on the tab");
+    var rt = nav.Handle(OverlayCommand.PrevTab);
+    Check(rt.Effect == NavEffect.RunHere && !nav.Holding && nav.CurrentTab.Id == "Controlli", "tab change while holding cancels");
+    Run(rt);
+    Check(log.SequenceEqual(["cancel"]), "tab change called Cancel");
+    log.Clear();
+    nav.Handle(OverlayCommand.NextTab);
+    nav.Handle(OverlayCommand.A);
+    Check(nav.Holding, "holding again on tab");
+    var resetCancel = nav.Reset([]);
+    Check(!nav.Holding && resetCancel != null, "Reset clears Holding and returns Cancel");
+    resetCancel?.Invoke();
+    Check(log.SequenceEqual(["cancel"]), "Reset cancel observed");
+    Check(nav.Reset([]) == null, "Reset without holding returns null");
+    log.Clear();
+
+    // Remove
+    order.Clear(); order.AddRange(["a", "b", "c"]);
+    nav.Handle(OverlayCommand.NextTab);
+    nav.Handle(OverlayCommand.Down);
+    Run(nav.Handle(OverlayCommand.Remove));
+    Check(log.SequenceEqual(["remove b"]), "Remove calls RemoveEntry");
+    log.Clear();
+    nav.Reset([]);
+    Check(nav.Handle(OverlayCommand.Remove).Effect == NavEffect.None, "Remove ignored without RemoveEntry");
+
+    // Refresh by key
+    nav.Handle(OverlayCommand.NextTab);
+    nav.Handle(OverlayCommand.Down); nav.Handle(OverlayCommand.Down);
+    Check(nav.Selected!.Key == "c", "selected last entry");
+    order.Remove("a");
+    nav.Refresh();
+    Check(nav.Selected!.Key == "c" && nav.Index == 1, "Refresh keeps selection by Key when an earlier item disappears");
+
+    // Selected media row hides
+    nav.Reset([]);
+    nav.Handle(OverlayCommand.Down); nav.Handle(OverlayCommand.Down);
+    Check(nav.Selected == mediaRow, "media row selected");
+    visible = false;
+    nav.Refresh();
+    Check(nav.Selected == mic, "hidden media row moves selection to a neighbour");
+    visible = true;
+
+    var bare = new OverlayNavigator([new OverlayTab("Controlli", () => "C", () => new[] { tail })], () => [], () => []);
+    bare.Reset([]);
+    Check(bare.Handle(OverlayCommand.PlayPause).Effect == NavEffect.None, "no media control: media commands do nothing");
+}
+
+{
+    var clock = new TestClock { Now = DateTimeOffset.UnixEpoch };
+    PadInterpreter New(bool open = false) => new(clock) { OverlayOpen = open };
+    PadAction Cmd(OverlayCommand c) => new(PadActionKind.Command, c);
+    bool Is(IReadOnlyList<PadAction> got, params PadAction[] want) => got.SequenceEqual(want);
+    var volDown = new PadAction(PadActionKind.VolumeDown);
+    var volUp = new PadAction(PadActionKind.VolumeUp);
+    var micMute = new PadAction(PadActionKind.MicMute);
+
+    var p = New(open: true);
+    Check(Is(p.ButtonDown(1, PadButton.LB), Cmd(OverlayCommand.PrevTrack)), "open: LB -> PrevTrack");
+    Check(Is(p.ButtonDown(1, PadButton.RB), Cmd(OverlayCommand.NextTrack)), "open: RB -> NextTrack");
+    Check(Is(p.ButtonDown(1, PadButton.X), Cmd(OverlayCommand.PlayPause)), "open: X -> PlayPause");
+    Check(Is(p.ButtonDown(1, PadButton.Y), Cmd(OverlayCommand.Remove)), "open: Y -> Remove");
+    p = New(open: true);
+    p.ButtonDown(1, PadButton.Back);
+    Check(Is(p.ButtonDown(1, PadButton.RB)), "open: Back+RB chord does not fire NextTrack");
+    Check(Is(p.ButtonUp(1, PadButton.RB), new PadAction(PadActionKind.ToggleOverlay)), "open: chord still toggles");
+
+    p = New();
+    Check(Is(p.ButtonDown(1, PadButton.LB)) && Is(p.ButtonDown(1, PadButton.X)) && Is(p.ButtonDown(1, PadButton.Y)), "closed: LB/X/Y alone do nothing");
+    p = New(); p.ButtonDown(1, PadButton.Back);
+    Check(Is(p.ButtonDown(1, PadButton.DpadLeft), volDown), "closed: Back+Left -> VolumeDown");
+    clock.Now += TimeSpan.FromSeconds(0.39);
+    Check(Is(p.Tick()), "volume: no repeat before 0.4 s");
+    clock.Now += TimeSpan.FromSeconds(0.02);
+    Check(Is(p.Tick(), volDown), "volume: repeats after 0.4 s");
+    clock.Now += TimeSpan.FromSeconds(0.12);
+    Check(Is(p.Tick(), volDown), "volume: then every 0.12 s");
+    p.ButtonUp(1, PadButton.Back);
+    clock.Now += TimeSpan.FromSeconds(1);
+    Check(Is(p.Tick()), "volume: repeat stops on Back release");
+    p = New(); p.ButtonDown(1, PadButton.Back);
+    Check(Is(p.ButtonDown(1, PadButton.DpadRight), volUp), "closed: Back+Right -> VolumeUp");
+    p.ButtonUp(1, PadButton.DpadRight);
+    clock.Now += TimeSpan.FromSeconds(1);
+    Check(Is(p.Tick()), "volume: repeat stops on D-pad release");
+    p.ButtonUp(1, PadButton.Back);
+    p = New(); p.ButtonDown(1, PadButton.Back);
+    Check(Is(p.ButtonDown(1, PadButton.Y), micMute), "closed: Back+Y -> MicMute");
+    Check(Is(p.ButtonDown(1, PadButton.DpadUp), new PadAction(PadActionKind.MonitorTv)), "monitor combo still works");
+    p = New(); p.CombosEnabled = false; p.ButtonDown(1, PadButton.Back);
+    Check(Is(p.ButtonDown(1, PadButton.DpadLeft)) && Is(p.ButtonDown(1, PadButton.Y)), "combos off: no volume or mic");
+    p = New(); p.ButtonDown(1, PadButton.Back); p.ButtonDown(1, PadButton.DpadLeft);
+    p.OverlayOpen = true;
+    clock.Now += TimeSpan.FromSeconds(1);
+    Check(!p.Tick().Contains(volDown), "opening the overlay stops volume repeat");
+
+    p = New();
+    p.ButtonDown(1, PadButton.Back); p.ButtonDown(2, PadButton.Back);
+    var dup = new List<PadAction>();
+    dup.AddRange(p.ButtonDown(1, PadButton.DpadLeft)); dup.AddRange(p.ButtonDown(2, PadButton.DpadLeft));
+    Check(dup.SequenceEqual([volDown]), "duplicate pad: one VolumeDown");
+    clock.Now += TimeSpan.FromSeconds(0.41);
+    Check(p.Tick().SequenceEqual([volDown]), "duplicate pad: volume repeats once");
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;
@@ -836,4 +1057,13 @@ sealed class FakeHost : IOverlayHost
     public void ChooseMonitorSwitcher() => Calls.Add("ChooseMonitorSwitcher");
     public void SwitchFullMode() => Calls.Add("SwitchFullMode");
     public void Exit() => Calls.Add("Exit");
+}
+
+sealed class FakeMedia(List<string> log) : IMediaControl
+{
+    public NowPlaying? Current => null;
+    public event Action? Changed { add { } remove { } }
+    public void Previous() => log.Add("prev");
+    public void Next() => log.Add("next");
+    public void PlayPause() => log.Add("playpause");
 }

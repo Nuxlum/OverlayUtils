@@ -1,3 +1,4 @@
+using OverlayUtils.Core.Audio;
 using OverlayUtils.Core.Localization;
 
 namespace OverlayUtils.Core.Overlay;
@@ -19,25 +20,40 @@ public sealed class OverlayNavigator
     readonly Func<IReadOnlyList<OverlayItem>> _settings;
     readonly Func<IReadOnlyList<OverlayItem>> _info;
     readonly TimeProvider _time;
+    readonly IMediaControl? _media;
 
     IReadOnlyCollection<string> _hidden = [];
     int _tabIndex;
     int _savedIndex;
     int _savedSegment;
     (int Index, int Segment, DateTimeOffset Deadline)? _pending;
+    string? _selectedKey;
+    bool _holding;
+    Action? _holdCancel;
+    OverlayItem? _subItem;
+    OverlayPage _subOrigin;
+    int _subIndex;
+    int _subSegment;
 
     public OverlayNavigator(IReadOnlyList<OverlayTab> tabs, Func<IReadOnlyList<OverlayItem>> settings,
-        Func<IReadOnlyList<OverlayItem>> info, TimeProvider? time = null)
+        Func<IReadOnlyList<OverlayItem>> info, TimeProvider? time = null, IMediaControl? media = null)
     {
         _tabs = tabs;
         _settings = settings;
         _info = info;
         _time = time ?? TimeProvider.System;
+        _media = media;
     }
 
     public OverlayPage Page { get; private set; }
     public int Index { get; private set; }
     public int Segment { get; private set; }
+
+    /// <summary>A Reorder row is picked up: Up/Down move it, A drops it, B puts it back.</summary>
+    public bool Holding => _holding;
+
+    /// <summary>Title of the sub-page (the label of the row that opened it).</summary>
+    public string SubTitle => _subItem?.Label() ?? "";
 
     public IReadOnlyList<OverlayTab> VisibleTabs =>
         _tabs.Where(t => t.Id == ControlsTabId || !_hidden.Contains(t.Id)).ToList();
@@ -55,6 +71,7 @@ public sealed class OverlayNavigator
     {
         OverlayPage.Settings => _settings(),
         OverlayPage.Info => _info(),
+        OverlayPage.Sub => _subItem?.SubPage?.Invoke() ?? [],
         _ => CurrentTab.Items(),
     };
 
@@ -69,19 +86,35 @@ public sealed class OverlayNavigator
 
     public bool IsPending(int index, int segment) => _pending is { } p && p.Index == index && p.Segment == segment;
 
-    public void Reset(IReadOnlyCollection<string> hiddenTabIds)
+    /// <summary>
+    /// Back to the first tab. Returns the Cancel of a picked-up Reorder row (or null); the caller runs it
+    /// so the list is restored.
+    /// </summary>
+    public Action? Reset(IReadOnlyCollection<string> hiddenTabIds)
     {
+        var cancel = TakeHold();
         _hidden = hiddenTabIds;
         Page = OverlayPage.Tabs;
         _tabIndex = 0;
         _savedIndex = 0;
         _savedSegment = 0;
+        _subItem = null;
         SelectFirst();
+        return cancel;
     }
 
     public void Refresh()
     {
         var items = Items;
+        if (_selectedKey != null)
+        {
+            for (var i = 0; i < items.Count; i++)
+            {
+                if (items[i].Key != _selectedKey || !IsSelectable(items[i])) continue;
+                if (i != Index) Select(i);
+                return;
+            }
+        }
         if (Index >= 0 && Index < items.Count && IsSelectable(items[Index])) return;
 
         var from = Math.Clamp(Index, 0, Math.Max(items.Count - 1, 0));
@@ -94,6 +127,7 @@ public sealed class OverlayNavigator
 
     public NavResult Handle(OverlayCommand command)
     {
+        if (_holding) return HandleHolding(command);
         switch (command)
         {
             case OverlayCommand.Up: return Move(-1);
@@ -110,12 +144,80 @@ public sealed class OverlayNavigator
                 return Redraw;
             case OverlayCommand.PrevTab: return ChangeTab(-1);
             case OverlayCommand.NextTab: return ChangeTab(1);
-            default: return None; // LeftRepeat/RightRepeat: only sliders use them
+            case OverlayCommand.LeftRepeat:
+                return Selected?.Kind == ItemKind.Slider ? Horizontal(-1) : None;
+            case OverlayCommand.RightRepeat:
+                return Selected?.Kind == ItemKind.Slider ? Horizontal(1) : None;
+            case OverlayCommand.PrevTrack: return Media(_media is { } prev ? prev.Previous : null);
+            case OverlayCommand.NextTrack: return Media(_media is { } next ? next.Next : null);
+            case OverlayCommand.PlayPause: return Media(_media is { } play ? play.PlayPause : null);
+            case OverlayCommand.Remove:
+                return Selected?.RemoveEntry is { } remove ? new NavResult(NavEffect.RunHere, remove) : None;
+            default: return None;
         }
+    }
+
+    static NavResult Media(Action? action) => action == null ? None : new NavResult(NavEffect.RunHere, action);
+
+    /// <summary>Commands while a Reorder row is picked up: move, drop, cancel; everything else is ignored.</summary>
+    NavResult HandleHolding(OverlayCommand command)
+    {
+        switch (command)
+        {
+            case OverlayCommand.Up: return MoveHeld(-1);
+            case OverlayCommand.Down: return MoveHeld(1);
+            case OverlayCommand.A:
+            {
+                var commit = Selected?.Commit;
+                _holding = false;
+                _holdCancel = null;
+                return commit == null ? Redraw : new NavResult(NavEffect.RunHere, commit);
+            }
+            case OverlayCommand.B:
+                return Cancelled(TakeHold());
+            case OverlayCommand.Settings:
+            {
+                var cancel = TakeHold();
+                if (Page == OverlayPage.Tabs) OpenPage(OverlayPage.Settings);
+                else ReturnToTabs();
+                return Cancelled(cancel);
+            }
+            case OverlayCommand.PrevTab:
+            case OverlayCommand.NextTab:
+            {
+                if (Page != OverlayPage.Tabs) return None;
+                var cancel = TakeHold();
+                ChangeTab(command == OverlayCommand.PrevTab ? -1 : 1);
+                return Cancelled(cancel);
+            }
+            default: return None;
+        }
+    }
+
+    static NavResult Cancelled(Action? cancel) => cancel == null ? Redraw : new NavResult(NavEffect.RunHere, cancel);
+
+    Action? TakeHold()
+    {
+        if (!_holding) return null;
+        var cancel = _holdCancel;
+        _holding = false;
+        _holdCancel = null;
+        return cancel;
+    }
+
+    NavResult MoveHeld(int direction)
+    {
+        var items = Items;
+        var target = Index + direction;
+        if (target < 0 || target >= items.Count || items[target].Kind != ItemKind.Reorder || !items[target].Visible()) return None;
+        if (Selected?.Move is not { } move) return None;
+        Index = target; // the entry moves with the selection; _selectedKey still names it
+        return new NavResult(NavEffect.RunHere, () => move(direction));
     }
 
     public NavResult Click(int index, int? segment = null)
     {
+        if (_holding) return None;
         var items = Items;
         if (index < 0 || index >= items.Count || !IsSelectable(items[index])) return None;
         // Re-selecting the current row would clear a pending confirm, so a second click could never fire it.
@@ -145,12 +247,23 @@ public sealed class OverlayNavigator
     public IReadOnlyList<FooterHint> Footer(bool pad = false)
     {
         var hints = new List<FooterHint>();
+        if (_holding)
+        {
+            hints.Add(new FooterHint(pad ? "A" : "Enter", Loc.T("Overlay.Footer.Drop")));
+            hints.Add(new FooterHint("↑ ↓", Loc.T("Overlay.Footer.Move")));
+            hints.Add(new FooterHint(pad ? "B" : "Esc", Loc.T("Overlay.Footer.Cancel")));
+            return hints;
+        }
         var item = Selected;
         if (item is not null)
         {
             hints.Add(new FooterHint(pad ? "A" : "Enter", Loc.T(item.Kind switch
             {
+                ItemKind.Choice when item.Apply == null && item.Toggle != null => "Overlay.Footer.Toggle",
                 ItemKind.Choice when item.Apply == null => "Overlay.Footer.Change",
+                ItemKind.Slider => "Overlay.Footer.Mute",
+                ItemKind.Media => "Overlay.Footer.PlayPause",
+                ItemKind.Reorder => "Overlay.Footer.PickUp",
                 ItemKind.Toggle => "Overlay.Footer.Toggle",
                 ItemKind.Expander => "Overlay.Footer.Open",
                 ItemKind.Info => "Overlay.Footer.Select",
@@ -158,6 +271,10 @@ public sealed class OverlayNavigator
             })));
             if (item.Kind is ItemKind.Segmented or ItemKind.Choice)
                 hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.Change")));
+            else if (item.Kind == ItemKind.Slider)
+                hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.Volume")));
+            else if (item.Kind == ItemKind.Media)
+                hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.Track")));
             else if (item.Kind == ItemKind.Expander)
                 hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.OpenClose")));
         }
@@ -188,6 +305,7 @@ public sealed class OverlayNavigator
         _pending = null;
         Segment = 0;
         var items = Items;
+        _selectedKey = index >= 0 && index < items.Count ? items[index].Key : null;
         if (index < 0 || index >= items.Count || items[index].Kind != ItemKind.Segmented) return;
         var options = items[index].Options();
         for (var i = 0; i < options.Count; i++)
@@ -227,7 +345,10 @@ public sealed class OverlayNavigator
                 _pending = null;
                 return Redraw;
             case ItemKind.Choice:
+            case ItemKind.Slider:
                 return item.Step is { } step ? new NavResult(NavEffect.RunHere, () => step(direction)) : None;
+            case ItemKind.Media:
+                return Media(_media is { } m ? (direction < 0 ? m.Previous : m.Next) : null);
             case ItemKind.Toggle:
                 return item.Toggle is { } toggle ? new NavResult(NavEffect.RunHere, toggle) : None;
             case ItemKind.Expander:
@@ -248,7 +369,24 @@ public sealed class OverlayNavigator
         {
             case ItemKind.Choice:
                 if (item.Apply is { } apply) return new NavResult(NavEffect.HideAndRun, apply);
+                if (item.Toggle is { } choiceToggle) return new NavResult(NavEffect.RunHere, choiceToggle);
                 return Horizontal(1);
+            case ItemKind.Slider:
+                return item.Toggle is { } mute ? new NavResult(NavEffect.RunHere, mute) : None;
+            case ItemKind.Media:
+                return Media(_media is { } m ? m.PlayPause : null);
+            case ItemKind.Reorder:
+                _holding = true;
+                _holdCancel = item.Cancel;
+                return Redraw;
+            case ItemKind.Action when item.SubPage != null:
+                if (Page == OverlayPage.Sub) return None;
+                _subItem = item;
+                _subOrigin = Page;
+                _subIndex = Index;
+                _subSegment = Segment;
+                OpenPage(OverlayPage.Sub);
+                return Redraw;
             case ItemKind.Toggle:
             case ItemKind.Expander:
                 return item.Toggle is { } toggle ? new NavResult(NavEffect.RunHere, toggle) : None;
@@ -289,6 +427,12 @@ public sealed class OverlayNavigator
                 return Redraw;
             case OverlayPage.Settings:
                 ReturnToTabs();
+                return Redraw;
+            case OverlayPage.Sub:
+                Page = _subOrigin;
+                Select(_subIndex);
+                Refresh();
+                if (Index == _subIndex) Segment = _subSegment;
                 return Redraw;
             default:
                 return new NavResult(NavEffect.Hide);
