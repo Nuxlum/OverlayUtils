@@ -55,10 +55,24 @@ warnings, self-test passes; nothing tested with a real pad yet.
 - [~] Overlay navigation with repeat, LT/RT tabs, hold Back for Settings
 - [~] Pad battery for any pad that reports it; Pad combos switch in Settings
 
-### Stage 4 - audio and media  `[ ]`
-- [ ] Volume and mute, Windows output switching (Core Audio)  *(VOLUME..., USCITA AUDIO)*
-- [ ] SteelSeries Sonar detection and output name
-- [ ] Now playing card (GlobalSystemMediaTransportControls)  *(MEDIA IN RIPRODUZIONE)*
+### Stage 4 - audio and media  `[~]`
+Design: `docs/superpowers/specs/2026-11-03-audio-design.md`, built in two
+parts. Part 4a builds with 0 warnings and the self-test passes; nothing tested
+with real devices yet.
+
+#### 4a - devices  `[~]`
+- [~] Audio tab: Output and Input pickers, Volume, Now playing  *(VOLUME..., USCITA AUDIO, MEDIA IN RIPRODUZIONE)*
+- [~] Core Audio service: devices, default switching on all roles (IPolicyConfig), master volume and mute, microphone mute, live updates
+- [~] Priority lists for outputs and inputs, auto-switch on device changes, reorder / remove from the pad, in Settings
+- [~] Max volume per output device (Settings), applied from the overlay / pad and when the output changes
+- [~] Pad: Back+D-pad Left/Right volume and Back+Y mic mute with the overlay closed, volume indicator; LB / RB / X media buttons with the overlay open
+- [~] Now playing from the Windows media session (GlobalSystemMediaTransportControls), no Spotify-specific code
+- [~] Overlay entry in the tray menu
+
+#### 4b - mixing  `[ ]`
+- [ ] Channels (Game, Chat, Media, Other) with per-app volumes, automatic assignment, Programs page
+- [ ] Custom channels, mix per output device, presets
+- [ ] Sonar: no integration planned; its virtual devices are ordinary entries in the priority lists
 
 ### Stage 5 - Steam library  `[ ]`
 - [ ] Installed games, non-Steam shortcuts (binary VDF), artwork, launch  *(LIBRERIA GIOCHI)*
@@ -83,6 +97,36 @@ warnings, self-test passes; nothing tested with a real pad yet.
    Program Files, tooltip says "Full mode". Then Disable: back to
    `%LOCALAPPDATA%\Programs\OverlayUtils`, Program Files folder and certificate gone.
 5. Logs: `%APPDATA%\OverlayUtils\errors.log`.
+
+## Testing on Windows (stage 4a)
+
+Needs a real headset, a second output and a pad. Auto-switch is on by default,
+so the first tests change the default devices on purpose.
+1. Headset on / off with Settings -> Audio auto-switch on: Windows' default
+   output follows the highest-ranked connected device (headset first when it
+   is ranked first). Repeat for the microphone.
+2. With SteelSeries Sonar installed: its virtual devices ranked first, then
+   last. First, Sonar's device wins while it runs; last, the real device wins.
+3. Pick an output from the Audio tab, then plug in another device: the pick
+   holds until that device change, then the ranking decides again. Turning
+   auto-switch off and on again changes nothing until the next device event.
+4. Settings -> Audio lists: select a device, A picks it up, Up/Down move it,
+   A drops it, B cancels. A disconnected device is removed with Y on the pad
+   (Delete on the keyboard).
+5. Max volume on the headphones set to 40 %: switch to them from the Audio
+   tab; the volume drops to 40 % and Right stops there. A new, lower cap
+   applies at the next step or device change. Windows' own volume keys are
+   not limited.
+6. Overlay closed, a game in front: Back+D-pad Left/Right lowers / raises the
+   volume (repeat while held) and the indicator shows over the game on the
+   monitor of the foreground window for about 1.5 s.
+7. Back+Y toggles the microphone mute with the indicator; the Input row in
+   the Audio tab shows it muted.
+8. Play YouTube Music in a browser: Now playing shows the title and app;
+   with the overlay open LB / RB / X go back / forward / play-pause.
+9. Open the overlay, change the volume from the Windows flyout: the Volume
+   row updates at once. Hide the Audio tab in Settings -> Tabs while the
+   overlay is open: it disappears at once.
 
 ## Testing on Windows (stage 3)
 

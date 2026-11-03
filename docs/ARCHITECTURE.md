@@ -10,10 +10,11 @@ How the .NET OverlayUtils is put together. What is ported so far is in
 OverlayUtils.sln
 ├─ src/OverlayUtils.Core       net10.0, no NuGet. Config, localization, Win32 interop,
 │                              services. Builds on any OS; runs on Windows.
-├─ src/OverlayUtils.App        net10.0-windows, WPF + WinForms. AppHost (startup),
-│                              tray, mode switching; overlay from stage 2.
+├─ src/OverlayUtils.App        net10.0-windows10.0.19041.0, WPF + WinForms. AppHost
+│                              (startup), tray, mode switching, overlay, media session.
 ├─ src/OverlayUtils            Launcher: OverlayUtils.exe          (uiAccess=false)
 ├─ src/OverlayUtils.UIAccess   Launcher: OverlayUtils.UIAccess.exe (uiAccess=true)
+│                              (both launchers also target net10.0-windows10.0.19041.0)
 └─ tests/OverlayUtils.SelfTest Console checks for Core, no test framework
 ```
 
@@ -77,6 +78,7 @@ so disabling never removes one we did not add.
 | UI (STA) | WPF `Dispatcher` | tray, menus, dialogs, the overlay window |
 | Hotkeys | `HotkeyService` | own message loop; `RegisterHotKey` must be called on it, so requests are queued and the thread is woken with `PostThreadMessage` |
 | Workers | `Task.Run` | MonitorSwitcher search, mode switching (waits on UAC), overlay actions after hide |
+| Audio | `AudioService` | own MTA thread; every Core Audio COM call runs there (see Audio) |
 | Pads | `PadService` | all SDL3 calls; actions go to the overlay via `OverlayController.Command`/`Toggle`, which marshal to the UI thread |
 
 Rule: anything that touches UI goes through `TrayController.OnUi`. Hotkey callbacks arrive on the hotkey thread.
@@ -172,6 +174,52 @@ click on the tray icon does the same. Both call `OverlayController.Toggle`.
 - `TrayController` maps actions; `OverlayController.OpenChanged` keeps the
   interpreter's `OverlayOpen` in sync; `SetPadState` drives the pad footer and
   battery glyph.
+
+## Audio
+
+Stage 4a. Pure rules and COM in Core, the media session in App.
+
+| Core (`Audio/`, `Interop/CoreAudio.cs`) | App (`Audio/`, `Overlay/`) |
+|---|---|
+| `AudioRules`: target device, merge / seed of the priority lists, volume step, cap | `AudioServiceView`: adapts `AudioService` to `IAudioView` for the overlay |
+| `AudioService`: devices, default switching, volume, mute, mic mute | `MediaSession`: now playing and transport via GlobalSystemMediaTransportControls |
+| `IAudioView`, `IMediaControl` / `NowPlaying`: what the overlay sees | `VolumeIndicator`: small non-activating topmost window |
+
+- **Target framework.** The media session is a WinRT API, so App and both
+  launchers target `net10.0-windows10.0.19041.0` (the Windows SDK projection;
+  the debug output folder changed with it). Core stays plain `net10.0`; Core
+  Audio is COM through `GeneratedComInterface` and `LibraryImport` (no NuGet),
+  declarations in `Interop/CoreAudio.cs`.
+- **Service thread.** `AudioService` runs one MTA thread with a command
+  queue. Windows notifications (any thread) only queue work; bursts of device
+  events are settled for 250 ms and handled once. Public members read a cached
+  snapshot or queue a command, so they are non-blocking from any thread; errors
+  are logged, never thrown. `Changed` is raised for any change, including ones
+  made elsewhere (Windows flyout), and the tray refreshes the open overlay.
+  It runs for the whole session, overlay open or not.
+- **Default device.** Set through `IPolicyConfig` (undocumented but what every
+  audio switcher uses), for all three roles (console, multimedia,
+  communications).
+- **Priority lists.** `audio_output_order` / `audio_input_order` hold every
+  device seen (id and last known name), new ones at the bottom. When a device
+  is added, removed, enabled or disabled, and `audio_auto_output` /
+  `audio_auto_input` is on, the default becomes the highest-ranked available
+  device (`AudioRules.Target`). A manual pick from the Audio tab holds until
+  the next device event. Re-enabling auto-switch waits for that next event.
+- **Volume cap.** `audio_volume_caps` (device id -> %, default 100). Applied
+  when the volume is stepped from the overlay or pad and when the default
+  output changes; not at startup and not to Windows' own volume keys. A new cap
+  applies at the next step or device change.
+- **Pad.** With the overlay closed and Pad combos on, Back+D-pad Left/Right
+  step the volume (repeat) and Back+Y toggles the microphone mute, both via
+  `PadInterpreter`; the tray shows `VolumeIndicator` on the foreground
+  window's monitor for about 1.5 s. With the overlay open LB / RB / X are
+  previous / next / play-pause. List reordering in Settings uses the `Reorder`
+  item kind: A picks up, Up/Down move, A drops, B cancels;
+  `OverlayCommand.Remove` (Delete, or Y on the pad) removes a disconnected
+  entry.
+- **Tabs.** Audio is a tab after Controls and can be hidden in Settings
+  (`hidden_tabs`); the change applies to the open overlay at once.
 
 ## Configuration
 

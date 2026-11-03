@@ -32,6 +32,22 @@ Moonlight's virtual pad): Back+RB opens and closes the overlay. Inside,
 D-pad or left stick move, A selects, B goes back, LT/RT switch tab, hold
 Back for Settings. With the overlay closed, Back+D-pad Up / Down switch to
 the TV / desk monitor profile (Settings -> Pad combos turns this off).
+Also with the overlay closed: Back+D-pad Left / Right lower / raise the
+volume and Back+Y mutes the microphone (a small indicator appears on screen).
+With the overlay open, LB / RB / X are previous / next / play-pause.
+
+AUDIO
+-----
+The Audio tab shows the output device, the microphone, the volume and what
+is playing. Left/Right on Output or Input switch device, A on Input mutes the
+microphone, A on Volume mutes, Left/Right on Now playing skip tracks.
+Settings -> Audio has one priority list for outputs and one for microphones:
+select a device, A picks it up, Up/Down move it, A drops it (B cancels), Y
+removes a device that is not connected. Whenever a device is plugged in or
+removed, Windows is switched to the highest device in the list that is
+connected (turn this off per list in Settings). A choice made by hand in the
+Audio tab holds until the next device change. "Max volume" limits the volume
+of an output device from the overlay and the pad.
 
 OVERLAY OVER FULLSCREEN GAMES (optional)
 ----------------------------------------
@@ -99,6 +115,24 @@ sinistro si muovono, A sceglie, B torna indietro, LT/RT cambiano scheda,
 tenere premuto Back apre le Impostazioni. A overlay chiuso, Back+croce Su /
 Giù passano al profilo monitor TV / Scrivania (Impostazioni -> Combo del pad
 li disattiva).
+Sempre a overlay chiuso: Back+croce Sinistra / Destra abbassano / alzano il
+volume e Back+Y silenzia il microfono (compare un piccolo indicatore).
+Con l'overlay aperto, LB / RB / X sono traccia precedente / successiva /
+play-pausa.
+
+AUDIO
+-----
+La scheda Audio mostra l'uscita, il microfono, il volume e cosa sta
+suonando. Sinistra/Destra su Uscita o Ingresso cambiano dispositivo, A su
+Ingresso silenzia il microfono, A su Volume silenzia, Sinistra/Destra su
+In riproduzione cambiano traccia.
+Impostazioni -> Audio ha una lista di priorità per le uscite e una per i
+microfoni: seleziona un dispositivo, A lo solleva, Su/Giù lo spostano, A lo
+lascia (B annulla), Y toglie un dispositivo non collegato. Quando colleghi o
+scolleghi un dispositivo, Windows passa al primo della lista tra quelli
+collegati (si disattiva per ogni lista nelle Impostazioni). Una scelta fatta
+a mano nella scheda Audio vale fino al prossimo cambio di dispositivi.
+"Volume massimo" limita il volume di un'uscita dall'overlay e dal pad.
 
 OVERLAY SOPRA I GIOCHI A SCHERMO INTERO (facoltativo)
 -----------------------------------------------------

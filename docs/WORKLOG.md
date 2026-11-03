@@ -68,6 +68,26 @@ The stage checklist lives in `PORTING.md`.
 - 2026-11-03 - **Footer shows pad buttons instead of keys** while a pad is
   connected (Enter/Esc/F2 still work); pad shortcuts are listed in the Info
   Shortcuts panel, marked "(pad)", not in a separate section.
+- 2026-11-03 - **Stage 4a target framework:** App and both launchers now
+  target `net10.0-windows10.0.19041.0` (needed for the WinRT media session
+  API); the debug output path changed accordingly. Core stays `net10.0`.
+- 2026-11-03 - **IPolicyConfig** (IID F8679F50-850A-41CF-9C72-430F290290C8,
+  CLSID 870AF99C-...) sets the default device, on all three roles (console,
+  multimedia, communications). If it fails, the error is logged and the
+  default is left as it was.
+- 2026-11-03 - **Pad audio buttons:** Back+D-pad Left/Right change the volume
+  and Back+Y toggles the microphone mute (overlay closed, Pad combos on).
+  With the overlay open LB / RB / X are previous / next / play-pause, and Y
+  removes a disconnected device from a priority list.
+- 2026-11-03 - **Volume cap:** applied from the overlay and pad and when the
+  output changes, not at startup and not to Windows' own volume keys. A new
+  cap applies at the next step or device change.
+- 2026-11-03 - **Re-enabling auto-switch** waits for the next device event;
+  it does not switch at once.
+- 2026-11-03 - **RB before Back:** with the overlay open, pressing RB before
+  Back skips a track (same as Python), then closes the overlay.
+- 2026-11-03 - **Media app name "Lettore multimediale"** comes from the
+  Python mapping and is not localized yet.
 
 ## Open questions
 
@@ -95,6 +115,12 @@ The stage checklist lives in `PORTING.md`.
 
 ## Session log
 
+- 2026-11-03 - Stage 4a (audio devices) written: audio rules (self-tested),
+  Core Audio service, media session, Audio tab with Output / Input / Volume /
+  Now playing, priority lists and auto-switch in Settings, pad volume and mic
+  mute with a volume indicator, tray overlay entry, docs. Builds with 0
+  warnings; nothing tested with real devices yet (stage 4a list in PORTING).
+  Stage 4b (channels, per-app volumes, presets) is next.
 - 2026-11-03 - Stage 3 (gamepad) written: pad interpreter (self-tested),
   SDL3 pad service, overlay/tray wiring, docs. Builds with 0 warnings; SDL3
   loads and fails cleanly without the DLL; not yet tested with a real pad.
