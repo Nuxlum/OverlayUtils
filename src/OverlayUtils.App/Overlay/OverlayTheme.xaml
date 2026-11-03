@@ -18,6 +18,8 @@
     <SolidColorBrush x:Key="Danger" Color="#DC4646" />
     <SolidColorBrush x:Key="SegmentBg" Color="#1A1A1A" />
     <SolidColorBrush x:Key="SegmentActive" Color="#444444" />
+    <!-- Mouse over a clickable element (button, arrow, option, tab, footer hint). -->
+    <SolidColorBrush x:Key="Hover" Color="#26FFFFFF" />
 
     <FontFamily x:Key="TextFont">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="DisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>

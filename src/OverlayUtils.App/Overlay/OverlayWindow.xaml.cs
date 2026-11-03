@@ -41,6 +41,33 @@ internal sealed partial class OverlayWindow : Window
     /// <summary>Row index (navigator index) and the clicked option of a segmented row, if any.</summary>
     public event Action<int, int?>? RowClicked;
 
+    /// <summary>The mouse really moved onto a row (navigator index).</summary>
+    public event Action<int>? RowHovered;
+
+    /// <summary>A tab header was clicked (index into the visible tabs).</summary>
+    public event Action<int>? TabClicked;
+
+    /// <summary>A picker arrow (row, -1/+1) was clicked, or the wheel turned over the volume bar.</summary>
+    public event Action<int, int>? StepClicked;
+
+    /// <summary>The volume bar was clicked or dragged (row, fraction of its width).</summary>
+    public event Action<int, double>? LevelClicked;
+
+    /// <summary>A media button was clicked (row, -1 previous / 0 play-pause / +1 next).</summary>
+    public event Action<int, int>? MediaClicked;
+
+    // Last cursor position seen, in screen pixels: hover acts only when the mouse really moves, not when the
+    // overlay opens under a still cursor or the list scrolls under it.
+    Point? _lastPointer;
+    FrameworkElement? _dragBar;
+
+    /// <summary>Called on open: the cursor where it is now does not count as a move.</summary>
+    public void ResetPointer()
+    {
+        var p = System.Windows.Forms.Cursor.Position;
+        _lastPointer = new Point(p.X, p.Y);
+    }
+
     public void Bind(OverlayViewModel vm)
     {
         if (_vm is not null) _vm.PropertyChanged -= OnViewModelChanged;
@@ -189,8 +216,107 @@ internal sealed partial class OverlayWindow : Window
     void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         // The wheel moves the selection (and the list follows it); it never scrolls the list by itself.
+        // Over the volume bar it changes the volume instead.
         e.Handled = true;
+        if (Ancestor(e.OriginalSource as DependencyObject, n => n is FrameworkElement { Tag: "VolumeBar" }) is not null
+            && RowOf(e.OriginalSource as DependencyObject) is { } row)
+        {
+            Raise(() => StepClicked?.Invoke(row.Index, e.Delta > 0 ? 1 : -1), "wheel on the volume bar");
+            return;
+        }
         Issue(e.Delta > 0 ? OverlayCommand.WheelUp : OverlayCommand.WheelDown);
+    }
+
+    void OnPreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_dragBar is not null) return; // dragging the volume bar keeps its row
+        var p = PointToScreen(e.GetPosition(this));
+        if (_lastPointer == p) return;
+        _lastPointer = p;
+        if (RowOf(e.OriginalSource as DependencyObject) is { } row)
+            Raise(() => RowHovered?.Invoke(row.Index), "hover");
+    }
+
+    void OnTabMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not TabVm tab || _vm is null) return;
+        e.Handled = true;
+        if (e.ClickCount > 1) return;
+        var index = _vm.Tabs.ToList().IndexOf(tab);
+        if (index >= 0) Raise(() => TabClicked?.Invoke(index), "tab click");
+    }
+
+    void OnStepMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (RowOf(sender as DependencyObject) is not { } row || !int.TryParse((sender as FrameworkElement)?.Tag as string, out var direction)) return;
+        e.Handled = true;
+        if (e.ClickCount > 1) return;
+        Raise(() => StepClicked?.Invoke(row.Index, direction), "picker arrow");
+    }
+
+    void OnMediaMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (RowOf(sender as DependencyObject) is not { } row || !int.TryParse((sender as FrameworkElement)?.Tag as string, out var button)) return;
+        e.Handled = true;
+        if (e.ClickCount > 1) return;
+        Raise(() => MediaClicked?.Invoke(row.Index, button), "media button");
+    }
+
+    void OnBarMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement bar) return;
+        e.Handled = true;
+        _dragBar = bar;
+        bar.CaptureMouse();
+        SetLevelFrom(bar, e);
+    }
+
+    void OnBarMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_dragBar is { } bar && ReferenceEquals(sender, bar) && e.LeftButton == MouseButtonState.Pressed)
+            SetLevelFrom(bar, e);
+    }
+
+    void OnBarMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_dragBar is not { } bar) return;
+        e.Handled = true;
+        bar.ReleaseMouseCapture();
+        _dragBar = null;
+    }
+
+    void SetLevelFrom(FrameworkElement bar, MouseEventArgs e)
+    {
+        if (RowOf(bar) is not { } row) return;
+        // The fill runs between the knob's half-widths (the 7 DIP margin on each side of the track).
+        const double inset = 7;
+        var width = Math.Max(bar.ActualWidth - 2 * inset, 1);
+        var fraction = (e.GetPosition(bar).X - inset) / width;
+        Raise(() => LevelClicked?.Invoke(row.Index, fraction), "volume bar");
+    }
+
+    void OnFooterMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not FooterVm { Command: { } command }) return;
+        e.Handled = true;
+        if (e.ClickCount > 1) return;
+        Issue(command);
+    }
+
+    static RowVm? RowOf(DependencyObject? node) =>
+        (Ancestor(node, n => (n as FrameworkElement)?.DataContext is RowVm) as FrameworkElement)?.DataContext as RowVm;
+
+    static DependencyObject? Ancestor(DependencyObject? node, Func<DependencyObject, bool> match)
+    {
+        while (node is not null && !match(node))
+            node = node is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(node) : LogicalTreeHelper.GetParent(node);
+        return node;
+    }
+
+    static void Raise(Action raise, string what)
+    {
+        try { raise(); }
+        catch (Exception ex) { Log.Error($"Overlay {what}", ex); }
     }
 
     void Issue(OverlayCommand command)

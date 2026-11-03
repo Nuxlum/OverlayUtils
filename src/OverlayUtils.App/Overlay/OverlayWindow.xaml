@@ -13,7 +13,7 @@
         FontFamily="{DynamicResource TextFont}" Foreground="{DynamicResource Text}"
         UseLayoutRounding="True" KeyboardNavigation.TabNavigation="None"
         KeyboardNavigation.DirectionalNavigation="None" KeyboardNavigation.ControlTabNavigation="None"
-        PreviewKeyDown="OnPreviewKeyDown" PreviewMouseWheel="OnPreviewMouseWheel"
+        PreviewKeyDown="OnPreviewKeyDown" PreviewMouseWheel="OnPreviewMouseWheel" PreviewMouseMove="OnPreviewMouseMove"
         MouseRightButtonDown="OnMouseRightButtonDown">
     <Window.Resources>
         <ResourceDictionary>
@@ -62,6 +62,18 @@
                 </Style.Triggers>
             </Style>
 
+            <!-- Clickable element inside a row or the header: hand cursor and a light background on hover. -->
+            <Style x:Key="HoverButton" TargetType="Border">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="{StaticResource Hover}" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
             <!--
               Frame of the standard rows (Python _render_rows): optional section header, 40 px row with tint and
               accent bar, icon, label, and the kind's control (the Content) on the right.
@@ -84,7 +96,7 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                                <Grid Height="40" Margin="0,0,0,2" Background="Transparent"
+                                <Grid Height="40" Margin="0,0,0,2" Background="Transparent" Cursor="Hand"
                                       MouseLeftButtonDown="OnRowMouseDown">
                                     <Border Style="{StaticResource Tint}" CornerRadius="6" />
                                     <Rectangle Style="{StaticResource AccentBar}" />
@@ -152,13 +164,17 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border x:Name="Pill" CornerRadius="11" Padding="9,0" BorderThickness="1"
-                                            BorderBrush="Transparent" Background="Transparent"
+                                            BorderBrush="Transparent" Background="Transparent" Cursor="Hand"
                                             MouseLeftButtonDown="OnOptionMouseDown">
                                         <TextBlock x:Name="PillText" Text="{Binding Label}" FontSize="12"
                                                    FontWeight="SemiBold" VerticalAlignment="Center"
                                                    Foreground="{StaticResource Muted}" />
                                     </Border>
                                     <DataTemplate.Triggers>
+                                        <Trigger SourceName="Pill" Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Pill" Property="Background" Value="{StaticResource Hover}" />
+                                            <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
+                                        </Trigger>
                                         <DataTrigger Binding="{Binding IsActive}" Value="True">
                                             <Setter TargetName="Pill" Property="Background" Value="{StaticResource SegmentActive}" />
                                             <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
@@ -184,8 +200,11 @@
             <DataTemplate x:Key="ChoiceRow">
                 <ContentControl Style="{StaticResource RowFrame}">
                     <StackPanel Orientation="Horizontal" Margin="0,0,4,0">
-                        <TextBlock Style="{StaticResource RowChevron}" Text="{x:Static core:Glyphs.ChevronLeft}" />
-                        <TextBlock Text="{Binding Value}" FontSize="13" Margin="10,0" MaxWidth="210"
+                        <Border Style="{StaticResource HoverButton}" Tag="-1" Width="22" Height="26"
+                                MouseLeftButtonDown="OnStepMouseDown">
+                            <TextBlock Style="{StaticResource RowChevron}" Text="{x:Static core:Glyphs.ChevronLeft}" />
+                        </Border>
+                        <TextBlock Text="{Binding Value}" FontSize="13" Margin="6,0" MaxWidth="200"
                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
@@ -198,7 +217,10 @@
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
-                        <TextBlock Style="{StaticResource RowChevron}" Text="{x:Static core:Glyphs.ChevronRight}" />
+                        <Border Style="{StaticResource HoverButton}" Tag="1" Width="22" Height="26"
+                                MouseLeftButtonDown="OnStepMouseDown">
+                            <TextBlock Style="{StaticResource RowChevron}" Text="{x:Static core:Glyphs.ChevronRight}" />
+                        </Border>
                     </StackPanel>
                 </ContentControl>
             </DataTemplate>
@@ -225,7 +247,7 @@
 
             <!-- Info page panel header (Python _render_info): a card with a chevron that turns down when open. -->
             <DataTemplate x:Key="ExpanderRow">
-                <Grid Height="38" Margin="0,6,0,0" Background="Transparent" MouseLeftButtonDown="OnRowMouseDown">
+                <Grid Height="38" Margin="0,6,0,0" Background="Transparent" Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
                     <Border CornerRadius="8" Background="{StaticResource Surface}" />
                     <Border Style="{StaticResource Tint}" CornerRadius="8" />
                     <Rectangle Style="{StaticResource AccentBar}" />
@@ -253,7 +275,7 @@
 
             <!-- Compact label/value row inside an open Info panel, with the action word on the right. -->
             <DataTemplate x:Key="InfoRow">
-                <Grid Height="25" Background="Transparent" MouseLeftButtonDown="OnRowMouseDown">
+                <Grid Height="25" Background="Transparent" Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
                     <Border Style="{StaticResource Tint}" CornerRadius="6" Margin="6,0" />
                     <Rectangle Style="{StaticResource AccentBar}" Margin="6,0,0,0" />
                     <Grid>
@@ -281,8 +303,10 @@
             <DataTemplate x:Key="SliderRow">
                 <ContentControl Style="{StaticResource RowFrame}">
                     <StackPanel Orientation="Horizontal" Margin="0,0,4,0">
-                        <Grid Width="134" Height="14" VerticalAlignment="Center">
-                            <Grid Margin="7,0">
+                        <Grid Width="134" Height="24" VerticalAlignment="Center" Background="Transparent"
+                              Cursor="Hand" Tag="VolumeBar" MouseLeftButtonDown="OnBarMouseDown"
+                              MouseMove="OnBarMouseMove" MouseLeftButtonUp="OnBarMouseUp">
+                            <Grid Margin="7,0" Height="14">
                                 <Border Height="4" CornerRadius="2" Background="{StaticResource Line}" />
                                 <Border x:Name="Fill" Height="4" CornerRadius="2" HorizontalAlignment="Left"
                                         Width="{Binding SliderFill}" Background="{DynamicResource Accent}" />
@@ -323,7 +347,7 @@
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
-                    <Grid Height="64" Margin="2,2,2,4" Background="Transparent" MouseLeftButtonDown="OnRowMouseDown">
+                    <Grid Height="64" Margin="2,2,2,4" Background="Transparent" Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
                         <Border x:Name="Outline" CornerRadius="10" Margin="-2" BorderThickness="2"
                                 BorderBrush="Transparent" />
                         <Border CornerRadius="8" Background="{StaticResource Surface}" />
@@ -344,15 +368,20 @@
                                            Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Previous}" FontSize="14"
-                                           Width="22" />
-                                <Grid Width="32" Height="32" Margin="6,0">
-                                    <Ellipse Fill="{DynamicResource Accent}" />
+                                <Border Style="{StaticResource HoverButton}" Tag="-1" Width="30" Height="30"
+                                        CornerRadius="15" MouseLeftButtonDown="OnMediaMouseDown">
+                                    <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Previous}" FontSize="14" />
+                                </Border>
+                                <Grid Width="32" Height="32" Margin="4,0" Cursor="Hand" Tag="0"
+                                      MouseLeftButtonDown="OnMediaMouseDown">
+                                    <Ellipse x:Name="PlayDisc" Fill="{DynamicResource Accent}" />
                                     <TextBlock x:Name="PlayGlyph" Style="{StaticResource Icon}" FontSize="14"
                                                Text="{x:Static core:Glyphs.Play}" Foreground="{StaticResource Bg}" />
                                 </Grid>
-                                <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Next}" FontSize="14"
-                                           Width="22" />
+                                <Border Style="{StaticResource HoverButton}" Tag="1" Width="30" Height="30"
+                                        CornerRadius="15" MouseLeftButtonDown="OnMediaMouseDown">
+                                    <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Next}" FontSize="14" />
+                                </Border>
                             </StackPanel>
                         </Grid>
                     </Grid>
@@ -364,6 +393,9 @@
                     <DataTrigger Binding="{Binding IsOn}" Value="True">
                         <Setter TargetName="PlayGlyph" Property="Text" Value="{x:Static core:Glyphs.Pause}" />
                     </DataTrigger>
+                    <Trigger SourceName="PlayDisc" Property="IsMouseOver" Value="True">
+                        <Setter TargetName="PlayDisc" Property="Opacity" Value="0.8" />
+                    </Trigger>
                     <DataTrigger Binding="{Binding Value}" Value="">
                         <Setter TargetName="Subtitle" Property="Visibility" Value="Collapsed" />
                     </DataTrigger>
@@ -423,12 +455,15 @@
                     <TextBlock Text="{Binding Title}" FontFamily="{StaticResource DisplayFont}" FontSize="20"
                                FontWeight="SemiBold" VerticalAlignment="Center" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Border Width="24" Height="24" CornerRadius="12" VerticalAlignment="Center"
+                        <Border Width="24" Height="24" CornerRadius="12" VerticalAlignment="Center" Cursor="Hand"
                                 MouseLeftButtonDown="OnGearMouseDown">
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Setter Property="Background" Value="Transparent" />
                                     <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource Hover}" />
+                                        </Trigger>
                                         <DataTrigger Binding="{Binding IsOnPage}" Value="True">
                                             <Setter Property="Background" Value="{StaticResource Surface}" />
                                         </DataTrigger>
@@ -492,7 +527,8 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Grid Margin="0,0,18,0">
+                                <Grid x:Name="Tab" Margin="0,0,18,0" Background="Transparent" Cursor="Hand"
+                                      MouseLeftButtonDown="OnTabMouseDown">
                                     <TextBlock x:Name="TabText" Text="{Binding Title}" Height="28" Padding="0,5,0,0"
                                                FontSize="14" FontWeight="SemiBold" VerticalAlignment="Top"
                                                Foreground="{StaticResource Subtle}" />
@@ -501,6 +537,9 @@
                                                Fill="{DynamicResource Accent}" />
                                 </Grid>
                                 <DataTemplate.Triggers>
+                                    <Trigger SourceName="Tab" Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource Muted}" />
+                                    </Trigger>
                                     <DataTrigger Binding="{Binding IsCurrent}" Value="True">
                                         <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource Text}" />
                                         <Setter TargetName="Underline" Property="Visibility" Value="Visible" />
@@ -509,7 +548,7 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <Grid Margin="14,0" Background="Transparent" MouseLeftButtonDown="OnBackMouseDown">
+                    <Grid Margin="14,0" Background="Transparent" Cursor="Hand" MouseLeftButtonDown="OnBackMouseDown">
                         <Grid.Style>
                             <Style TargetType="Grid">
                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -545,13 +584,26 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <StackPanel Orientation="Horizontal" Height="20" Margin="0,0,12,0">
+                            <StackPanel x:Name="Hint" Orientation="Horizontal" Height="20" Margin="0,0,12,0"
+                                        Background="Transparent" MouseLeftButtonDown="OnFooterMouseDown">
                                 <Border Style="{StaticResource Keycap}" Padding="5,0">
                                     <TextBlock Style="{StaticResource KeycapText}" Text="{Binding Keys}" />
                                 </Border>
-                                <TextBlock Text="{Binding Label}" Margin="5,0,0,0" FontSize="12"
+                                <TextBlock x:Name="HintLabel" Text="{Binding Label}" Margin="5,0,0,0" FontSize="12"
                                            VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
                             </StackPanel>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsClickable}" Value="True">
+                                    <Setter TargetName="Hint" Property="Cursor" Value="Hand" />
+                                </DataTrigger>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsClickable}" Value="True" />
+                                        <Condition Binding="{Binding IsMouseOver, ElementName=Hint}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter TargetName="HintLabel" Property="Foreground" Value="{StaticResource Text}" />
+                                </MultiDataTrigger>
+                            </DataTemplate.Triggers>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

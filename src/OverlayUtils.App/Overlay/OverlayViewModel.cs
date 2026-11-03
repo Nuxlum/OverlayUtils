@@ -13,7 +13,10 @@ internal sealed record TabVm(string Title, bool IsCurrent);
 
 internal sealed record OptionVm(int Index, string Label, bool IsCursor, bool IsActive, bool IsPending);
 
-internal sealed record FooterVm(string Keys, string Label);
+internal sealed record FooterVm(string Keys, string Label, OverlayCommand? Command = null)
+{
+    public bool IsClickable => Command is not null;
+}
 
 /// <summary>
 /// One visible row. <see cref="Index"/> is the navigator index, so clicks map back to it. <see cref="IsOn"/> is the
@@ -126,7 +129,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         }
         Rows = rows;
         Description = nav.Description();
-        Footer = nav.Footer(pad).Select(h => new FooterVm(h.Keys, h.Label)).ToList();
+        Footer = nav.Footer(pad).Select(h => new FooterVm(h.Keys, h.Label, h.Command)).ToList();
     }
 
     /// <summary>A Slider's Value is its percent ("45%").</summary>

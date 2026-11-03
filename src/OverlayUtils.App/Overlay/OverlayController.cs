@@ -60,6 +60,11 @@ internal sealed class OverlayController : IDisposable
         _window.Bind(_vm);
         _window.CommandIssued += OnCommand;
         _window.RowClicked += OnRowClicked;
+        _window.RowHovered += index => { if (_open && _navigator.Hover(index)) Render(); };
+        _window.TabClicked += index => { if (_open) Apply(_navigator.ClickTab(index)); };
+        _window.StepClicked += (index, direction) => { if (_open) Apply(_navigator.ClickStep(index, direction)); };
+        _window.LevelClicked += (index, fraction) => { if (_open) Apply(_navigator.ClickLevel(index, fraction)); };
+        _window.MediaClicked += (index, button) => { if (_open) Apply(_navigator.ClickMedia(index, button)); };
         _window.Closing += OnClosing;
 
         _hwnd = new WindowInteropHelper(_window).EnsureHandle(); // the window applies its chrome and backdrop here
@@ -161,6 +166,7 @@ internal sealed class OverlayController : IDisposable
             Render();
 
             _window.PrepareOpening(cfg.OverlaySide);
+            _window.ResetPointer();
             _window.Show();
             Place(); // Show must not have moved it
             _open = true;
