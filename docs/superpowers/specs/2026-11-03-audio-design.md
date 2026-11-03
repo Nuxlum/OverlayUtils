@@ -99,6 +99,35 @@ Python reference (`reference/python/app.py`, see `docs/PYTHON-CODEMAP.md`):
 7. Volume and mute changes are reflected live in the overlay if changed
    elsewhere (Windows flyout, keyboard keys) while it is open.
 
+## Additions approved after review (2026-11-03)
+
+8. **Mix per output device:** channel and app volumes/mutes are stored per
+   output device; when the default output changes, that device's mix is
+   applied (a device seen for the first time starts from the current mix).
+9. **Mix presets:** save the current channel volumes/mutes as a named
+   preset; a "Presets" row in the Audio tab applies one with Left/Right + A.
+   Presets are per output device like the mix (my call: a preset saved on
+   the speakers applies to whichever device is current; it is not tied).
+10. **Pad volume shortcut:** with the overlay closed and Pad combos on,
+    Back+D-pad Left/Right lower/raise the master volume (repeat while held),
+    showing a small volume indicator (non-activating, topmost, ~1.5 s, on
+    the monitor of the foreground window). Back+Y toggles the microphone
+    mute (same indicator, mic icon). (my calls on the buttons)
+11. **Microphone mute** row in the Audio tab (Input row: A mutes the default
+    input device, so it works in every app).
+12. **Volume cap per output device:** Settings → Audio → a maximum master
+    volume per device (default 100 %); the master volume never goes above it
+    from the overlay or the pad, and is lowered to it when that device
+    becomes the default. (Windows' own volume keys are not intercepted.)
+
+## Build in two parts
+
+- **4a - devices:** goals 1 (Output, Input + mic mute, Volume, Now playing
+  rows; no Channels section yet), 4 (media buttons), 5 (priority lists and
+  auto-switch), 6, 7, 10, 11, 12.
+- **4b - mixing:** goals 1 (Channels section), 2, 3, 8, 9.
+Each part is planned, built, reviewed and tested on its own.
+
 ## Changes from Python
 
 - The now-playing card moves from Controls to the Audio tab.
