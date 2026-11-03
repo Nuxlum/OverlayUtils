@@ -270,6 +270,53 @@ public sealed class OverlayNavigator
         return Activate();
     }
 
+    // --- mouse ------------------------------------------------------------------
+
+    /// <summary>Mouse over a row: it becomes the selection (true if that changed). Ignored while a row is held.</summary>
+    public bool Hover(int index)
+    {
+        var items = Items;
+        if (_holding || index == Index || index < 0 || index >= items.Count || !IsSelectable(items[index])) return false;
+        Select(index);
+        return true;
+    }
+
+    /// <summary>Click on a tab header (index into <see cref="VisibleTabs"/>); from a page it goes back to that tab.</summary>
+    public NavResult ClickTab(int visibleIndex)
+    {
+        if (_holding || visibleIndex < 0 || visibleIndex >= VisibleTabs.Count) return None;
+        if (Page != OverlayPage.Tabs) Page = OverlayPage.Tabs;
+        else if (visibleIndex == _tabIndex) return None;
+        _tabIndex = visibleIndex;
+        SelectFirst();
+        return Redraw;
+    }
+
+    /// <summary>Click on a picker arrow: select the row, then as Left (-1) or Right (+1).</summary>
+    public NavResult ClickStep(int index, int direction) =>
+        SelectForClick(index) ? Horizontal(Math.Sign(direction)) : None;
+
+    /// <summary>Click or drag on a slider bar at <paramref name="fraction"/> of its width.</summary>
+    public NavResult ClickLevel(int index, double fraction)
+    {
+        if (!SelectForClick(index) || Items[index].SetLevel is not { } set) return None;
+        var level = Math.Clamp(fraction, 0.0, 1.0);
+        return new NavResult(NavEffect.RunHere, () => set(level));
+    }
+
+    /// <summary>Click on a media button: -1 previous, 0 play/pause, +1 next.</summary>
+    public NavResult ClickMedia(int index, int button) =>
+        !SelectForClick(index) || Items[index].Kind != ItemKind.Media ? None
+        : Media(_media is { } m ? button < 0 ? m.Previous : button > 0 ? m.Next : m.PlayPause : null);
+
+    bool SelectForClick(int index)
+    {
+        var items = Items;
+        if (_holding || index < 0 || index >= items.Count || !IsSelectable(items[index])) return false;
+        if (index != Index) Select(index);
+        return true;
+    }
+
     public bool ExpirePending()
     {
         if (_pending is not { } p || _time.GetUtcNow() <= p.Deadline) return false;
@@ -285,9 +332,9 @@ public sealed class OverlayNavigator
         var hints = new List<FooterHint>();
         if (_holding)
         {
-            hints.Add(new FooterHint(pad ? "A" : "Enter", Loc.T("Overlay.Footer.Drop")));
+            hints.Add(new FooterHint(pad ? "A" : "Enter", Loc.T("Overlay.Footer.Drop"), OverlayCommand.A));
             hints.Add(new FooterHint("↑ ↓", Loc.T("Overlay.Footer.Move")));
-            hints.Add(new FooterHint(pad ? "B" : "Esc", Loc.T("Overlay.Footer.Cancel")));
+            hints.Add(new FooterHint(pad ? "B" : "Esc", Loc.T("Overlay.Footer.Cancel"), OverlayCommand.B));
             return hints;
         }
         var item = Selected;
@@ -304,7 +351,7 @@ public sealed class OverlayNavigator
                 ItemKind.Expander => "Overlay.Footer.Open",
                 ItemKind.Info => "Overlay.Footer.Select",
                 _ => "Overlay.Footer.Confirm",
-            })));
+            }), OverlayCommand.A));
             if (item.Kind is ItemKind.Segmented or ItemKind.Choice)
                 hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.Change")));
             else if (item.Kind == ItemKind.Slider)
@@ -316,14 +363,14 @@ public sealed class OverlayNavigator
         }
         if (Page == OverlayPage.Tabs)
         {
-            hints.Add(new FooterHint(pad ? "B" : "Esc", Loc.T("Overlay.Footer.Close")));
+            hints.Add(new FooterHint(pad ? "B" : "Esc", Loc.T("Overlay.Footer.Close"), OverlayCommand.B));
             hints.Add(pad
-                ? new FooterHint("Back", Loc.T("Overlay.Footer.SettingsHold"))
-                : new FooterHint("F2", Loc.T("Overlay.Footer.Settings")));
+                ? new FooterHint("Back", Loc.T("Overlay.Footer.SettingsHold"), OverlayCommand.Settings)
+                : new FooterHint("F2", Loc.T("Overlay.Footer.Settings"), OverlayCommand.Settings));
         }
         else
         {
-            hints.Add(new FooterHint(pad ? "B" : "Esc", Loc.T("Overlay.Footer.Back")));
+            hints.Add(new FooterHint(pad ? "B" : "Esc", Loc.T("Overlay.Footer.Back"), OverlayCommand.B));
         }
         return hints;
     }

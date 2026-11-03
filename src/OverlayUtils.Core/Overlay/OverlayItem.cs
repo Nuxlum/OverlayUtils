@@ -20,7 +20,8 @@ public sealed record OverlayOption(Func<string> Label, Action Action, bool Stay 
 
 public sealed record OverlayTab(string Id, Func<string> Title, Func<IReadOnlyList<OverlayItem>> Items);
 
-public sealed record FooterHint(string Keys, string Label);
+/// <summary>A footer hint; <paramref name="Command"/> is what clicking it does (null: not clickable).</summary>
+public sealed record FooterHint(string Keys, string Label, OverlayCommand? Command = null);
 
 /// <summary>A row of the overlay. Which properties matter depends on <see cref="Kind"/>.</summary>
 public sealed class OverlayItem
@@ -34,6 +35,7 @@ public sealed class OverlayItem
     public Func<IReadOnlyList<OverlayOption>> Options { get; init; } = () => [];  // Segmented
     public Func<string> Value { get; init; } = () => "";                         // Choice, Info
     public Action<int>? Step { get; init; }              // Choice
+    public Action<double>? SetLevel { get; init; }       // Slider: level 0..1 (click on the bar)
     public Action? Apply { get; init; }                  // Choice: A runs this after hiding
     public Func<bool> IsOn { get; init; } = () => false; // Toggle, Expander
     public Action? Toggle { get; init; }                 // Toggle, Expander

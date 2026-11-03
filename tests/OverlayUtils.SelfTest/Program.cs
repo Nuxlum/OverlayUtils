@@ -754,9 +754,9 @@ string RepoRoot()
     var nav = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
     nav.Reset([]);
     var pad = nav.Footer(pad: true);
-    Check(pad.Contains(new FooterHint("A", Loc.T("Overlay.Footer.Confirm"))), "pad footer: A confirms");
-    Check(pad.Contains(new FooterHint("B", Loc.T("Overlay.Footer.Close"))), "pad footer: B closes");
-    Check(pad.Contains(new FooterHint("Back", Loc.T("Overlay.Footer.SettingsHold"))), "pad footer: hold Back for Settings");
+    Check(pad.Contains(new FooterHint("A", Loc.T("Overlay.Footer.Confirm"), OverlayCommand.A)), "pad footer: A confirms");
+    Check(pad.Contains(new FooterHint("B", Loc.T("Overlay.Footer.Close"), OverlayCommand.B)), "pad footer: B closes");
+    Check(pad.Contains(new FooterHint("Back", Loc.T("Overlay.Footer.SettingsHold"), OverlayCommand.Settings)), "pad footer: hold Back for Settings");
     Check(pad.All(h => h.Keys is not ("Enter" or "Esc" or "F2")), "pad footer has no keyboard keys");
     var keys = nav.Footer();
     Check(keys.Any(h => h.Keys == "Enter") && keys.Any(h => h.Keys == "F2"), "keyboard footer unchanged");
@@ -865,7 +865,7 @@ string RepoRoot()
     Check(log.SequenceEqual(["mute"]), "slider A mutes");
     log.Clear();
     var f = nav.Footer();
-    Check(f.Contains(new FooterHint("← →", Loc.T("Overlay.Footer.Volume"))) && f[0] == new FooterHint("Enter", Loc.T("Overlay.Footer.Mute")),
+    Check(f.Contains(new FooterHint("← →", Loc.T("Overlay.Footer.Volume"))) && f[0] == new FooterHint("Enter", Loc.T("Overlay.Footer.Mute"), OverlayCommand.A),
         "slider footer: arrows Volume, A Mute");
 
     nav.Handle(OverlayCommand.Down);
@@ -1295,6 +1295,75 @@ string RepoRoot()
     var shortcuts = content.Info().Where(i => i.Kind == ItemKind.Info && i.Visible()).Select(i => i.Value()).ToList();
     foreach (var expected in new[] { "Back + ← / →", "Back + Y", "LB / RB / X" })
         Check(shortcuts.Contains(expected), $"Info shortcuts list {expected}");
+}
+
+// --- Mouse entry points -----------------------------------------------------
+{
+    var log = new List<string>();
+    var clock = new TestClock { Now = DateTimeOffset.UnixEpoch };
+    OverlayItem Act(string name) => new() { Kind = ItemKind.Action, Label = () => name, Action = () => log.Add(name) };
+    var power = new OverlayItem
+    {
+        Kind = ItemKind.Segmented, Label = () => "Power", Confirm = true,
+        Options = () => [new OverlayOption(() => "Sleep", () => log.Add("sleep")), new OverlayOption(() => "Off", () => log.Add("off"))],
+    };
+    var pick = new OverlayItem { Kind = ItemKind.Choice, Label = () => "Pick", Step = d => log.Add($"step {d}") };
+    var vol = new OverlayItem { Kind = ItemKind.Slider, Label = () => "Vol", Step = d => log.Add($"vstep {d}"), SetLevel = v => log.Add("level " + v.ToString(CultureInfo.InvariantCulture)) };
+    var media = new OverlayItem { Kind = ItemKind.Media, Label = () => "Now" };
+    var hidden = new OverlayItem { Kind = ItemKind.Action, Label = () => "Hidden", Visible = () => false };
+    var tabA = new OverlayTab("Controlli", () => "A", () => [Act("first"), power, pick, vol, media, hidden]);
+    var tabB = new OverlayTab("Audio", () => "B", () => [Act("b-first"), Act("b-second")]);
+    var order = new List<string> { "x", "y" };
+    var reorder = new OverlayItem { Kind = ItemKind.Reorder, Label = () => "x", Key = "x", Move = d => log.Add($"move {d}"), Commit = () => log.Add("commit"), Cancel = () => log.Add("cancel") };
+    var nav = new OverlayNavigator([tabA, tabB], () => [Act("s-first"), Act("s-second")], () => [reorder], clock, new FakeMedia(log));
+    nav.Reset([]);
+    void Run(NavResult r) => r.Action?.Invoke();
+
+    Check(nav.Hover(2) && nav.Index == 2, "hover selects the row");
+    Check(!nav.Hover(2), "hover on the selected row changes nothing");
+    Check(!nav.Hover(5) && nav.Index == 2, "hover on a hidden row is ignored");
+    Check(!nav.Hover(99), "hover outside the list is ignored");
+
+    nav.Hover(1);
+    Run(nav.Click(1, 1));
+    Check(nav.IsPending(1, 1), "click arms Power");
+    nav.Hover(0);
+    Check(!nav.IsPending(1, 1), "hovering away disarms the confirm");
+    nav.Hover(1);
+    var again = nav.Click(1, 1);
+    Check(again.Effect == NavEffect.Redraw && !log.Contains("off"), "hovering back does not re-arm: the next click only arms");
+
+    log.Clear();
+    Run(nav.ClickStep(2, 1));
+    Check(log.SequenceEqual(["step 1"]) && nav.Index == 2, "picker arrow click selects and steps");
+    log.Clear();
+    Run(nav.ClickLevel(3, 1.4)); Run(nav.ClickLevel(3, -0.2)); Run(nav.ClickLevel(3, 0.5));
+    Check(log.SequenceEqual(["level 1", "level 0", "level 0.5"]), "volume bar clicks clamp to 0..1");
+    log.Clear();
+    Run(nav.ClickMedia(4, -1)); Run(nav.ClickMedia(4, 0)); Run(nav.ClickMedia(4, 1));
+    Check(log.Count == 3 && nav.Index == 4, "media buttons call previous, play/pause, next");
+
+    Check(nav.ClickTab(1).Effect == NavEffect.Redraw && nav.CurrentTab.Id == "Audio" && nav.Index == 0, "tab click switches tab");
+    nav.Handle(OverlayCommand.Settings);
+    nav.ClickTab(0);
+    Check(nav.Page == OverlayPage.Tabs && nav.CurrentTab.Id == "Controlli", "tab click from Settings returns to that tab");
+
+    // A held Reorder row ignores tab clicks and hover.
+    var holdNav = new OverlayNavigator([new OverlayTab("Controlli", () => "A", () => [reorder]), tabB], () => [], () => [], clock);
+    holdNav.Reset([]);
+    holdNav.Handle(OverlayCommand.A);
+    Check(holdNav.Holding, "row picked up");
+    Check(holdNav.ClickTab(1).Effect == NavEffect.None && holdNav.Holding, "tab click while holding does nothing");
+    Check(!holdNav.Hover(0) && holdNav.Holding, "hover while holding is ignored");
+
+    var keys = nav.Footer();
+    Check(keys.Any(h => h.Keys == "Esc" && h.Command == OverlayCommand.B), "footer Esc hint carries B");
+    Check(keys.Any(h => h.Keys == "F2" && h.Command == OverlayCommand.Settings), "footer F2 hint carries Settings");
+    Check(keys.Any(h => h.Keys == "Enter" && h.Command == OverlayCommand.A), "footer Enter hint carries A");
+    var padKeys = nav.Footer(pad: true);
+    Check(padKeys.Any(h => h.Keys == "B" && h.Command == OverlayCommand.B) && padKeys.Any(h => h.Keys == "Back" && h.Command == OverlayCommand.Settings), "pad footer hints carry commands");
+    nav.Hover(2);
+    Check(nav.Footer().Where(h => h.Keys == "← →").All(h => h.Command == null), "arrow hints have no single command");
 }
 
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
