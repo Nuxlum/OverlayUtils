@@ -698,6 +698,48 @@ string RepoRoot()
         && PadInterpreter.BatteryLevel(1, -1) == null && PadInterpreter.BatteryLevel(0, 50) == null, "battery unknown cases");
 }
 
+// --- Pad interpreter: duplicate pads and stale Back hold --------------------
+{
+    var clock = new TestClock { Now = DateTimeOffset.UnixEpoch };
+    var toggle = new PadAction(PadActionKind.ToggleOverlay);
+    var down = new PadAction(PadActionKind.Command, OverlayCommand.Down);
+
+    // One physical pad seen twice (DS4Windows/ViGEm): every press arrives on two pads.
+    var p = new PadInterpreter(clock);
+    var acts = new List<PadAction>();
+    foreach (var pad in new uint[] { 1, 2 }) { p.ButtonDown(pad, PadButton.Back); p.ButtonDown(pad, PadButton.RB); }
+    foreach (var pad in new uint[] { 1, 2 }) acts.AddRange(p.ButtonUp(pad, PadButton.RB));
+    Check(acts.SequenceEqual([toggle]), "duplicate pad toggles the overlay once");
+    foreach (var pad in new uint[] { 1, 2 }) p.ButtonUp(pad, PadButton.Back);
+    clock.Now += TimeSpan.FromSeconds(0.3);
+    p.ButtonDown(1, PadButton.Back); p.ButtonDown(1, PadButton.RB);
+    Check(p.ButtonUp(1, PadButton.RB).SequenceEqual([toggle]), "a later toggle still works");
+    p.ButtonUp(1, PadButton.Back);
+
+    p = new PadInterpreter(clock) { OverlayOpen = true };
+    acts = [.. p.ButtonDown(1, PadButton.DpadDown), .. p.ButtonDown(2, PadButton.DpadDown)];
+    Check(acts.SequenceEqual([down]), "duplicate pad moves one row");
+    clock.Now += TimeSpan.FromSeconds(0.41);
+    Check(p.Tick().SequenceEqual([down]), "duplicate pad repeats once");
+    p.ButtonUp(1, PadButton.DpadDown); p.ButtonUp(2, PadButton.DpadDown);
+    clock.Now += TimeSpan.FromSeconds(0.2);
+    Check(p.ButtonDown(2, PadButton.DpadDown).SequenceEqual([down]), "second pad alone still navigates");
+    p.ButtonUp(2, PadButton.DpadDown);
+    clock.Now += TimeSpan.FromSeconds(0.1);
+    p.ButtonDown(1, PadButton.DpadDown); p.ButtonUp(1, PadButton.DpadDown);
+    Check(p.ButtonDown(1, PadButton.DpadDown).SequenceEqual([down]), "same pad pressing twice quickly is not deduplicated");
+
+    // Back held in a game, then the overlay opens: no instant Settings.
+    p = new PadInterpreter(clock);
+    p.ButtonDown(1, PadButton.Back);
+    clock.Now += TimeSpan.FromSeconds(0.3);
+    p.Tick();
+    p.OverlayOpen = true;
+    clock.Now += TimeSpan.FromSeconds(0.4);
+    Check(!p.Tick().Contains(new PadAction(PadActionKind.Command, OverlayCommand.Settings)),
+        "Back held before the overlay opened does not open Settings");
+}
+
 // --- Pad in the overlay -----------------------------------------------------
 {
     var store = new ConfigStore(Path.Combine(temp, "padui", "config.json"));

@@ -27,6 +27,12 @@ public sealed class PadInterpreter
     public static readonly TimeSpan SettingsHold = TimeSpan.FromSeconds(0.6);
     public const short PressThreshold = 16000, ReleaseThreshold = 8000;
 
+    // One physical pad can show up twice (DS4Windows/ViGEm, reWASD: real pad + virtual
+    // Xbox pad), so each press arrives from two pads. The same action from another pad
+    // this close in time is dropped; a toggle shortly after a toggle is always dropped.
+    public static readonly TimeSpan DuplicateWindow = TimeSpan.FromMilliseconds(50);
+    public static readonly TimeSpan ToggleDebounce = TimeSpan.FromMilliseconds(250);
+
     // Triggers behave as buttons; they get keys after the PadButton values.
     private const int LT = 100, RT = 101;
     // Repeat sources for the stick, distinct from button keys.
@@ -47,41 +53,48 @@ public sealed class PadInterpreter
 
     private readonly TimeProvider _time;
     private readonly Dictionary<uint, Pad> _pads = [];
+    private readonly Dictionary<PadAction, (uint Pad, DateTimeOffset At)> _lastEmitted = [];
+    private bool _overlayOpen;
 
     public PadInterpreter(TimeProvider? time = null) => _time = time ?? TimeProvider.System;
 
-    public bool OverlayOpen { get; set; }
+    public bool OverlayOpen
+    {
+        get => _overlayOpen;
+        set
+        {
+            if (value == _overlayOpen) return;
+            _overlayOpen = value;
+            // A Back hold that started before the change must not open Settings.
+            foreach (var state in _pads.Values) state.BackSince = null;
+        }
+    }
     public bool CombosEnabled { get; set; } = true;
     public uint? LastUsedPad { get; private set; }
 
     public IReadOnlyList<PadAction> ButtonDown(uint pad, PadButton button)
     {
         LastUsedPad = pad;
-        return button == PadButton.Guide ? None : Press(Get(pad), (int)button);
+        return button == PadButton.Guide ? None : Emit(pad, Press(Get(pad), (int)button));
     }
 
     public IReadOnlyList<PadAction> ButtonUp(uint pad, PadButton button)
     {
         LastUsedPad = pad;
-        return button == PadButton.Guide ? None : Release(Get(pad), (int)button);
+        return button == PadButton.Guide ? None : Emit(pad, Release(Get(pad), (int)button));
     }
 
     public IReadOnlyList<PadAction> Axis(uint pad, PadAxis axis, short value)
     {
         var state = Get(pad);
-        switch (axis)
+        return Emit(pad, axis switch
         {
-            case PadAxis.LeftTrigger:
-                return Trigger(state, ref state.LtDown, LT, value);
-            case PadAxis.RightTrigger:
-                return Trigger(state, ref state.RtDown, RT, value);
-            case PadAxis.LeftX:
-                return Stick(state, ref state.StickXDir, StickX, value, OverlayCommand.Left, OverlayCommand.Right);
-            case PadAxis.LeftY:
-                return Stick(state, ref state.StickYDir, StickY, value, OverlayCommand.Up, OverlayCommand.Down);
-            default:
-                return None;
-        }
+            PadAxis.LeftTrigger => Trigger(state, ref state.LtDown, LT, value),
+            PadAxis.RightTrigger => Trigger(state, ref state.RtDown, RT, value),
+            PadAxis.LeftX => Stick(state, ref state.StickXDir, StickX, value, OverlayCommand.Left, OverlayCommand.Right),
+            PadAxis.LeftY => Stick(state, ref state.StickYDir, StickY, value, OverlayCommand.Up, OverlayCommand.Down),
+            _ => None,
+        });
     }
 
     public IReadOnlyList<PadAction> Tick()
@@ -93,20 +106,22 @@ public sealed class PadInterpreter
         }
         var now = _time.GetUtcNow();
         var actions = new List<PadAction>();
-        foreach (var state in _pads.Values)
+        foreach (var (pad, state) in _pads)
         {
+            var mine = new List<PadAction>();
             if (state.BackSince is { } since && now - since >= SettingsHold)
             {
                 state.BackSince = null;
                 state.BackConsumed = true;
-                actions.Add(Command(OverlayCommand.Settings));
+                mine.Add(Command(OverlayCommand.Settings));
             }
             foreach (var (source, (repeat, next)) in state.Repeats.ToList())
             {
                 if (now < next) continue;
                 state.Repeats[source] = (repeat, now + RepeatInterval);
-                actions.Add(Command(repeat));
+                mine.Add(Command(repeat));
             }
+            actions.AddRange(Emit(pad, mine));
         }
         return actions;
     }
@@ -124,6 +139,26 @@ public sealed class PadInterpreter
         if (sdlPowerState == charged) return 3;
         if (sdlPowerState is not (onBattery or charging) || percent < 0) return null;
         return percent switch { <= 10 => 0, <= 40 => 1, <= 70 => 2, _ => 3 };
+    }
+
+    /// <summary>Drops actions a duplicate pad already produced (see <see cref="DuplicateWindow"/>).</summary>
+    private IReadOnlyList<PadAction> Emit(uint pad, IReadOnlyList<PadAction> actions)
+    {
+        if (actions.Count == 0) return actions;
+        var now = _time.GetUtcNow();
+        var kept = new List<PadAction>(actions.Count);
+        foreach (var action in actions)
+        {
+            if (_lastEmitted.TryGetValue(action, out var last))
+            {
+                var window = action.Kind == PadActionKind.ToggleOverlay ? ToggleDebounce : DuplicateWindow;
+                var otherPad = last.Pad != pad || action.Kind == PadActionKind.ToggleOverlay;
+                if (otherPad && now - last.At < window) continue;
+            }
+            _lastEmitted[action] = (pad, now);
+            kept.Add(action);
+        }
+        return kept;
     }
 
     private Pad Get(uint pad)

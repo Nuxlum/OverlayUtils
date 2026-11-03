@@ -59,6 +59,16 @@ The stage checklist lives in `PORTING.md`.
 - 2026-11-03 - **Input bleed accepted:** a game still sees the pad while the
   overlay is open; no driver-free fix known (research item in Backlog).
 
+- 2026-11-03 - **Duplicate pads:** the same action from another pad within
+  50 ms is dropped, and a second overlay toggle within 250 ms too, because
+  DS4Windows/ViGEm/reWASD show one physical pad twice.
+- 2026-11-03 - **Monitor combos fire only on the D-pad press** (Back held
+  first), not when Back is pressed while the D-pad is held: holding the D-pad
+  in a game and then pressing Back must not switch monitors.
+- 2026-11-03 - **Footer shows pad buttons instead of keys** while a pad is
+  connected (Enter/Esc/F2 still work); pad shortcuts are listed in the Info
+  Shortcuts panel, marked "(pad)", not in a separate section.
+
 ## Open questions
 
 - Signing: stay self-signed, or get a CA-issued certificate (Azure Artifact
