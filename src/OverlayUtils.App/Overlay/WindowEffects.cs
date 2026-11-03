@@ -89,9 +89,12 @@ internal static class WindowEffects
         return false;
     }
 
-    /// <summary>The Windows accent (light variant, for a dark background), or Python's blue.</summary>
-    public static Color Accent() =>
-        AccentPalette.Read() is { } c ? Color.FromRgb(c.R, c.G, c.B) : OverlayViewModel.FallbackAccent;
+    /// <summary>The Windows accent in a variant readable on the dark panel, or Python's blue.</summary>
+    public static Color Accent()
+    {
+        var c = AccentPalette.ReadForDarkBackground();
+        return Color.FromRgb(c.R, c.G, c.B);
+    }
 
     static bool TransparencyEnabled()
     {

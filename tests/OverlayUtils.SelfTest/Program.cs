@@ -403,6 +403,18 @@ string RepoRoot()
     byte[] palette = [0x99, 0xEB, 0xFF, 0, 0x4C, 0xC2, 0xFF, 0, 0, 0x78, 0xD4, 0];
     Check(AccentPalette.LightVariant(palette) == ((byte)0x4C, (byte)0xC2, (byte)0xFF), "light accent is entry 1");
     Check(AccentPalette.LightVariant([1, 2, 3]) is null && AccentPalette.LightVariant(null) is null, "short palette ignored");
+
+    var blueAccent = ((byte)0x4C, (byte)0xC2, (byte)0xFF);
+    byte[] blue = [0x99, 0xEB, 0xFF, 0, 0x60, 0xCD, 0xFF, 0, 0, 0x78, 0xD4, 0];
+    Check(AccentPalette.ForDarkBackground(blue) == ((byte)0x60, (byte)0xCD, (byte)0xFF), "readable light accent (entry 1) is used");
+    byte[] grey = [0xC4, 0xC4, 0xC4, 0, 0x59, 0x59, 0x59, 0, 0x4C, 0x4C, 0x4C, 0];
+    Check(AccentPalette.ForDarkBackground(grey) == ((byte)0xC4, (byte)0xC4, (byte)0xC4), "dim entry 1 falls back to entry 0");
+    byte[] dark = [0x6B, 0x6B, 0x6B, 0, 0x59, 0x59, 0x59, 0, 0x4C, 0x4C, 0x4C, 0];
+    Check(AccentPalette.ForDarkBackground(dark) == AccentPalette.Fallback, "unreadable palette uses #4CC2FF");
+    Check(AccentPalette.Fallback == blueAccent, "accent fallback is #4CC2FF");
+    Check(AccentPalette.ForDarkBackground(null) == AccentPalette.Fallback
+        && AccentPalette.ForDarkBackground([1, 2, 3]) == AccentPalette.Fallback, "missing palette uses #4CC2FF");
+    Check(Math.Abs(AccentPalette.Contrast((255, 255, 255), (0, 0, 0)) - 21) < 1e-9, "WCAG contrast white/black is 21:1");
 }
 
 // --- Overlay content --------------------------------------------------------
