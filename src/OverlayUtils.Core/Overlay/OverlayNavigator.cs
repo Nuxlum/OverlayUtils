@@ -120,7 +120,11 @@ public sealed class OverlayNavigator
             }
         }
         var cancel = _selectedKey != null ? TakeHold() : null; // keyed entry is gone
-        if (Index >= 0 && Index < items.Count && IsSelectable(items[Index])) return cancel;
+        if (Index >= 0 && Index < items.Count && IsSelectable(items[Index]))
+        {
+            _selectedKey = items[Index].Key; // drop a stale key so later Refreshes do not misread it
+            return cancel;
+        }
 
         var from = Math.Clamp(Index, 0, Math.Max(items.Count - 1, 0));
         for (var i = from; i >= 0; i--)

@@ -980,6 +980,24 @@ string RepoRoot()
     Run(nav.Handle(OverlayCommand.Down)); Run(nav.Handle(OverlayCommand.A));
     Check(!log.Any(l => l.StartsWith("move") || l == "commit"), "neighbour's Move/Commit not called after the hold was dropped");
 
+    // After the vanish, a new pick-up must survive Refresh (no stale key)
+    nav.Reset([]); log.Clear();
+    order.Clear(); order.AddRange(["a", "b", "c", "d"]);
+    nav.Handle(OverlayCommand.NextTab);
+    nav.Handle(OverlayCommand.Down);
+    nav.Handle(OverlayCommand.A);
+    order.Remove("b");
+    nav.Refresh();
+    Check(nav.Selected!.Key == "c", "fallback selection is c");
+    nav.Handle(OverlayCommand.A);
+    Check(nav.Holding, "picked up c");
+    nav.Refresh();
+    Check(nav.Holding && nav.Selected!.Key == "c", "Refresh keeps a pick-up made after the vanish");
+    log.Clear();
+    Run(nav.Handle(OverlayCommand.Down));
+    Check(log.SequenceEqual(["move c 1"]) && nav.Selected!.Key == "c", "Down moves c");
+    nav.Handle(OverlayCommand.B);
+
     // Selected media row hides
     nav.Reset([]);
     nav.Handle(OverlayCommand.Down); nav.Handle(OverlayCommand.Down);
