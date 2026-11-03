@@ -232,7 +232,7 @@ public sealed partial class AudioService : IDisposable
             _defaultInput = defaultInput;
         }
 
-        if (defaultOutput != _boundOutput) BindOutput(defaultOutput);
+        if (defaultOutput != _boundOutput) BindOutput(defaultOutput, applyCap: !starting);
         if (defaultInput != _boundInput) BindInput(defaultInput);
         ReadVolumes(raise: false);
         RaiseChanged();
@@ -296,16 +296,24 @@ public sealed partial class AudioService : IDisposable
         return ok;
     }
 
-    private void BindOutput(string? id)
+    /// <summary>Binds the default output volume; the cap applies only when the default changes, never at start.</summary>
+    private void BindOutput(string? id, bool applyCap)
     {
         Unbind(ref _outputVolume, ref _outputCallback);
         _boundOutput = id;
         if (id is null) return;
         (_outputVolume, _outputCallback) = Bind(id);
-        if (_outputVolume is null) return;
-        var cap = AudioRules.CapFor(_config.Current.AudioVolumeCaps, id);
-        if (_outputVolume.GetMasterVolumeLevelScalar() > cap + 1e-4)
-            _outputVolume.SetMasterVolumeLevelScalar((float)cap, EventContext);
+        if (_outputVolume is null || !applyCap) return;
+        try
+        {
+            var cap = AudioRules.CapFor(_config.Current.AudioVolumeCaps, id);
+            if (_outputVolume.GetMasterVolumeLevelScalar() > cap + 1e-4)
+                _outputVolume.SetMasterVolumeLevelScalar((float)cap, EventContext);
+        }
+        catch (Exception e)
+        {
+            Log.Error("Applying the volume cap", e);
+        }
     }
 
     private void BindInput(string? id)
