@@ -89,7 +89,9 @@ The stage checklist lives in `PORTING.md`.
   offer it as an advanced option next to full mode.
 - [ ] Stage 7: "watch a friend's stream" in Discord is wanted; probably not
   in Discord's local RPC, may need a workaround.
-- [ ] Stage 4: decide whether audio output switching gets a pad shortcut.
+- [ ] Optional Sonar integration after the built-in audio features (show
+  the device Sonar routes to, ChatMix).
+- [ ] Stage 6: YouTube Music integration in addition to Spotify (keep both).
 
 ## Session log
 
