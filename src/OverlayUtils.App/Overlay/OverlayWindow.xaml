@@ -14,6 +14,8 @@
         UseLayoutRounding="True" KeyboardNavigation.TabNavigation="None"
         KeyboardNavigation.DirectionalNavigation="None" KeyboardNavigation.ControlTabNavigation="None"
         PreviewKeyDown="OnPreviewKeyDown" PreviewMouseWheel="OnPreviewMouseWheel" PreviewMouseMove="OnPreviewMouseMove"
+        PreviewMouseLeftButtonUp="OnPreviewMouseLeftButtonUp" LostMouseCapture="OnLostMouseCapture"
+        IsVisibleChanged="OnIsVisibleChanged"
         MouseRightButtonDown="OnMouseRightButtonDown">
     <Window.Resources>
         <ResourceDictionary>
@@ -62,6 +64,17 @@
                 </Style.Triggers>
             </Style>
 
+            <!-- Faint tint on the row under the mouse pointer (the accent tint marks the selection). -->
+            <Style x:Key="HoverTint" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource Hover}" />
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Grid}}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
             <!-- Clickable element inside a row or the header: hand cursor and a light background on hover. -->
             <Style x:Key="HoverButton" TargetType="Border">
                 <Setter Property="Background" Value="Transparent" />
@@ -98,6 +111,7 @@
                                 </TextBlock>
                                 <Grid Height="40" Margin="0,0,0,2" Background="Transparent" Cursor="Hand"
                                       MouseLeftButtonDown="OnRowMouseDown">
+                                    <Border Style="{StaticResource HoverTint}" CornerRadius="6" />
                                     <Border Style="{StaticResource Tint}" CornerRadius="6" />
                                     <Rectangle Style="{StaticResource AccentBar}" />
                                     <Grid>
@@ -249,6 +263,7 @@
             <DataTemplate x:Key="ExpanderRow">
                 <Grid Height="38" Margin="0,6,0,0" Background="Transparent" Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
                     <Border CornerRadius="8" Background="{StaticResource Surface}" />
+                    <Border Style="{StaticResource HoverTint}" CornerRadius="8" />
                     <Border Style="{StaticResource Tint}" CornerRadius="8" />
                     <Rectangle Style="{StaticResource AccentBar}" />
                     <Grid>
@@ -276,6 +291,7 @@
             <!-- Compact label/value row inside an open Info panel, with the action word on the right. -->
             <DataTemplate x:Key="InfoRow">
                 <Grid Height="25" Background="Transparent" Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
+                    <Border Style="{StaticResource HoverTint}" CornerRadius="6" Margin="6,0" />
                     <Border Style="{StaticResource Tint}" CornerRadius="6" Margin="6,0" />
                     <Rectangle Style="{StaticResource AccentBar}" Margin="6,0,0,0" />
                     <Grid>
@@ -304,8 +320,7 @@
                 <ContentControl Style="{StaticResource RowFrame}">
                     <StackPanel Orientation="Horizontal" Margin="0,0,4,0">
                         <Grid Width="134" Height="24" VerticalAlignment="Center" Background="Transparent"
-                              Cursor="Hand" Tag="VolumeBar" MouseLeftButtonDown="OnBarMouseDown"
-                              MouseMove="OnBarMouseMove" MouseLeftButtonUp="OnBarMouseUp">
+                              Cursor="Hand" Tag="VolumeBar" MouseLeftButtonDown="OnBarMouseDown">
                             <Grid Margin="7,0" Height="14">
                                 <Border Height="4" CornerRadius="2" Background="{StaticResource Line}" />
                                 <Border x:Name="Fill" Height="4" CornerRadius="2" HorizontalAlignment="Left"

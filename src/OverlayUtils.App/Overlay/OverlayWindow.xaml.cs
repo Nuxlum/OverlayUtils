@@ -59,11 +59,18 @@ internal sealed partial class OverlayWindow : Window
     // Last cursor position seen, in screen pixels: hover acts only when the mouse really moves, not when the
     // overlay opens under a still cursor or the list scrolls under it.
     Point? _lastPointer;
-    FrameworkElement? _dragBar;
+
+    // Volume bar drag. Every render rebuilds the rows, so the drag is tracked by row index and the window
+    // holds the capture; the window-to-bar transform taken at the press stays valid (same layout).
+    int? _dragRow;
+    GeneralTransform? _toBar;
+    double _barWidth;
+    int _dragPercent = -1;
 
     /// <summary>Called on open: the cursor where it is now does not count as a move.</summary>
     public void ResetPointer()
     {
+        EndDrag();
         var p = System.Windows.Forms.Cursor.Position;
         _lastPointer = new Point(p.X, p.Y);
     }
@@ -229,7 +236,13 @@ internal sealed partial class OverlayWindow : Window
 
     void OnPreviewMouseMove(object sender, MouseEventArgs e)
     {
-        if (_dragBar is not null) return; // dragging the volume bar keeps its row
+        if (_dragRow is not null)
+        {
+            // Dragging the volume bar keeps its row; no hover meanwhile.
+            if (e.LeftButton == MouseButtonState.Pressed) DragTo(e.GetPosition(this));
+            else EndDrag();
+            return;
+        }
         var p = PointToScreen(e.GetPosition(this));
         if (_lastPointer == p) return;
         _lastPointer = p;
@@ -264,35 +277,57 @@ internal sealed partial class OverlayWindow : Window
 
     void OnBarMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not FrameworkElement bar) return;
+        if (sender is not FrameworkElement bar || RowOf(bar) is not { } row) return;
         e.Handled = true;
-        _dragBar = bar;
-        bar.CaptureMouse();
-        SetLevelFrom(bar, e);
+        if (e.ClickCount > 1) return;
+        _dragRow = row.Index;
+        _toBar = TransformToDescendant(bar);
+        _barWidth = bar.ActualWidth;
+        _dragPercent = -1;
+        CaptureMouse();
+        DragTo(e.GetPosition(this));
     }
 
-    void OnBarMouseMove(object sender, MouseEventArgs e)
+    void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (_dragBar is { } bar && ReferenceEquals(sender, bar) && e.LeftButton == MouseButtonState.Pressed)
-            SetLevelFrom(bar, e);
-    }
-
-    void OnBarMouseUp(object sender, MouseButtonEventArgs e)
-    {
-        if (_dragBar is not { } bar) return;
+        if (_dragRow is null) return;
         e.Handled = true;
-        bar.ReleaseMouseCapture();
-        _dragBar = null;
+        EndDrag();
     }
 
-    void SetLevelFrom(FrameworkElement bar, MouseEventArgs e)
+    void OnLostMouseCapture(object sender, MouseEventArgs e) => ClearDrag();
+
+    void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (RowOf(bar) is not { } row) return;
+        if (!IsVisible) EndDrag();
+    }
+
+    void DragTo(Point inWindow)
+    {
+        if (_dragRow is not { } index || _toBar is null) return;
         // The fill runs between the knob's half-widths (the 7 DIP margin on each side of the track).
         const double inset = 7;
-        var width = Math.Max(bar.ActualWidth - 2 * inset, 1);
-        var fraction = (e.GetPosition(bar).X - inset) / width;
-        Raise(() => LevelClicked?.Invoke(row.Index, fraction), "volume bar");
+        var x = _toBar.Transform(inWindow).X;
+        var fraction = Math.Clamp((x - inset) / Math.Max(_barWidth - 2 * inset, 1), 0, 1);
+        // One update per whole percent: each one posts to the audio worker and redraws the rows.
+        var percent = (int)Math.Round(fraction * 100);
+        if (percent == _dragPercent) return;
+        _dragPercent = percent;
+        Raise(() => LevelClicked?.Invoke(index, fraction), "volume bar");
+    }
+
+    void EndDrag()
+    {
+        var dragging = _dragRow is not null;
+        ClearDrag();
+        if (dragging && IsMouseCaptured) ReleaseMouseCapture();
+    }
+
+    void ClearDrag()
+    {
+        _dragRow = null;
+        _toBar = null;
+        _dragPercent = -1;
     }
 
     void OnFooterMouseDown(object sender, MouseButtonEventArgs e)
