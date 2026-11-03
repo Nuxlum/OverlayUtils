@@ -59,7 +59,8 @@ Python reference (`reference/python/app.py`, see `docs/PYTHON-CODEMAP.md`):
      exe) to assign one before it ever plays. A program's own choice always
      wins over the automatic rule.
    - Stored in config: program (exe path, case-insensitive) → channel and
-     app volume/mute; channel volumes/mutes.
+     app volume/mute; channel definitions (id, name, icon, order) and
+     their volumes/mutes.
    - Volumes are applied when a program's session appears and whenever the
      user changes them in the overlay; changes made elsewhere (Windows
      mixer) are left alone until the next overlay change. (my call)
