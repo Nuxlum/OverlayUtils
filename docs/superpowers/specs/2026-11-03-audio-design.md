@@ -33,19 +33,40 @@ Python reference (`reference/python/app.py`, see `docs/PYTHON-CODEMAP.md`):
    - **Input** row: same for the default microphone.
    - **Volume** row: master volume of the default output; Left/Right change
      it (held = repeat, as Python), A toggles mute.
-   - **Apps** section: one row per app currently playing sound (Windows
-     audio sessions on the default output, grouped per process, our own
-     process excluded), labelled with the app's name. Left/Right change that
-     app's volume, A mutes/unmutes it. Rows appear/disappear as apps start
-     and stop playing (refreshed while the overlay is open). Each app is
-     independent (no single balance slider; the owner chose this).
+   - **Channels** section (owner approved the mockup): channels **Game,
+     Chat, Media, Other**, each a bold row with its own volume, followed by
+     its apps indented, one row per app currently playing sound (Windows
+     audio sessions on the default output, grouped per program, our own
+     process excluded). Channels with no app playing are hidden. On any row,
+     Left/Right change the volume and A mutes/unmutes. Effective app volume
+     = channel volume × app volume, written to the app's Windows session
+     volume; muting a channel mutes its apps. Lowering a channel keeps the
+     balance of the apps inside it. No single balance slider (owner chose
+     independent volumes).
    - **Now playing** card: title/artist (and app) from the Windows media
      session (works for YouTube Music, browsers, Spotify…); Left/Right
      previous/next, A play/pause. Hidden when nothing is playing.
-2. **Media buttons from any tab** (Python): LB / RB = previous / next track,
+2. **Channel assignment** (inspired by Sonar's channels, improved):
+   - Automatic, when a program first plays sound (my call on the rules):
+     Chat = known voice apps (Discord, TeamSpeak, Mumble, Teams, Zoom, Skype,
+     Slack); Media = browsers (Chrome, Edge, Firefox, Opera, Brave, Vivaldi)
+     and media players (Spotify, YouTube Music desktop, VLC, mpv, foobar2000,
+     MusicBee); Game = an exe under a game library folder
+     (`\steamapps\common\`, `\Epic Games\`, `\GOG Galaxy\Games\`) or whose
+     window is fullscreen in the foreground when it first plays; else Other.
+   - Settings → Audio → "Programs": every program seen so far with its
+     channel (Left/Right changes it), plus "Add program…" (file picker on an
+     exe) to assign one before it ever plays. A program's own choice always
+     wins over the automatic rule.
+   - Stored in config: program (exe path, case-insensitive) → channel and
+     app volume/mute; channel volumes/mutes.
+   - Volumes are applied when a program's session appears and whenever the
+     user changes them in the overlay; changes made elsewhere (Windows
+     mixer) are left alone until the next overlay change. (my call)
+3. **Media buttons from any tab** (Python): LB / RB = previous / next track,
    X = play/pause, while the overlay is open (pad). These are added to
    `PadInterpreter` (they currently do nothing).
-3. **Device priority lists**, one for outputs and one for inputs, in
+4. **Device priority lists**, one for outputs and one for inputs, in
    Settings → Audio:
    - Each list holds every device seen on this PC (connected or not), new
      devices added at the bottom, stored in config (device id + last known
@@ -57,10 +78,10 @@ Python reference (`reference/python/app.py`, see `docs/PYTHON-CODEMAP.md`):
      to the highest-ranked device currently available. A manual pick from
      the Audio tab holds until the next such device change.
    - A Settings toggle per list turns auto-switching off (manual only).
-4. **Sonar coexistence:** Sonar's virtual devices are ordinary devices in
+5. **Sonar coexistence:** Sonar's virtual devices are ordinary devices in
    the lists. Ranked above the real devices, Sonar is used while it runs;
    ranked below, our auto-switch wins. No Sonar-specific code in this stage.
-5. Volume and mute changes are reflected live in the overlay if changed
+6. Volume and mute changes are reflected live in the overlay if changed
    elsewhere (Windows flyout, keyboard keys) while it is open.
 
 ## Changes from Python
@@ -70,7 +91,8 @@ Python reference (`reference/python/app.py`, see `docs/PYTHON-CODEMAP.md`):
   API, switching outputs with GG keyboard shortcuts on Italian scan codes)
   is **not ported**. The audio output pad combo (Back+LB+Left/Right) stays
   dropped (stage 3 decision); the Audio tab replaces it.
-- New: input devices, per-app volumes, priority-based auto-switch.
+- New: input devices, channels with per-channel and per-app volumes,
+  priority-based auto-switch.
 
 ## Constraints
 
@@ -87,7 +109,8 @@ Python reference (`reference/python/app.py`, see `docs/PYTHON-CODEMAP.md`):
 - Pure logic in Core and self-tested: the priority rule (given a ranked
   list and the available devices, which is the target), list editing
   (pick up / move / drop / cancel, new devices appended), session grouping
-  per process, volume stepping. Interop is the thin layer around it.
+  per process, volume stepping, channel classification and the
+  channel × app volume maths. Interop is the thin layer around it.
 - Config: new keys via `AppConfig` (snake_case), changed only through
   `ConfigStore.Update`; unknown keys still preserved.
 - Device notifications arrive on COM threads: marshal to the right thread;
@@ -103,7 +126,9 @@ Python reference (`reference/python/app.py`, see `docs/PYTHON-CODEMAP.md`):
   The owner sometimes uses Sonar's equaliser: that stays Sonar's job. With
   Sonar's devices ranked first in the priority lists, audio goes through
   Sonar (and its EQ) whenever it runs.
-- A game/chat balance slider (owner chose per-app volumes).
+- A game/chat balance slider (owner chose per-app and per-channel volumes).
+- Custom channels beyond Game/Chat/Media/Other (owner asked to edit and add
+  programs, not channels).
 - Sonar integration (backlog: show Sonar's real routed device, ChatMix).
 - Per-app output routing (sending one app to a different device).
 - YouTube Music / Spotify library integration (stage 6).
