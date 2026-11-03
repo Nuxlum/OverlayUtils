@@ -23,7 +23,11 @@ Press Shift+F1, or left-click the tray icon. Press again (or click outside)
 to close it.
 Inside: Up/Down move, Left/Right change a value, Enter selects (Power options
 ask for a second Enter within 3 seconds), Tab / PgUp / PgDn switch tab,
-F2 opens Settings, Esc goes back or closes. The mouse works too.
+F2 opens Settings, Esc goes back or closes.
+The mouse works as well as the pad: the row under the pointer is selected,
+and tabs, arrows, options, switches, the volume bar (click, drag or wheel),
+the media buttons and the hints at the bottom can all be clicked. Right
+click goes back.
 Settings has size, side of the screen, language and the full mode switch
 (see below), so you can enable full mode from the overlay as well.
 
@@ -105,7 +109,11 @@ fuori) per chiuderlo.
 Dentro: Su/Giù si muovono, Sinistra/Destra cambiano un valore, Invio sceglie
 (le opzioni di spegnimento chiedono un secondo Invio entro 3 secondi),
 Tab / Pag su / Pag giù cambiano scheda, F2 apre le Impostazioni, Esc torna
-indietro o chiude. Funziona anche con il mouse.
+indietro o chiude.
+Il mouse funziona bene quanto il pad: la riga sotto il puntatore viene
+selezionata, e si possono cliccare schede, frecce, opzioni, interruttori,
+la barra del volume (clic, trascinamento o rotella), i tasti multimediali e
+i suggerimenti in basso. Il tasto destro torna indietro.
 Le Impostazioni hanno dimensione, lato dello schermo, lingua e l'interruttore
 della modalità completa (vedi sotto): si può attivare anche dall'overlay.
 

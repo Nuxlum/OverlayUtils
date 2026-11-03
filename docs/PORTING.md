@@ -98,6 +98,25 @@ with real devices yet.
    `%LOCALAPPDATA%\Programs\OverlayUtils`, Program Files folder and certificate gone.
 5. Logs: `%APPDATA%\OverlayUtils\errors.log`.
 
+## Testing on Windows (mouse)
+
+1. Open the overlay under a still mouse pointer: the first row stays
+   selected. Move the mouse over the rows: the selection, description and
+   footer follow it; rows, tabs, arrows and buttons show a hand cursor.
+2. Use the pad or keyboard while the pointer rests on a row: the selection
+   follows the pad/keyboard and stays there until the mouse moves again.
+3. Click Power -> Shut down once ("Confirm?"), move the mouse to another row
+   and back: it is no longer armed; a single click only arms it again
+   (do not confirm unless you mean it). A double-click never confirms.
+4. Click each tab; from Settings, click a tab: back on that tab.
+5. Click the < > arrows of Output/Input, the segmented options, a toggle.
+6. Volume bar: click a point, drag past both ends (stops at 0 and at the
+   device's max volume), use the wheel over it.
+7. Media buttons previous / play-pause / next; footer hints act like their
+   key (Esc/B, Enter/A, F2/Back); right click goes back.
+8. While moving a device in Output order, clicking tabs or hovering other
+   rows does nothing; Enter/B still drop/cancel.
+
 ## Testing on Windows (stage 4a)
 
 Needs a real headset, a second output and a pad. Auto-switch is on by default,

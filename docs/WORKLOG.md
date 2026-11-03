@@ -89,6 +89,12 @@ The stage checklist lives in `PORTING.md`.
 - 2026-11-03 - **Media app name "Lettore multimediale"** comes from the
   Python mapping and is not localized yet.
 
+- 2026-11-04 - **Mouse as a first-class input:** the row under the pointer
+  becomes the selection (Steam Big Picture style), but only when the mouse
+  really moves, so opening the overlay or scrolling never moves it; pad and
+  keyboard take the selection back until the next move. Every visible
+  control is clickable, clickables get a hand cursor and a hover highlight.
+
 ## Open questions
 
 - Signing: stay self-signed, or get a CA-issued certificate (Azure Artifact
@@ -115,6 +121,9 @@ The stage checklist lives in `PORTING.md`.
 
 ## Session log
 
+- 2026-11-04 - Mouse: hover selection, clickable tabs/arrows/volume bar/media
+  buttons/footer hints, hover highlights; self-tested navigator entry points;
+  not yet tried by hand.
 - 2026-11-03 - Stage 4a (audio devices) written: audio rules (self-tested),
   Core Audio service, media session, Audio tab with Output / Input / Volume /
   Now playing, priority lists and auto-switch in Settings, pad volume and mic
