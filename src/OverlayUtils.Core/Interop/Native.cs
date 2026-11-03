@@ -234,4 +234,13 @@ internal static partial class Native
     [return: MarshalAs(UnmanagedType.U1)]
     public static partial bool SetSuspendState([MarshalAs(UnmanagedType.U1)] bool hibernate,
         [MarshalAs(UnmanagedType.U1)] bool forceCritical, [MarshalAs(UnmanagedType.U1)] bool disableWakeEvent);
+
+    // --- COM ----------------------------------------------------------------
+    public const uint CLSCTX_ALL = 0x17; // INPROC_SERVER | INPROC_HANDLER | LOCAL_SERVER | REMOTE_SERVER
+
+    [LibraryImport("ole32.dll")]
+    public static partial int CoCreateInstance(in Guid clsid, nint outer, uint context, in Guid iid, out nint instance);
+
+    [LibraryImport("ole32.dll")]
+    public static partial int PropVariantClear(ref CoreAudio.PropVariant value);
 }
