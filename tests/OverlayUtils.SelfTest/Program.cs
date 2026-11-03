@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using OverlayUtils.Core;
 using OverlayUtils.Core.Config;
+using OverlayUtils.Core.Input;
 using OverlayUtils.Core.Legacy;
 using OverlayUtils.Core.Localization;
 using OverlayUtils.Core.Monitors;
@@ -592,6 +593,109 @@ string RepoRoot()
         "Italian window rows");
     Loc.SetLanguage("en");
     Check(content.Controls().Any(i => i.Label() == "Power"), "English again");
+}
+
+// --- Pad interpreter --------------------------------------------------------
+{
+    var clock = new TestClock { Now = DateTimeOffset.UnixEpoch };
+    PadInterpreter New(bool open = false) => new(clock) { OverlayOpen = open };
+    PadAction Cmd(OverlayCommand c) => new(PadActionKind.Command, c);
+    bool Is(IReadOnlyList<PadAction> got, params PadAction[] want) => got.SequenceEqual(want);
+    var toggle = new PadAction(PadActionKind.ToggleOverlay);
+
+    var p = New();
+    Check(Is(p.ButtonDown(1, PadButton.Back)) && Is(p.ButtonDown(1, PadButton.RB)), "chord press fires nothing");
+    Check(Is(p.ButtonUp(1, PadButton.RB), toggle), "Back+RB toggles on release");
+    Check(Is(p.ButtonUp(1, PadButton.Back)), "second release fires nothing");
+    p = New();
+    p.ButtonDown(1, PadButton.RB); p.ButtonDown(1, PadButton.Back);
+    Check(Is(p.ButtonUp(1, PadButton.Back), toggle), "RB first, Back released first also toggles");
+    p = New();
+    p.ButtonDown(1, PadButton.Back); p.ButtonDown(1, PadButton.RB); p.ButtonDown(1, PadButton.A);
+    Check(Is(p.ButtonUp(1, PadButton.RB)), "another button disarms the chord");
+    p = New();
+    p.ButtonDown(1, PadButton.Back); p.ButtonDown(2, PadButton.RB);
+    Check(Is(p.ButtonUp(2, PadButton.RB)) && Is(p.ButtonUp(1, PadButton.Back)), "chord split across pads does nothing");
+
+    p = New();
+    p.ButtonDown(1, PadButton.Back);
+    Check(Is(p.ButtonDown(1, PadButton.DpadUp), new PadAction(PadActionKind.MonitorTv)), "Back+Up -> TV");
+    p.ButtonUp(1, PadButton.DpadUp);
+    Check(Is(p.ButtonDown(1, PadButton.DpadUp), new PadAction(PadActionKind.MonitorTv)), "Back+Up again -> TV again");
+    Check(Is(p.ButtonDown(1, PadButton.DpadDown), new PadAction(PadActionKind.MonitorDesk)), "Back+Down -> Desk");
+    p = New(); p.CombosEnabled = false; p.ButtonDown(1, PadButton.Back);
+    Check(Is(p.ButtonDown(1, PadButton.DpadUp)), "combos off: no monitor switch");
+    p = New(open: true); p.ButtonDown(1, PadButton.Back);
+    Check(Is(p.ButtonDown(1, PadButton.DpadUp), Cmd(OverlayCommand.Up)), "overlay open: Back+Up navigates");
+
+    p = New(open: true);
+    Check(Is(p.ButtonDown(1, PadButton.DpadDown), Cmd(OverlayCommand.Down)), "D-pad down navigates");
+    clock.Now += TimeSpan.FromSeconds(0.39);
+    Check(Is(p.Tick()), "no repeat before 0.4 s");
+    clock.Now += TimeSpan.FromSeconds(0.02);
+    Check(Is(p.Tick(), Cmd(OverlayCommand.Down)), "first repeat after 0.4 s");
+    clock.Now += TimeSpan.FromSeconds(0.12);
+    Check(Is(p.Tick(), Cmd(OverlayCommand.Down)), "then every 0.12 s");
+    p.ButtonUp(1, PadButton.DpadDown); clock.Now += TimeSpan.FromSeconds(1);
+    Check(Is(p.Tick()), "release stops the repeat");
+    p.ButtonDown(1, PadButton.DpadRight); clock.Now += TimeSpan.FromSeconds(0.41);
+    Check(Is(p.Tick(), Cmd(OverlayCommand.RightRepeat)), "held right repeats as RightRepeat");
+    p.ButtonUp(1, PadButton.DpadRight);
+
+    p = New(open: true);
+    Check(Is(p.Axis(1, PadAxis.LeftX, -20000), Cmd(OverlayCommand.Left)), "stick left navigates");
+    Check(Is(p.Axis(1, PadAxis.LeftX, -12000)), "stick between thresholds stays");
+    Check(Is(p.Axis(1, PadAxis.LeftX, -5000)), "stick release fires nothing");
+    clock.Now += TimeSpan.FromSeconds(1);
+    Check(Is(p.Tick()), "released stick does not repeat");
+
+    p = New(open: true);
+    Check(Is(p.Axis(1, PadAxis.LeftTrigger, 17000), Cmd(OverlayCommand.PrevTab)), "LT -> previous tab");
+    Check(Is(p.Axis(1, PadAxis.LeftTrigger, 15000)) && Is(p.Axis(1, PadAxis.LeftTrigger, 17000)), "trigger noise above release threshold ignored");
+    p.Axis(1, PadAxis.LeftTrigger, 7000);
+    Check(Is(p.Axis(1, PadAxis.LeftTrigger, 17000), Cmd(OverlayCommand.PrevTab)), "LT again after release");
+    Check(Is(p.Axis(1, PadAxis.RightTrigger, 17000), Cmd(OverlayCommand.NextTab)), "RT -> next tab");
+
+    p = New(open: true);
+    p.ButtonDown(1, PadButton.Back); clock.Now += TimeSpan.FromSeconds(0.6);
+    Check(Is(p.Tick(), Cmd(OverlayCommand.Settings)), "hold Back 0.6 s -> Settings");
+    Check(Is(p.Tick()), "Settings fires once per hold");
+    p.ButtonDown(1, PadButton.RB);
+    Check(Is(p.ButtonUp(1, PadButton.RB)), "consumed Back hold does not arm the chord");
+    p.ButtonUp(1, PadButton.Back);
+    p.ButtonDown(1, PadButton.Back); p.ButtonDown(1, PadButton.RB);
+    Check(Is(p.ButtonUp(1, PadButton.RB), toggle), "after releasing Back the chord works again");
+    p.ButtonUp(1, PadButton.Back);
+
+    p = New(open: true);
+    p.ButtonDown(1, PadButton.Back); clock.Now += TimeSpan.FromSeconds(0.3);
+    Check(Is(p.ButtonDown(1, PadButton.DpadDown), Cmd(OverlayCommand.Down)), "Back+Down while open navigates");
+    clock.Now += TimeSpan.FromSeconds(0.5);
+    Check(!p.Tick().Contains(Cmd(OverlayCommand.Settings)), "Back with another button is not a Settings hold");
+
+    p = New(open: true);
+    p.ButtonDown(1, PadButton.DpadDown); p.PadRemoved(1); clock.Now += TimeSpan.FromSeconds(1);
+    Check(Is(p.Tick()), "removed pad stops repeating");
+    p = New(); p.ButtonDown(1, PadButton.Back); p.ButtonDown(1, PadButton.RB); p.PadRemoved(1);
+    Check(Is(p.ButtonUp(1, PadButton.RB)) && Is(p.ButtonUp(1, PadButton.Back)), "removed pad forgets its chord");
+
+    foreach (var open in new[] { false, true })
+    {
+        p = New(open);
+        Check(Is(p.ButtonDown(1, PadButton.Guide)) && Is(p.ButtonUp(1, PadButton.Guide)), "Guide ignored");
+        var acts = new List<PadAction>();
+        foreach (var b in new[] { PadButton.Start, PadButton.Back, PadButton.LB, PadButton.RB }) acts.AddRange(p.ButtonDown(1, b));
+        foreach (var b in new[] { PadButton.RB, PadButton.LB, PadButton.Back, PadButton.Start }) acts.AddRange(p.ButtonUp(1, b));
+        Check(acts.Count == 0, "Moonlight quit chord does nothing");
+    }
+
+    p = New(); p.ButtonDown(3, PadButton.A); p.ButtonUp(3, PadButton.A);
+    Check(p.LastUsedPad == 3, "last used pad tracked");
+
+    Check(PadInterpreter.BatteryLevel(1, 5) == 0 && PadInterpreter.BatteryLevel(1, 40) == 1
+        && PadInterpreter.BatteryLevel(3, 70) == 2 && PadInterpreter.BatteryLevel(1, 71) == 3, "battery levels");
+    Check(PadInterpreter.BatteryLevel(4, -1) == 3 && PadInterpreter.BatteryLevel(2, -1) == null
+        && PadInterpreter.BatteryLevel(1, -1) == null && PadInterpreter.BatteryLevel(0, 50) == null, "battery unknown cases");
 }
 
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
