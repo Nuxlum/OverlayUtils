@@ -27,6 +27,12 @@ F2 opens Settings, Esc goes back or closes. The mouse works too.
 Settings has size, side of the screen, language and the full mode switch
 (see below), so you can enable full mode from the overlay as well.
 
+With a gamepad (Xbox, 8BitDo, DualShock 4, DualSense, Switch Pro, or
+Moonlight's virtual pad): Back+RB opens and closes the overlay. Inside,
+D-pad or left stick move, A selects, B goes back, LT/RT switch tab, hold
+Back for Settings. With the overlay closed, Back+D-pad Up / Down switch to
+the TV / desk monitor profile (Settings -> Pad combos turns this off).
+
 OVERLAY OVER FULLSCREEN GAMES (optional)
 ----------------------------------------
 By default the overlay works over the desktop, windows, borderless games and
@@ -86,6 +92,13 @@ Tab / Pag su / Pag giù cambiano scheda, F2 apre le Impostazioni, Esc torna
 indietro o chiude. Funziona anche con il mouse.
 Le Impostazioni hanno dimensione, lato dello schermo, lingua e l'interruttore
 della modalità completa (vedi sotto): si può attivare anche dall'overlay.
+
+Con un controller (Xbox, 8BitDo, DualShock 4, DualSense, Switch Pro, o il pad
+virtuale di Moonlight): Back+RB apre e chiude l'overlay. Dentro, croce o stick
+sinistro si muovono, A sceglie, B torna indietro, LT/RT cambiano scheda,
+tenere premuto Back apre le Impostazioni. A overlay chiuso, Back+croce Su /
+Giù passano al profilo monitor TV / Scrivania (Impostazioni -> Combo del pad
+li disattiva).
 
 OVERLAY SOPRA I GIOCHI A SCHERMO INTERO (facoltativo)
 -----------------------------------------------------

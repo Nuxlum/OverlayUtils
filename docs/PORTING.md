@@ -47,11 +47,13 @@ the manual tests below still to do.
 - [~] Verify the UIAccess z-order quirk (`_repair_frame` in Python) does not apply to WPF
 - [~] Checked by a scripted test run on Windows, still needs the owner's check: Shift+F1 opens / closes on the foreground window's monitor; Esc gives focus back; Close window reaches the previous app and does nothing over the desktop; the Power confirm expires after 3 s; F2 / Esc page navigation; Size and Position settings; Exit from the overlay
 
-### Stage 3 - gamepad  `[ ]`
-- [ ] SDL3 GameController input, hot-plug  *(CONTROLLER)*
-- [ ] Global combos (monitor, Win+D, Alt+F4, audio prev/next), overlay toggle on Back+RB release
-- [ ] Overlay navigation with repeat, Select-hold for settings
-- [ ] Pad battery (XInput)  *(VOLUME, BATTERIA DEL PAD...)*
+### Stage 3 - gamepad  `[~]`
+Design: `docs/superpowers/specs/2026-11-03-gamepad-design.md`. Builds with 0
+warnings, self-test passes; nothing tested with a real pad yet.
+- [~] SDL3 gamepad input (vendored SDL3.dll, loaded from the app folder only), hot-plug  *(CONTROLLER)*
+- [~] Back+RB toggles the overlay on release; Back+D-pad Up/Down switch TV/Desk profile (Python's other combos dropped, see WORKLOG)
+- [~] Overlay navigation with repeat, LT/RT tabs, hold Back for Settings
+- [~] Pad battery for any pad that reports it; Pad combos switch in Settings
 
 ### Stage 4 - audio and media  `[ ]`
 - [ ] Volume and mute, Windows output switching (Core Audio)  *(VOLUME..., USCITA AUDIO)*
@@ -81,6 +83,26 @@ the manual tests below still to do.
    Program Files, tooltip says "Full mode". Then Disable: back to
    `%LOCALAPPDATA%\Programs\OverlayUtils`, Program Files folder and certificate gone.
 5. Logs: `%APPDATA%\OverlayUtils\errors.log`.
+
+## Testing on Windows (stage 3)
+
+Needs a person pressing buttons. With each pad (Xbox, 8BitDo Ultimate 2,
+DualShock 4; DualSense and Switch Pro if available):
+1. Back+RB opens the overlay (on release) and closes it; D-pad and left stick
+   move (holding repeats), A confirms, B goes back, LT/RT change tab, holding
+   Back opens Settings. The footer shows pad buttons while a pad is connected.
+2. With the overlay closed, Back+D-pad Up/Down switch to the TV/Desk profile;
+   with Settings -> Pad combos off they do nothing, Back+RB still works.
+3. Plug and unplug a pad while the app runs: it is picked up / dropped without
+   a restart; the battery icon appears for pads that report it.
+4. A game in front: the pad still drives the overlay (the game may also see
+   the presses: known limit).
+5. Steam running: PlayStation / Switch pads through Steam Input still work.
+6. Moonlight from the Retroid Pocket 6: Back+RB opens the overlay in the
+   stream; Moonlight's own Start+Select+LB+RB still quits the stream.
+7. Full mode (Program Files): SDL3.dll is loaded from there and pads work.
+8. Rename SDL3.dll in a test copy: the app starts, logs one error, keyboard
+   and tray keep working.
 
 ## Testing on Windows (stage 2)
 

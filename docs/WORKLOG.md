@@ -49,6 +49,16 @@ The stage checklist lives in `PORTING.md`.
 - 2026-11-03 - **If the overlay never gets focus it stays open** until
   toggled (same as Python).
 
+- 2026-11-03 - **Gamepad via our own SDL3 wrapper** over the official
+  SDL3.dll (3.4.18, vendored in `third_party/SDL3`, loaded from the app folder
+  only). No binding package; nothing for the user to install.
+- 2026-11-03 - **Pad combos reduced** to Back+RB (overlay) and Back+D-pad
+  Up/Down (monitor). Python's Back+L3+R3, Back+Start+LB+RB+LT+RT and
+  Back+LB+Left/Right are dropped: those actions live in the overlay, and the
+  six-button chord contained Moonlight's quit-stream chord.
+- 2026-11-03 - **Input bleed accepted:** a game still sees the pad while the
+  overlay is open; no driver-free fix known (research item in Backlog).
+
 ## Open questions
 
 - Signing: stay self-signed, or get a CA-issued certificate (Azure Artifact
@@ -56,8 +66,6 @@ The stage checklist lives in `PORTING.md`.
   A CA certificate would remove the "trust this certificate" step.
 - Does the Home key low-level behaviour need anything beyond RegisterHotKey
   now that the app is no longer elevated? (Test in stage 1.)
-- Gamepad library for stage 3: SDL3 via a NuGet binding, or our own minimal
-  P/Invoke over a bundled SDL3.dll?
 - SteelSeries GG shortcuts use Italian-layout scan codes (`SCAN_*` in Python):
   make them configurable when porting stage 4?
 
@@ -75,6 +83,9 @@ The stage checklist lives in `PORTING.md`.
 
 ## Session log
 
+- 2026-11-03 - Stage 3 (gamepad) written: pad interpreter (self-tested),
+  SDL3 pad service, overlay/tray wiring, docs. Builds with 0 warnings; SDL3
+  loads and fails cleanly without the DLL; not yet tested with a real pad.
 - 2026-11-03 - Stage 2 review fixes: double-click no longer fires an armed
   confirm; Close window needs the previous window back in the foreground; a
   tray click closes an open overlay instead of reopening it; Size, Position

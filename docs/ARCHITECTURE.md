@@ -77,6 +77,7 @@ so disabling never removes one we did not add.
 | UI (STA) | WPF `Dispatcher` | tray, menus, dialogs, the overlay window |
 | Hotkeys | `HotkeyService` | own message loop; `RegisterHotKey` must be called on it, so requests are queued and the thread is woken with `PostThreadMessage` |
 | Workers | `Task.Run` | MonitorSwitcher search, mode switching (waits on UAC), overlay actions after hide |
+| Pads | `PadService` | all SDL3 calls; actions go to the overlay via `OverlayController.Command`/`Toggle`, which marshal to the UI thread |
 
 Rule: anything that touches UI goes through `TrayController.OnUi`. Hotkey callbacks arrive on the hotkey thread.
 
@@ -153,6 +154,24 @@ and moves it.
 
 Hotkey id 2 (reserved in stage 1) is now Shift+F1 via `RegisterHotKey`; a left
 click on the tray icon does the same. Both call `OverlayController.Toggle`.
+
+## Input: pad
+
+- `PadInterpreter` (Core, pure, self-tested): button/axis events plus a clock
+  in, `PadAction`s out. Back+RB armed only when exactly those two are held,
+  fires on release; Back+D-pad Up/Down (overlay closed, `controller_enabled`)
+  switch profiles; while the overlay is open D-pad/stick navigate with repeat
+  (0.4 s, then 0.12 s), A/B, LT/RT tabs, Back held alone 0.6 s opens Settings
+  (that hold is consumed). Triggers and stick: pressed above 16000, released
+  below 8000. Guide is ignored; nothing uses Start+Back+LB+RB (Moonlight).
+- `PadService` (Core): SDL3 on its own thread (`SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS`
+  so pads work while a game has focus), hot-plug, battery every 30 s.
+- `Sdl` resolves `SDL3.dll` only from `AppContext.BaseDirectory`; missing DLL =
+  one log line, pads off. The DLL is vendored in `third_party/SDL3` (version
+  and hash in its README) and copied to the output by the App project.
+- `TrayController` maps actions; `OverlayController.OpenChanged` keeps the
+  interpreter's `OverlayOpen` in sync; `SetPadState` drives the pad footer and
+  battery glyph.
 
 ## Configuration
 
