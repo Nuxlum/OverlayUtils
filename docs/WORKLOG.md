@@ -37,8 +37,8 @@ The stage checklist lives in `PORTING.md`.
 - 2026-11-03 - **Info-row actions** (open folder / site) close the overlay
   first; otherwise the new window would open under the topmost panel.
 - 2026-11-03 - **Accent contrast floor 4.5:1** against #202020, because the
-  selected icon glyph uses the accent; fallback is the lightest palette entry,
-  then #4CC2FF. Users with a dark accent see a lighter tone instead.
+  selected icon glyph uses the accent; the palette's light variant is tried first,
+  then the lightest entry, each needing 4.5:1, else #4CC2FF. Users with a dark accent see a lighter tone instead.
 - 2026-11-03 - **Acrylic needs Windows 11 build 22621+**; earlier builds
   (Windows 10, 11 21H2) get the solid background. The backdrop is re-applied
   on every show because DWM drops it.

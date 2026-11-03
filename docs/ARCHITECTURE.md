@@ -132,9 +132,10 @@ initial one. The window is per-monitor DPI aware and follows `WM_DPICHANGED`.
   11 21H2) get a solid background. It is re-applied on every show, because DWM
   drops it otherwise. Rounded corners and border colour (as in Python) go
   through DWM too.
-- Accent: read from the Windows accent palette (`AccentPalette`). It is used
-  only if its contrast against the panel (#202020) is at least 4.5:1, else the
-  lightest palette entry, else #4CC2FF. The selection must always be visible.
+- Accent: read from the Windows accent palette (`AccentPalette`). It tries the
+  light variant (palette entry 1), then the lightest entry (entry 0), each
+  needing a contrast of at least 4.5:1 against the panel (#202020), else
+  #4CC2FF. The selection must always be visible.
 - Transparency effects off in Windows -> solid; animation effects off -> no slide.
 
 ### Hotkey
