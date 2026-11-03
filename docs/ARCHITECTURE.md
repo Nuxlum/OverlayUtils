@@ -103,19 +103,27 @@ a `NavResult`: what to redraw, plus an optional effect.
   action (Big Picture, Show desktop, Close window, Power, full-mode switch,
   Exit, opening a folder or site from Info).
 
-The overlay itself lives on the UI thread. The view runs a 250 ms timer that
-calls `ExpirePending`, so a Power option armed with Enter or a click disarms
-after 3 s.
+The overlay itself lives on the UI thread. `OverlayController` runs a 250 ms
+timer that calls `ExpirePending`, so a Power option armed with Enter or a click
+disarms after 3 s. The second press of a double-click is ignored, so it cannot
+fire a confirm the first press armed.
 
 ### Focus
 
-On open the controller remembers the foreground window (`_prev`), skipping
-shell windows (taskbar, desktop, Start...: `WindowFocus.ShellWindows`) and its
-own, then takes foreground with `WindowFocus.Force`. It checks focus every
-150 ms and hides when it is lost. Esc gives focus back to `_prev` if it is
-still alive. If the overlay never gets focus it stays open until toggled (as in
-Python). Close window sends Alt+F4 to the previous app and does nothing when
-there is none (`HasPreviousWindow`: opened over the taskbar or desktop).
+On open the controller remembers the foreground window (`_prev`, from
+`WindowFocus.ForegroundApp`): the root of the foreground window, or none when
+that is a shell window (taskbar, desktop, tray overflow: the class names in
+`ShellWindows`). Windows of our own process are not skipped. It then takes
+foreground with `WindowFocus.Force`, checks focus every 150 ms and hides when
+it is lost. Esc gives focus back to `_prev` if it is still alive. If the
+overlay never gets focus it stays open until toggled (as in Python). Close
+window sends Alt+F4 only when, after the 150 ms delay, `_prev` is alive and is
+the foreground app again (`PreviousWindowIsForeground`); otherwise it does
+nothing (opened over the taskbar or desktop, or another window took over).
+
+The tray icon decides open or close on the mouse press: the press makes the
+taskbar foreground and the focus watcher hides the overlay before the release,
+so a toggle on the release would open it again.
 
 ### Placement and size
 
@@ -125,6 +133,9 @@ maps `overlay_size` (Auto looks at the active monitor profile) to a factor;
 `Place` returns the physical rectangle clamped to the work area. The content
 scales by the factor and scrolls when clamped. The XAML size is only the
 initial one. The window is per-monitor DPI aware and follows `WM_DPICHANGED`.
+When a setting changes while it is open (size, side, monitor profile) the
+controller recomputes the factor and placement on the monitor the panel is on
+and moves it.
 
 ### Look
 
@@ -157,7 +168,7 @@ click on the tray icon does the same. Both call `OverlayController.Toggle`.
 ## Localization
 
 `Strings.resx` (English, neutral) and `Strings.it.resx`. Keys are dotted:
-`Menu.*`, `Notify.*`, `Dialog.*`, `Tooltip.*`, `Language.*` `Overlay.*` (rows,
+`Menu.*`, `Notify.*`, `Dialog.*`, `Tooltip.*`, `Language.*`, `Overlay.*` (rows,
 footer, descriptions) and `Settings.*`.
 - Code: `Loc.T("Menu.Exit")`, `Loc.T("Tooltip.Monitor", name)`.
 - XAML: `{Binding [Menu.Exit], Source={x:Static loc:Loc.Instance}}`;

@@ -82,7 +82,7 @@ Premi Maiusc+F1, oppure clic sinistro sull'icona. Premi di nuovo (o clicca
 fuori) per chiuderlo.
 Dentro: Su/Giù si muovono, Sinistra/Destra cambiano un valore, Invio sceglie
 (le opzioni di spegnimento chiedono un secondo Invio entro 3 secondi),
-Tab / Pag su / Pag giu' cambiano scheda, F2 apre le Impostazioni, Esc torna
+Tab / Pag su / Pag giù cambiano scheda, F2 apre le Impostazioni, Esc torna
 indietro o chiude. Funziona anche con il mouse.
 Le Impostazioni hanno dimensione, lato dello schermo, lingua e l'interruttore
 della modalità completa (vedi sotto): si può attivare anche dall'overlay.

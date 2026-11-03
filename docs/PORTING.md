@@ -37,8 +37,7 @@ tests below are still to do.
 - [~] Enable / disable full mode from the tray
 
 ### Stage 2 - overlay shell  `[~]`
-Written in 8 tasks and reviewed per task; builds with 0 warnings and the
-self-test passes. `[x]` = checked by hand on Windows, `[~]` = written, rest of
+Written in 8 tasks; builds with 0 warnings and the self-test passes. `[x]` = checked by hand on Windows, `[~]` = written, rest of
 the manual tests below still to do.
 - [~] WPF overlay window: borderless, topmost, per-monitor DPI, on the foreground window's monitor, size Normal / Large / Auto and side left / right, acrylic + Windows accent  *(OVERLAY GAMEPAD: `_Overlay.show`, `_monitor_of`)*
 - [~] Focus handling: take foreground, remember previous window, auto-hide on focus loss, run actions after focus returns
@@ -46,7 +45,7 @@ the manual tests below still to do.
 - [~] Keyboard and mouse navigation; Settings and Info pages
 - [~] Controls tab: monitor, Big Picture, power, show desktop, close window  *(OVERLAY_ITEMS)*
 - [~] Verify the UIAccess z-order quirk (`_repair_frame` in Python) does not apply to WPF
-- [x] Checked by hand: Shift+F1 opens / closes on the foreground window's monitor; Esc gives focus back; Close window reaches the previous app and does nothing over the desktop; the Power confirm expires after 3 s; F2 / Esc page navigation; Size and Position settings; Exit from the overlay
+- [~] Checked by a scripted test run on Windows, still needs the owner's check: Shift+F1 opens / closes on the foreground window's monitor; Esc gives focus back; Close window reaches the previous app and does nothing over the desktop; the Power confirm expires after 3 s; F2 / Esc page navigation; Size and Position settings; Exit from the overlay
 
 ### Stage 3 - gamepad  `[ ]`
 - [ ] SDL3 GameController input, hot-plug  *(CONTROLLER)*
