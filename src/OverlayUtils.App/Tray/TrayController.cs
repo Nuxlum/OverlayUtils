@@ -293,6 +293,9 @@ internal sealed class TrayController : IOverlayHost, IDisposable
         _menu.Items.Clear();
         var cfg = _config.Current;
 
+        // Also reachable where Shift+F1 is not (e.g. Remote Desktop keeps some key combinations).
+        if (_overlay is not null)
+            _menu.Items.Add(Item(Loc.T("Overlay.Info.Key.Toggle"), () => _overlay.Toggle()));
         _menu.Items.Add(BuildMonitorMenu());
 
         var home = new ToolStripMenuItem(Loc.T("Menu.HomeKey"));
