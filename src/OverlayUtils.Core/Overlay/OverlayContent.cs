@@ -83,7 +83,8 @@ public sealed class OverlayContent
             Hint = () => "Alt+F4",
             Action = () =>
             {
-                if (_host.HasPreviousWindow) _sendAltF4(); // otherwise it would close the taskbar or desktop
+                // Otherwise it would close the taskbar, the desktop or whatever took the foreground meanwhile.
+                if (_host.PreviousWindowIsForeground) _sendAltF4();
             },
         },
         new OverlayItem

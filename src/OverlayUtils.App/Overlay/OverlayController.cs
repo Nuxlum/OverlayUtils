@@ -18,7 +18,7 @@ namespace OverlayUtils.App.Overlay;
 /// <summary>
 /// Shows and hides the overlay (Python _Overlay.show / hide / _watch_focus) and runs what the navigator returns.
 /// The window is created once and only shown and hidden. Lives on the UI thread; <see cref="Toggle"/> and
-/// <see cref="HasPreviousWindow"/> may be called from any thread.
+/// <see cref="PreviousWindowIsForeground"/> may be called from any thread.
 /// </summary>
 internal sealed class OverlayController : IDisposable
 {
@@ -64,7 +64,7 @@ internal sealed class OverlayController : IDisposable
         HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc);
 
         _focusTimer = Timer(FocusCheck, WatchFocus);
-        _clockTimer = Timer(ClockTick, () => Render(refreshSelection: _navigator.Page != OverlayPage.Info));
+        _clockTimer = Timer(ClockTick, Render);
         _pendingTimer = Timer(PendingCheck, CheckPending);
 
         _config.Changed += OnConfigChanged;
@@ -74,8 +74,18 @@ internal sealed class OverlayController : IDisposable
 
     public bool IsOpen => _open;
 
-    /// <summary>False when the overlay was opened over the desktop or taskbar (or that window has gone).</summary>
-    public bool HasPreviousWindow => WindowFocus.IsAlive(_prev);
+    /// <summary>
+    /// True when the window that was in front when the overlay opened still exists and is the foreground app now;
+    /// false when the overlay was opened over the desktop or taskbar, that window has gone, or another took over.
+    /// </summary>
+    public bool PreviousWindowIsForeground
+    {
+        get
+        {
+            var prev = _prev;
+            return prev != 0 && WindowFocus.ForegroundApp() == prev && WindowFocus.IsAlive(prev);
+        }
+    }
 
     /// <summary>The overlay's window handle, e.g. to own a dialog opened from it.</summary>
     public nint Handle => _hwnd;
@@ -84,6 +94,16 @@ internal sealed class OverlayController : IDisposable
     {
         if (_open) Hide();
         else Show();
+    });
+
+    /// <summary>
+    /// Toggle decided by an earlier state: closes when the overlay was open at <paramref name="wasOpen"/> time (even
+    /// if the focus watcher hid it since), opens otherwise. Used by the tray icon, whose press already steals focus.
+    /// </summary>
+    public void Toggle(bool wasOpen) => OnUi(() =>
+    {
+        if (wasOpen) Hide();
+        else if (!_open) Show();
     });
 
     /// <summary>Gives the foreground back to the overlay after one of our dialogs closed (Python does the same).</summary>
@@ -103,16 +123,11 @@ internal sealed class OverlayController : IDisposable
 
             _content.ResetTransient();
             _navigator.Reset(cfg.HiddenTabs);
-            var sizeFactor = OverlayLayout.SizeFactor(cfg.OverlaySize, _monitors.Current, _monitors.ForRole(MonitorRole.Tv));
-            _vm.SizeFactor = sizeFactor;
             UpdateAccent();
-            Render(refreshSelection: false);
 
             // Placed while still hidden, so a DPI change on the target monitor happens before the first frame.
-            _placement = OverlayLayout.Place(work, dpiScale, sizeFactor, cfg.OverlaySide);
-            _window.Width = _placement.Width / dpiScale;
-            _window.Height = _placement.Height / dpiScale;
-            Place();
+            Layout(cfg, work, dpiScale);
+            Render();
 
             _window.PrepareOpening(cfg.OverlaySide);
             _window.Show();
@@ -157,6 +172,34 @@ internal sealed class OverlayController : IDisposable
         }
     }
 
+    /// <summary>Size factor and placement for the current settings on the given monitor, applied to the window.</summary>
+    void Layout(AppConfig cfg, RectI work, double dpiScale)
+    {
+        var sizeFactor = OverlayLayout.SizeFactor(cfg.OverlaySize, _monitors.Current, _monitors.ForRole(MonitorRole.Tv));
+        _vm.SizeFactor = sizeFactor;
+        _placement = OverlayLayout.Place(work, dpiScale, sizeFactor, cfg.OverlaySide);
+        _window.Width = _placement.Width / dpiScale;
+        _window.Height = _placement.Height / dpiScale;
+        Place();
+    }
+
+    /// <summary>
+    /// Re-applies size and side while open (Settings rows, or a monitor profile switch that changed the size factor
+    /// or the display layout), on the monitor the panel is on now.
+    /// </summary>
+    void Relayout(AppConfig cfg)
+    {
+        try
+        {
+            var (work, dpiScale) = DisplayArea.ForWindow(_hwnd);
+            Layout(cfg, work, dpiScale);
+        }
+        catch (Exception e)
+        {
+            Log.Error("Overlay relayout", e);
+        }
+    }
+
     /// <summary>Applies <see cref="_placement"/> in physical pixels, topmost, without activating.</summary>
     void Place()
     {
@@ -184,7 +227,7 @@ internal sealed class OverlayController : IDisposable
 
     void CheckPending()
     {
-        if (_navigator.ExpirePending()) Render(refreshSelection: false);
+        if (_navigator.ExpirePending()) Render();
         if (!HasPending()) _pendingTimer.Stop();
     }
 
@@ -218,7 +261,7 @@ internal sealed class OverlayController : IDisposable
         switch (result.Effect)
         {
             case NavEffect.Redraw:
-                Render(refreshSelection: false);
+                Render();
                 break;
             case NavEffect.Hide:
                 Hide();
@@ -229,7 +272,7 @@ internal sealed class OverlayController : IDisposable
                     try { here(); }
                     catch (Exception e) { Log.Error("Overlay action", e); }
                 }
-                if (_open) Render(refreshSelection: true);
+                if (_open) Render();
                 break;
             case NavEffect.HideAndRun:
                 Hide();
@@ -246,11 +289,12 @@ internal sealed class OverlayController : IDisposable
         if (_open && !_pendingTimer.IsEnabled && HasPending()) _pendingTimer.Start();
     }
 
-    void Render(bool refreshSelection)
+    void Render()
     {
         try
         {
-            if (refreshSelection) _navigator.Refresh();
+            // Always: a row that became hidden must not stay selected until the next clock tick.
+            _navigator.Refresh();
             var profile = _monitors.List().Count > 0 ? _monitors.Current : "";
             (byte, byte, byte)? color = profile.Length > 0 ? _monitors.Style(profile).Color : null;
             _vm.Refresh(_navigator, DateTime.Now.ToString("HH:mm"), color, profile);
@@ -263,12 +307,14 @@ internal sealed class OverlayController : IDisposable
 
     void OnConfigChanged(AppConfig config) => OnUi(() =>
     {
-        if (_open) Render(refreshSelection: true);
+        if (!_open) return;
+        Relayout(config); // overlay size, side or monitor profile may have changed
+        Render();
     });
 
     void OnLanguageChanged() => OnUi(() =>
     {
-        if (_open) Render(refreshSelection: true);
+        if (_open) Render();
     });
 
     void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)

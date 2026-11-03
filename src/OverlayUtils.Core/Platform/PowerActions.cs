@@ -21,7 +21,7 @@ public static class PowerActions
     {
         try
         {
-            Process.Start(new ProcessStartInfo("shutdown", $"{mode} /t 0") { CreateNoWindow = true, UseShellExecute = false })?.Dispose();
+            Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "shutdown.exe"), $"{mode} /t 0") { CreateNoWindow = true, UseShellExecute = false })?.Dispose();
         }
         catch (Exception e)
         {

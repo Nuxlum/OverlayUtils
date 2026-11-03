@@ -494,12 +494,12 @@ string RepoRoot()
     while (nav.Selected?.Label() != close.Label()) nav.Handle(OverlayCommand.Down);
     var closeRun = nav.Handle(OverlayCommand.A);
     Check(closeRun.Effect == NavEffect.HideAndRun, "Close window hides then runs");
-    host.HasPreviousWindow = false;
+    host.PreviousWindowIsForeground = false;
     RunAction(closeRun);
-    Check(altF4 == 0, "no Alt+F4 without a previous window");
-    host.HasPreviousWindow = true;
+    Check(altF4 == 0, "no Alt+F4 when the previous window is not in the foreground");
+    host.PreviousWindowIsForeground = true;
     RunAction(closeRun);
-    Check(altF4 == 1, "Alt+F4 with a previous window");
+    Check(altF4 == 1, "Alt+F4 when the previous window is back in the foreground");
 
     // Power.
     var power = Row(content.Controls(), Loc.T("Overlay.Power.Label"));
@@ -608,7 +608,7 @@ sealed class FakeHost : IOverlayHost
 {
     public List<string> Calls { get; } = [];
     public bool InFullMode { get; set; }
-    public bool HasPreviousWindow { get; set; } = true;
+    public bool PreviousWindowIsForeground { get; set; } = true;
     public void SwitchMonitor(string profile) => Calls.Add("SwitchMonitor:" + profile);
     public void ToggleStartup() => Calls.Add("ToggleStartup");
     public void ChooseMonitorSwitcher() => Calls.Add("ChooseMonitorSwitcher");

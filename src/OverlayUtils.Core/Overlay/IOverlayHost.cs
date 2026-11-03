@@ -5,8 +5,12 @@ public interface IOverlayHost
 {
     bool InFullMode { get; }
 
-    /// <summary>False when the overlay was opened over the taskbar or desktop: Alt+F4 would hit the shell.</summary>
-    bool HasPreviousWindow { get; }
+    /// <summary>
+    /// True only when the window that was in front when the overlay opened is still alive and has the foreground
+    /// again. Read at the moment an action runs; when false (opened over the taskbar or desktop, or another window
+    /// took the foreground) Alt+F4 would hit the wrong window.
+    /// </summary>
+    bool PreviousWindowIsForeground { get; }
 
     /// <summary>Switch + tray icon + notification, like the hotkeys.</summary>
     void SwitchMonitor(string profile);

@@ -149,6 +149,7 @@ internal sealed partial class OverlayWindow : Window
     {
         if ((sender as FrameworkElement)?.DataContext is not RowVm row) return;
         e.Handled = true;
+        if (e.ClickCount > 1) return; // the second press of a double-click must not fire an armed confirm
         Click(row.Index, null);
     }
 
@@ -161,6 +162,7 @@ internal sealed partial class OverlayWindow : Window
             node = VisualTreeHelper.GetParent(node);
         if ((node as FrameworkElement)?.DataContext is not RowVm row) return;
         e.Handled = true;
+        if (e.ClickCount > 1) return; // the second press of a double-click must not fire an armed confirm
         Click(row.Index, option.Index);
     }
 

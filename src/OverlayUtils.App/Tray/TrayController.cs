@@ -44,6 +44,7 @@ internal sealed class TrayController : IOverlayHost, IDisposable
     private OverlayController? _overlay;
     private System.Drawing.Icon? _currentIcon;
     private bool _busy; // a mode switch is in progress
+    private bool? _overlayOpenAtPress; // left button pressed on the tray icon: was the overlay open then
 
     public TrayController(Application app, ConfigStore config, LauncherKind kind)
     {
@@ -55,10 +56,19 @@ internal sealed class TrayController : IOverlayHost, IDisposable
 
         _icon = new NotifyIcon { ContextMenuStrip = _menu };
         _menu.Opening += (_, _) => BuildMenu();
+        // Left click opens or closes the overlay; right click keeps the menu. Whether it was open is read on the
+        // press: the press makes the taskbar foreground, the focus watcher hides the overlay before the release,
+        // and a toggle on the release would open it again.
+        _icon.MouseDown += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left) _overlayOpenAtPress = _overlay?.IsOpen ?? false;
+        };
         _icon.MouseUp += (_, e) =>
         {
-            // Left click opens the overlay; right click keeps the menu.
-            if (e.Button == MouseButtons.Left) _overlay?.Toggle();
+            if (e.Button != MouseButtons.Left) return;
+            var wasOpen = _overlayOpenAtPress ?? _overlay?.IsOpen ?? false;
+            _overlayOpenAtPress = null;
+            _overlay?.Toggle(wasOpen);
         };
 
         _config.Changed += OnConfigChanged;
@@ -201,7 +211,7 @@ internal sealed class TrayController : IOverlayHost, IDisposable
     // --- overlay host ------------------------------------------------------------
     // Actions the overlay runs after hiding arrive on a worker thread; the others on the UI thread.
 
-    public bool HasPreviousWindow => _overlay?.HasPreviousWindow ?? false;
+    public bool PreviousWindowIsForeground => _overlay?.PreviousWindowIsForeground ?? false;
 
     public void SwitchMonitor(string profile) => SwitchMonitor(() => _monitors.Switch(profile));
 
