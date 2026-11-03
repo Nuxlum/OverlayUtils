@@ -66,6 +66,12 @@ The stage checklist lives in `PORTING.md`.
 - [ ] CI: GitHub Actions on windows-latest running build + self-test
 - [ ] First-run setup for friends: guide a new user through full mode and
   connecting Discord without reading docs. After stage 7 (Discord).
+- [ ] Research: a driver-free way to keep pad input away from the game
+  while the overlay is open (nothing for the user to install). If found,
+  offer it as an advanced option next to full mode.
+- [ ] Stage 7: "watch a friend's stream" in Discord is wanted; probably not
+  in Discord's local RPC, may need a workaround.
+- [ ] Stage 4: decide whether audio output switching gets a pad shortcut.
 
 ## Session log
 
