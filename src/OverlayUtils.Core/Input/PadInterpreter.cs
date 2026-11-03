@@ -182,9 +182,9 @@ public sealed class PadInterpreter
             {
                 (int)PadButton.DpadUp => [new PadAction(PadActionKind.MonitorTv)],
                 (int)PadButton.DpadDown => [new PadAction(PadActionKind.MonitorDesk)],
-                (int)PadButton.DpadLeft => Volume(state, key, PadActionKind.VolumeDown),
-                (int)PadButton.DpadRight => Volume(state, key, PadActionKind.VolumeUp),
-                (int)PadButton.Y => [new PadAction(PadActionKind.MicMute)],
+                (int)PadButton.DpadLeft when state.Held.Count == 2 => Volume(state, key, PadActionKind.VolumeDown),
+                (int)PadButton.DpadRight when state.Held.Count == 2 => Volume(state, key, PadActionKind.VolumeUp),
+                (int)PadButton.Y when state.Held.Count == 2 => [new PadAction(PadActionKind.MicMute)],
                 _ => None,
             };
         }

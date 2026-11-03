@@ -83,6 +83,11 @@ string RepoRoot()
     Check(cfg.Language == "auto" && cfg.NotificationsEnabled, "missing keys get defaults");
     Check(cfg.HiddenTabs.SequenceEqual(["Giochi"]), "lists load");
 
+    var nullPath = Path.Combine(Path.GetDirectoryName(path)!, "nulls.json");
+    File.WriteAllText(nullPath, """{ "audio_output_order": null, "audio_input_order": null, "audio_volume_caps": null, "hidden_tabs": null }""");
+    var nullCfg = new ConfigStore(nullPath).Current;
+    Check(nullCfg.AudioOutputOrder.Count == 0 && nullCfg.AudioInputOrder.Count == 0 && nullCfg.AudioVolumeCaps.Count == 0 && nullCfg.HiddenTabs.Count == 0, "null lists load as empty");
+
     var changed = 0;
     store.Changed += _ => changed++;
     store.Update(c => c.Language = "it");
@@ -1053,6 +1058,10 @@ string RepoRoot()
     p = New(); p.ButtonDown(1, PadButton.Back);
     Check(Is(p.ButtonDown(1, PadButton.Y), micMute), "closed: Back+Y -> MicMute");
     Check(Is(p.ButtonDown(1, PadButton.DpadUp), new PadAction(PadActionKind.MonitorTv)), "monitor combo still works");
+    p = New(); p.ButtonDown(1, PadButton.Back); p.ButtonDown(1, PadButton.LB);
+    Check(Is(p.ButtonDown(1, PadButton.Y)), "closed: Back+LB+Y -> no MicMute");
+    p = New(); p.ButtonDown(1, PadButton.Back); p.ButtonDown(1, PadButton.LB);
+    Check(Is(p.ButtonDown(1, PadButton.DpadLeft)), "closed: Back+LB+Left -> no VolumeDown");
     p = New(); p.CombosEnabled = false; p.ButtonDown(1, PadButton.Back);
     Check(Is(p.ButtonDown(1, PadButton.DpadLeft)) && Is(p.ButtonDown(1, PadButton.Y)), "combos off: no volume or mic");
     p = New(); p.ButtonDown(1, PadButton.Back); p.ButtonDown(1, PadButton.DpadLeft);

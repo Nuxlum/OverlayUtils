@@ -57,6 +57,9 @@ public sealed class ConfigStore
                 if (loaded is not null)
                 {
                     loaded.HiddenTabs ??= [];
+                    loaded.AudioOutputOrder ??= [];
+                    loaded.AudioInputOrder ??= [];
+                    loaded.AudioVolumeCaps ??= [];
                     return loaded;
                 }
             }

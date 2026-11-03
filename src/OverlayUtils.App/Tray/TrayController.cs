@@ -123,6 +123,7 @@ internal sealed class TrayController : IOverlayHost, IDisposable
             Notify(Loc.T("Notify.HotkeyBusy", "Ctrl+Alt+↓"));
         if (!await _hotkeys.RegisterAsync(HotkeyTv, Native.MOD_CONTROL | Native.MOD_ALT, Native.VK_UP))
             Notify(Loc.T("Notify.HotkeyBusy", "Ctrl+Alt+↑"));
+        _lastHomeKeyMode = _config.Current.HomeKeyMode;
         await ApplyHomeKeyAsync(_config.Current.HomeKeyMode, notifyIfBusy: false);
     }
 
@@ -301,11 +302,17 @@ internal sealed class TrayController : IOverlayHost, IDisposable
         }
     }
 
+    private string _lastHomeKeyMode = "";
+
     private void OnConfigChanged(AppConfig config)
     {
         if (_pads is not null) _pads.CombosEnabled = config.ControllerEnabled;
         Loc.SetLanguage(config.Language);
-        _ = ApplyHomeKeyAsync(config.HomeKeyMode, notifyIfBusy: true);
+        if (config.HomeKeyMode != _lastHomeKeyMode)
+        {
+            _lastHomeKeyMode = config.HomeKeyMode;
+            _ = ApplyHomeKeyAsync(config.HomeKeyMode, notifyIfBusy: true);
+        }
         OnUi(RefreshIcon);
     }
 

@@ -245,11 +245,18 @@ public sealed partial class AudioService : IDisposable
         var newOutputs = Updated(config.AudioOutputOrder, outputs, defaultOutput);
         var newInputs = Updated(config.AudioInputOrder, inputs, defaultInput);
         if (newOutputs.SequenceEqual(config.AudioOutputOrder) && newInputs.SequenceEqual(config.AudioInputOrder)) return;
-        _config.Update(c =>
+        try
         {
-            c.AudioOutputOrder = Updated(c.AudioOutputOrder, outputs, defaultOutput);
-            c.AudioInputOrder = Updated(c.AudioInputOrder, inputs, defaultInput);
-        });
+            _config.Update(c =>
+            {
+                c.AudioOutputOrder = Updated(c.AudioOutputOrder, outputs, defaultOutput);
+                c.AudioInputOrder = Updated(c.AudioInputOrder, inputs, defaultInput);
+            });
+        }
+        catch (Exception e)
+        {
+            Log.Error("Saving the audio device lists (using the in-memory lists)", e);
+        }
     }
 
     private static List<AudioDeviceRef> Updated(List<AudioDeviceRef> list, List<AudioDeviceRef> seen, string? currentDefault) =>
@@ -291,6 +298,16 @@ public sealed partial class AudioService : IDisposable
                 Log.Error($"Setting default audio {flow} ({role}) failed: 0x{hr:X8}");
                 ok = false;
             }
+        }
+        if (ok)
+        {
+            // Remember the pick now so a quick second Cycle continues from it, not from the stale default.
+            lock (_lock)
+            {
+                if (flow == AudioFlow.Output) _defaultOutput = id;
+                else _defaultInput = id;
+            }
+            RaiseChanged();
         }
         if (refresh) ScheduleRefresh(); // Windows also sends default-changed events; this covers a missed one
         return ok;
