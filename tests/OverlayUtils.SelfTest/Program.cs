@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using OverlayUtils.Core;
+using OverlayUtils.Core.Audio;
 using OverlayUtils.Core.Config;
 using OverlayUtils.Core.Input;
 using OverlayUtils.Core.Legacy;
@@ -770,6 +771,44 @@ string RepoRoot()
     foreach (var expected in new[] { "Back + RB", "Back + ↑ / ↓", "LT / RT", "A / B" })
         Check(shortcuts.Contains(expected), $"Info shortcuts list {expected}");
     Check(content.Info().Any(i => i.Visible() && i.Label() == Loc.T("Overlay.Info.Pad.SettingsHold")), "Info lists hold Back for Settings");
+}
+
+// --- Audio rules ---
+{
+    AudioDeviceRef D(string id, string name = "") => new(id, name == "" ? id : name);
+    var ranked = new List<AudioDeviceRef> { D("A"), D("B"), D("C") };
+    IReadOnlySet<string> Set(params string[] ids) => new HashSet<string>(ids);
+    Check(AudioRules.Target(ranked, Set("B", "C"), "C") == "B", "Audio Target picks best available when default is lower");
+    Check(AudioRules.Target(ranked, Set("B", "C"), "B") is null, "Audio Target null when default already best");
+    Check(AudioRules.Target(ranked, Set(), "C") is null, "Audio Target null when nothing available");
+    Check(AudioRules.Target([], Set("B"), "B") is null, "Audio Target null for empty ranking");
+    Check(AudioRules.Target(ranked, Set("D"), "D") is null, "Audio Target null when only unranked available");
+
+    var merged = AudioRules.Merge([D("A"), D("B")], [D("B", "B2"), D("C")]);
+    Check(merged.Select(d => d.Id).SequenceEqual(["A", "B", "C"]) && merged[1].Name == "B2", "Audio Merge appends and renames");
+    var seeded = AudioRules.Seed([D("X"), D("Y"), D("Z")], "Y");
+    Check(seeded.Select(d => d.Id).SequenceEqual(["Y", "X", "Z"]), "Audio Seed puts default first");
+
+    Check(Math.Abs(AudioRules.StepVolume(0.52, +1, 1) - 0.55) < 1e-9, "Audio step up snaps to 5%");
+    Check(Math.Abs(AudioRules.StepVolume(0.52, -1, 1) - 0.50) < 1e-9, "Audio step down snaps to 5%");
+    Check(AudioRules.StepVolume(0.98, +1, 1) == 1.0, "Audio step clamps to 1");
+    Check(AudioRules.StepVolume(0.03, -1, 1) == 0.0, "Audio step clamps to 0");
+    Check(Math.Abs(AudioRules.StepVolume(0.70, +1, 0.6) - 0.6) < 1e-9, "Audio step up clamps to cap");
+    Check(Math.Abs(AudioRules.StepVolume(0.70, -1, 0.6) - 0.6) < 1e-9, "Audio step down then clamps to cap");
+    var caps = new Dictionary<string, int> { ["A"] = 60 };
+    Check(Math.Abs(AudioRules.CapFor(caps, "A") - 0.6) < 1e-9 && AudioRules.CapFor(caps, "B") == 1.0, "Audio CapFor");
+
+    var ac = new AppConfig();
+    Check(ac.AudioAutoOutput && ac.AudioAutoInput && ac.AudioOutputOrder.Count == 0 && ac.AudioInputOrder.Count == 0 && ac.AudioVolumeCaps.Count == 0, "Audio config defaults");
+    var acJson = JsonSerializer.Serialize(ac, ConfigStore.JsonOptions);
+    foreach (var key in new[] { "audio_output_order", "audio_input_order", "audio_auto_output", "audio_auto_input", "audio_volume_caps" })
+        Check(acJson.Contains($"\"{key}\""), $"Audio config JSON has {key}");
+    var audioPath = Path.Combine(temp, "audio-config.json");
+    var audioStore = new ConfigStore(audioPath);
+    audioStore.Update(c => { c.AudioOutputOrder = [D("o1", "Speakers")]; c.AudioVolumeCaps["o1"] = 60; c.AudioAutoInput = false; });
+    var reloaded = new ConfigStore(audioPath).Current;
+    Check(reloaded.AudioOutputOrder.Count == 1 && reloaded.AudioOutputOrder[0] == D("o1", "Speakers")
+        && reloaded.AudioVolumeCaps["o1"] == 60 && !reloaded.AudioAutoInput, "Audio config round-trips through ConfigStore");
 }
 
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }

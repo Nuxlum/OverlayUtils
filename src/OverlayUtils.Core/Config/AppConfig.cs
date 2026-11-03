@@ -38,12 +38,29 @@ public sealed class AppConfig
     /// <summary>"left" or "right" edge of the work area.</summary>
     [JsonPropertyName("overlay_side")] public string OverlaySide { get; set; } = OverlaySides.Left;
 
+    /// <summary>Output devices, best first (Audio tab order).</summary>
+    [JsonPropertyName("audio_output_order")] public List<AudioDeviceRef> AudioOutputOrder { get; set; } = [];
+
+    /// <summary>Input devices, best first.</summary>
+    [JsonPropertyName("audio_input_order")] public List<AudioDeviceRef> AudioInputOrder { get; set; } = [];
+
+    [JsonPropertyName("audio_auto_output")] public bool AudioAutoOutput { get; set; } = true;
+    [JsonPropertyName("audio_auto_input")] public bool AudioAutoInput { get; set; } = true;
+
+    /// <summary>Volume cap per output device id, in percent (missing = 100).</summary>
+    [JsonPropertyName("audio_volume_caps")] public Dictionary<string, int> AudioVolumeCaps { get; set; } = [];
+
     [JsonExtensionData] public Dictionary<string, JsonElement>? Extra { get; set; }
 
     public AppConfig Clone() =>
         JsonSerializer.Deserialize<AppConfig>(JsonSerializer.Serialize(this, ConfigStore.JsonOptions),
             ConfigStore.JsonOptions)!;
 }
+
+/// <summary>An audio endpoint remembered in the config: stable id plus last known name.</summary>
+public sealed record AudioDeviceRef(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("name")] string Name);
 
 public static class HomeKeyModes
 {
