@@ -29,6 +29,23 @@ The stage checklist lives in `PORTING.md`.
   that bothers anyone.
 - 2026-10-31 - English names for scripts and docs; the Python files keep
   their original names inside `reference/python/` (frozen reference).
+- 2026-11-03 - **Overlay Settings key is F2.**
+- 2026-11-03 - **The overlay's full-mode switch has no dialogs** (A twice is
+  the confirmation) and always notifies failures, even with notifications off.
+- 2026-11-03 - **Close window does nothing** when there is no previous app
+  window (overlay opened over the taskbar or desktop).
+- 2026-11-03 - **Info-row actions** (open folder / site) close the overlay
+  first; otherwise the new window would open under the topmost panel.
+- 2026-11-03 - **Accent contrast floor 4.5:1** against #202020, because the
+  selected icon glyph uses the accent; fallback is the lightest palette entry,
+  then #4CC2FF. Users with a dark accent see a lighter tone instead.
+- 2026-11-03 - **Acrylic needs Windows 11 build 22621+**; earlier builds
+  (Windows 10, 11 21H2) get the solid background. The backdrop is re-applied
+  on every show because DWM drops it.
+- 2026-11-03 - **Monitor row says "Confirm"** instead of the pad's "A" until
+  stage 3 adds the gamepad.
+- 2026-11-03 - **If the overlay never gets focus it stays open** until
+  toggled (same as Python).
 
 ## Open questions
 
@@ -47,11 +64,17 @@ The stage checklist lives in `PORTING.md`.
 - [ ] CI: GitHub Actions on windows-latest running build + self-test
 - [ ] First-run setup for friends: guide a new user through full mode and
   connecting Discord without reading docs. After stage 7 (Discord).
-- [ ] Python leftover to drop in the port: temporary diagnostics in
-  `_Overlay.show()` (`_diag_windows`, "DIAGNOSTICA TEMPORANEA")
 
 ## Session log
 
+- 2026-11-03 - Stage 2 written in 8 tasks, each reviewed: overlay model and
+  navigator, layout maths, focus / monitor / power / accent helpers, window and
+  view model, Shift+F1 and tray toggle, acrylic / accent / animation, docs.
+  Verified by hand: open / close on the right monitor, Esc focus return, Close
+  window, Power confirm timeout, F2 / Esc pages, Size and Position, Exit.
+  Remains: the stage 2 manual list in PORTING (DPI pair, Large on 1080p,
+  effects off, accent change, full mode over a fullscreen game with the
+  `_repair_frame` check, real Power actions, Windows 10).
 - 2026-10-31 - Stage 1 written: solution, Core (config, migration,
   localization, hotkeys, monitor profiles, start-up, full-mode installer,
   legacy cleanup), App (tray, mode switching), scripts, docs. Core self-test

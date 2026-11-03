@@ -17,11 +17,22 @@ START
 Do not start OverlayUtils.UIAccess.exe yourself: Windows refuses to run it
 until full mode is enabled (see below). OverlayUtils starts it when needed.
 
+OPENING THE OVERLAY
+-------------------
+Press Shift+F1, or left-click the tray icon. Press again (or click outside)
+to close it.
+Inside: Up/Down move, Left/Right change a value, Enter selects (Power options
+ask for a second Enter within 3 seconds), Tab / PgUp / PgDn switch tab,
+F2 opens Settings, Esc goes back or closes. The mouse works too.
+Settings has size, side of the screen, language and the full mode switch
+(see below), so you can enable full mode from the overlay as well.
+
 OVERLAY OVER FULLSCREEN GAMES (optional)
 ----------------------------------------
 By default the overlay works over the desktop, windows, borderless games and
 Steam Big Picture. To show it over fullscreen games too:
 tray menu -> Overlay over fullscreen games -> Enable...
+(or Settings in the overlay).
 
 Windows asks for administrator permission once. OverlayUtils then trusts the
 certificate it is signed with on this PC, copies itself to Program Files and
@@ -65,11 +76,23 @@ Non avviare tu OverlayUtils.UIAccess.exe: Windows si rifiuta di eseguirlo
 finché non attivi la modalità completa (vedi sotto). Lo avvia OverlayUtils
 quando serve.
 
+APRIRE L'OVERLAY
+----------------
+Premi Maiusc+F1, oppure clic sinistro sull'icona. Premi di nuovo (o clicca
+fuori) per chiuderlo.
+Dentro: Su/Giù si muovono, Sinistra/Destra cambiano un valore, Invio sceglie
+(le opzioni di spegnimento chiedono un secondo Invio entro 3 secondi),
+Tab / Pag su / Pag giu' cambiano scheda, F2 apre le Impostazioni, Esc torna
+indietro o chiude. Funziona anche con il mouse.
+Le Impostazioni hanno dimensione, lato dello schermo, lingua e l'interruttore
+della modalità completa (vedi sotto): si può attivare anche dall'overlay.
+
 OVERLAY SOPRA I GIOCHI A SCHERMO INTERO (facoltativo)
 -----------------------------------------------------
 Di base l'overlay funziona sopra desktop, finestre, giochi in finestra senza
 bordi e Steam Big Picture. Per vederlo anche sopra i giochi a schermo intero:
 menu dell'icona -> Overlay sopra i giochi a schermo intero -> Attiva...
+(oppure Impostazioni nell'overlay).
 
 Windows chiede una volta i permessi di amministratore. OverlayUtils rende
 attendibile su questo PC il certificato con cui è firmato, si copia in

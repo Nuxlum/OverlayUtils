@@ -74,12 +74,73 @@ so disabling never removes one we did not add.
 
 | Thread | Owner | Notes |
 |---|---|---|
-| UI (STA) | WPF `Dispatcher` | tray, menus, dialogs; later the overlay |
+| UI (STA) | WPF `Dispatcher` | tray, menus, dialogs, the overlay window |
 | Hotkeys | `HotkeyService` | own message loop; `RegisterHotKey` must be called on it, so requests are queued and the thread is woken with `PostThreadMessage` |
-| Workers | `Task.Run` | MonitorSwitcher search, mode switching (waits on UAC) |
+| Workers | `Task.Run` | MonitorSwitcher search, mode switching (waits on UAC), overlay actions after hide |
 
-Rule: anything that touches UI goes through `TrayController.OnUi` (later a
-shared dispatcher helper). Hotkey callbacks arrive on the hotkey thread.
+Rule: anything that touches UI goes through `TrayController.OnUi`. Hotkey callbacks arrive on the hotkey thread.
+
+## Overlay
+
+Split like the rest: everything that can run without WPF is in Core and
+covered by the self-test.
+
+| Core (`Overlay/`, `Platform/`) | App (`Overlay/`) |
+|---|---|
+| `OverlayContent`: tabs and rows (Controls, Settings, Info) | `OverlayController`: open / close, focus, placement, runs effects |
+| `OverlayNavigator`: selection, pages, expanders, Power confirm | `OverlayWindow` + `OverlayViewModel`: drawing, key and mouse input |
+| `OverlayLayout`: size factor and `Place` (physical px, clamped) | `OverlayTheme.xaml`, `WindowEffects`: acrylic, border, rounded corners |
+| `IOverlayHost` (implemented by `TrayController`) | |
+| `WindowFocus`, `DisplayArea`, `PowerActions`, `ShellOpen`, `AccentPalette` | |
+
+### Effect model
+
+The navigator never runs callbacks. Each command (Up, Enter, Click...) returns
+a `NavResult`: what to redraw, plus an optional effect.
+- `RunHere`: run now on the UI thread (settings changes, language switch).
+- `HideAndRun`: the controller hides the overlay, gives focus back to the
+  previous window, waits 150 ms on a worker (`Task.Run`) and then runs the
+  action (Big Picture, Show desktop, Close window, Power, full-mode switch,
+  Exit, opening a folder or site from Info).
+
+The overlay itself lives on the UI thread. The view runs a 250 ms timer that
+calls `ExpirePending`, so a Power option armed with Enter or a click disarms
+after 3 s.
+
+### Focus
+
+On open the controller remembers the foreground window (`_prev`), skipping
+shell windows (taskbar, desktop, Start...: `WindowFocus.ShellWindows`) and its
+own, then takes foreground with `WindowFocus.Force`. It checks focus every
+150 ms and hides when it is lost. Esc gives focus back to `_prev` if it is
+still alive. If the overlay never gets focus it stays open until toggled (as in
+Python). Close window sends Alt+F4 to the previous app and does nothing when
+there is none (`HasPreviousWindow`: opened over the taskbar or desktop).
+
+### Placement and size
+
+The window opens on the monitor of the foreground window (`DisplayArea`, cursor
+as fallback), at the chosen side of its work area. `OverlayLayout.SizeFactor`
+maps `overlay_size` (Auto looks at the active monitor profile) to a factor;
+`Place` returns the physical rectangle clamped to the work area. The content
+scales by the factor and scrolls when clamped. The XAML size is only the
+initial one. The window is per-monitor DPI aware and follows `WM_DPICHANGED`.
+
+### Look
+
+- Backdrop: acrylic on Windows 11 build 22621 or newer; older builds (Windows 10,
+  11 21H2) get a solid background. It is re-applied on every show, because DWM
+  drops it otherwise. Rounded corners and border colour (as in Python) go
+  through DWM too.
+- Accent: read from the Windows accent palette (`AccentPalette`). It is used
+  only if its contrast against the panel (#202020) is at least 4.5:1, else the
+  lightest palette entry, else #4CC2FF. The selection must always be visible.
+- Transparency effects off in Windows -> solid; animation effects off -> no slide.
+
+### Hotkey
+
+Hotkey id 2 (reserved in stage 1) is now Shift+F1 via `RegisterHotKey`; a left
+click on the tray icon does the same. Both call `OverlayController.Toggle`.
 
 ## Configuration
 
@@ -87,16 +148,18 @@ shared dispatcher helper). Hotkey callbacks arrive on the hotkey thread.
 - property names match the Python file, so migrated configs load unchanged;
 - unknown keys are kept (`[JsonExtensionData]`) - Spotify/Discord settings
   survive until their stage is ported;
+- overlay keys: `overlay_size` (`normal` / `large` / `auto`; auto picks by the
+  active monitor profile) and `overlay_side` (`left` / `right`);
 - `Update(change)` saves atomically (temp file + move) and raises `Changed`;
 - a corrupt file is backed up as `config.json.bad` and defaults are used.
 
 ## Localization
 
 `Strings.resx` (English, neutral) and `Strings.it.resx`. Keys are dotted:
-`Menu.*`, `Notify.*`, `Dialog.*`, `Tooltip.*`, `Language.*` (later
-`Overlay.*`, `Settings.*`).
+`Menu.*`, `Notify.*`, `Dialog.*`, `Tooltip.*`, `Language.*` `Overlay.*` (rows,
+footer, descriptions) and `Settings.*`.
 - Code: `Loc.T("Menu.Exit")`, `Loc.T("Tooltip.Monitor", name)`.
-- XAML (stage 2): `{Binding [Menu.Exit], Source={x:Static loc:Loc.Instance}}`;
+- XAML: `{Binding [Menu.Exit], Source={x:Static loc:Loc.Instance}}`;
   bindings refresh when `Loc.SetLanguage` runs.
 - The self-test fails if a key is missing in either language, if placeholders
   differ, or if source code uses a key that does not exist.

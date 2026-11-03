@@ -36,13 +36,17 @@ tests below are still to do.
 - [~] Start with Windows  *(AVVIO CON WINDOWS)*
 - [~] Enable / disable full mode from the tray
 
-### Stage 2 - overlay shell  `[ ]`
-- [ ] WPF overlay window: borderless, topmost, per-monitor DPI, on the foreground window's monitor  *(OVERLAY GAMEPAD: `_Overlay.show`, `_monitor_of`)*
-- [ ] Focus handling: take foreground, remember previous window, auto-hide on focus loss, run actions after focus returns
-- [ ] Shift+F1 and tray click toggle (hotkey id 2 is reserved)
-- [ ] Keyboard and mouse navigation; Settings and Info pages
-- [ ] Controls tab: monitor, Big Picture, power, show desktop, close window  *(OVERLAY_ITEMS)*
-- [ ] Verify the UIAccess z-order quirk (`_repair_frame` in Python) does not apply to WPF
+### Stage 2 - overlay shell  `[~]`
+Written in 8 tasks and reviewed per task; builds with 0 warnings and the
+self-test passes. `[x]` = checked by hand on Windows, `[~]` = written, rest of
+the manual tests below still to do.
+- [~] WPF overlay window: borderless, topmost, per-monitor DPI, on the foreground window's monitor, size Normal / Large / Auto and side left / right, acrylic + Windows accent  *(OVERLAY GAMEPAD: `_Overlay.show`, `_monitor_of`)*
+- [~] Focus handling: take foreground, remember previous window, auto-hide on focus loss, run actions after focus returns
+- [~] Shift+F1 and tray click toggle (hotkey id 2)
+- [~] Keyboard and mouse navigation; Settings and Info pages
+- [~] Controls tab: monitor, Big Picture, power, show desktop, close window  *(OVERLAY_ITEMS)*
+- [~] Verify the UIAccess z-order quirk (`_repair_frame` in Python) does not apply to WPF
+- [x] Checked by hand: Shift+F1 opens / closes on the foreground window's monitor; Esc gives focus back; Close window reaches the previous app and does nothing over the desktop; the Power confirm expires after 3 s; F2 / Esc page navigation; Size and Position settings; Exit from the overlay
 
 ### Stage 3 - gamepad  `[ ]`
 - [ ] SDL3 GameController input, hot-plug  *(CONTROLLER)*
@@ -78,3 +82,16 @@ tests below are still to do.
    Program Files, tooltip says "Full mode". Then Disable: back to
    `%LOCALAPPDATA%\Programs\OverlayUtils`, Program Files folder and certificate gone.
 5. Logs: `%APPDATA%\OverlayUtils\errors.log`.
+
+## Testing on Windows (stage 2)
+
+1. Tray icon left click opens and closes the overlay; clicking outside it closes it.
+2. Size Large on a 1080p monitor: the panel clamps to the work area and scrolls.
+3. Two monitors at 100% and 150% DPI: open on each, the panel is sharp and sized correctly.
+4. Settings row: switch language, the overlay and tray menu change at once.
+5. Windows Settings -> Transparency effects off: the panel becomes solid. Animation effects off: no slide.
+6. Change the Windows accent colour while running: the overlay follows on the next open. A dark or grey accent falls back to a lighter tone, then to blue.
+7. Full mode: `scripts\build.ps1`, start `dist\OverlayUtils\OverlayUtils.exe`, enable full mode from the overlay's Settings (A twice, UAC once; the app restarts from Program Files).
+8. In full mode, open the overlay over a fullscreen game (borderless and, if available, exclusive): it appears on top and takes keys and clicks. Confirm the `_repair_frame` problem does not occur (content detached from the frame, as in Python). If it does, stop and record it in WORKLOG.
+9. Power options for real (once): Sleep, Restart, Shut down each ask for a second Confirm and run after it.
+10. Windows 10, if available: the panel is solid, everything else works.
