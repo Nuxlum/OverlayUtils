@@ -698,6 +698,38 @@ string RepoRoot()
         && PadInterpreter.BatteryLevel(1, -1) == null && PadInterpreter.BatteryLevel(0, 50) == null, "battery unknown cases");
 }
 
+// --- Pad in the overlay -----------------------------------------------------
+{
+    var store = new ConfigStore(Path.Combine(temp, "padui", "config.json"));
+    var monitors = new MonitorProfiles(store, new MonitorSwitcherLocator(store), Path.Combine(temp, "padui", "none"));
+    var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), new FakeHost());
+    var nav = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
+    nav.Reset([]);
+    var pad = nav.Footer(pad: true);
+    Check(pad.Contains(new FooterHint("A", Loc.T("Overlay.Footer.Confirm"))), "pad footer: A confirms");
+    Check(pad.Contains(new FooterHint("B", Loc.T("Overlay.Footer.Close"))), "pad footer: B closes");
+    Check(pad.Contains(new FooterHint("Back", Loc.T("Overlay.Footer.SettingsHold"))), "pad footer: hold Back for Settings");
+    Check(pad.All(h => h.Keys is not ("Enter" or "Esc" or "F2")), "pad footer has no keyboard keys");
+    var keys = nav.Footer();
+    Check(keys.Any(h => h.Keys == "Enter") && keys.Any(h => h.Keys == "F2"), "keyboard footer unchanged");
+
+    var combos = content.Settings().FirstOrDefault(i => i.Label() == Loc.T("Settings.PadCombos"));
+    Check(combos is { Kind: ItemKind.Toggle }, "Settings has the Pad combos toggle");
+    if (combos is not null)
+    {
+        var before = store.Current.ControllerEnabled;
+        Check(combos.IsOn() == before, "Pad combos shows the setting");
+        combos.Toggle!();
+        Check(store.Current.ControllerEnabled == !before, "Pad combos flips controller_enabled");
+    }
+
+    content.ResetTransient();
+    var shortcuts = content.Info().Where(i => i.Kind == ItemKind.Info && i.Visible()).Select(i => i.Value()).ToList();
+    foreach (var expected in new[] { "Back + RB", "Back + ↑ / ↓", "LT / RT", "A / B" })
+        Check(shortcuts.Contains(expected), $"Info shortcuts list {expected}");
+    Check(content.Info().Any(i => i.Visible() && i.Label() == Loc.T("Overlay.Info.Pad.SettingsHold")), "Info lists hold Back for Settings");
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;

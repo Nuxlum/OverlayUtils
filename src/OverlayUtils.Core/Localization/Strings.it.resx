@@ -87,6 +87,7 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.Footer.OpenClose" xml:space="preserve"><value>Chiudi / apri</value></data>
   <data name="Overlay.Footer.Select" xml:space="preserve"><value>Seleziona</value></data>
   <data name="Overlay.Footer.Settings" xml:space="preserve"><value>Impostazioni</value></data>
+  <data name="Overlay.Footer.SettingsHold" xml:space="preserve"><value>Impostazioni (tieni)</value></data>
   <data name="Overlay.Footer.Toggle" xml:space="preserve"><value>Attiva/disattiva</value></data>
   <data name="Overlay.Info.Config" xml:space="preserve"><value>Configurazione</value></data>
   <data name="Overlay.Info.Download" xml:space="preserve"><value>Scarica</value></data>
@@ -99,6 +100,10 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.Info.Mode" xml:space="preserve"><value>Modalità</value></data>
   <data name="Overlay.Info.Monitor" xml:space="preserve"><value>Monitor</value></data>
   <data name="Overlay.Info.NoProfiles" xml:space="preserve"><value>nessuno: salvali con MonitorSwitcher</value></data>
+  <data name="Overlay.Info.Pad.Confirm" xml:space="preserve"><value>Conferma / indietro</value></data>
+  <data name="Overlay.Info.Pad.Monitor" xml:space="preserve"><value>Monitor TV / Scrivania</value></data>
+  <data name="Overlay.Info.Pad.SettingsHold" xml:space="preserve"><value>Impostazioni (tieni premuto)</value></data>
+  <data name="Overlay.Info.Pad.Toggle" xml:space="preserve"><value>Apri / chiudi l'overlay (pad)</value></data>
   <data name="Overlay.Info.Profiles" xml:space="preserve"><value>Profili</value></data>
   <data name="Overlay.Info.Roles" xml:space="preserve"><value>Scrivania · TV</value></data>
   <data name="Overlay.Info.Shortcuts" xml:space="preserve"><value>Scorciatoie</value></data>
@@ -150,6 +155,8 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Settings.MonitorSwitcher.Missing" xml:space="preserve"><value>non trovato</value></data>
   <data name="Settings.MonitorSwitcher.Searching" xml:space="preserve"><value>ricerca…</value></data>
   <data name="Settings.Notifications.Desc" xml:space="preserve"><value>Avvisi di Windows quando cambi profilo monitor.</value></data>
+  <data name="Settings.PadCombos" xml:space="preserve"><value>Combo del pad</value></data>
+  <data name="Settings.PadCombos.Desc" xml:space="preserve"><value>Back + croce Su / Giù cambiano profilo monitor. Back + RB apre sempre l'overlay.</value></data>
   <data name="Settings.Position.Desc" xml:space="preserve"><value>Lato dello schermo in cui compare l'overlay.</value></data>
   <data name="Settings.Position.Label" xml:space="preserve"><value>Posizione</value></data>
   <data name="Settings.Position.Left" xml:space="preserve"><value>Sinistra</value></data>

@@ -36,6 +36,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     IReadOnlyList<RowVm> _rows = [];
     string _description = "";
     IReadOnlyList<FooterVm> _footer = [];
+    string _batteryGlyph = "";
     Brush _accentBrush = Frozen(FallbackAccent);
     double _sizeFactor = 1;
 
@@ -43,6 +44,8 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
 
     public string Title => AppPaths.AppName;
     public string Clock { get => _clock; private set => Set(ref _clock, value); }
+    /// <summary>Pad battery level glyph, empty when no pad reports one.</summary>
+    public string BatteryGlyph { get => _batteryGlyph; private set => Set(ref _batteryGlyph, value); }
     public string ProfileName { get => _profileName; private set => Set(ref _profileName, value); }
     public Brush? ProfileBrush { get => _profileBrush; private set => Set(ref _profileBrush, value); }
     public IReadOnlyList<TabVm> Tabs { get => _tabs; private set => Set(ref _tabs, value); }
@@ -58,9 +61,11 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     /// <summary>Scale of the whole panel (Large size); set by the controller.</summary>
     public double SizeFactor { get => _sizeFactor; set => Set(ref _sizeFactor, value); }
 
-    public void Refresh(OverlayNavigator nav, string clock, (byte R, byte G, byte B)? profileColor, string profileName)
+    public void Refresh(OverlayNavigator nav, string clock, (byte R, byte G, byte B)? profileColor, string profileName,
+        bool pad = false, int? battery = null)
     {
         Clock = clock;
+        BatteryGlyph = battery is { } level ? Glyphs.Battery[Math.Clamp(level, 0, 3)] : "";
         ProfileName = profileName;
         ProfileBrush = profileColor is { } c ? Frozen(Color.FromRgb(c.R, c.G, c.B)) : null;
 
@@ -103,7 +108,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         }
         Rows = rows;
         Description = nav.Description();
-        Footer = nav.Footer().Select(h => new FooterVm(h.Keys, h.Label)).ToList();
+        Footer = nav.Footer(pad).Select(h => new FooterVm(h.Keys, h.Label)).ToList();
     }
 
     static SolidColorBrush Frozen(Color color)

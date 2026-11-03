@@ -42,6 +42,7 @@ internal sealed class TrayController : IOverlayHost, IDisposable
     private readonly ContextMenuStrip _menu = new();
     private HotkeyService? _hotkeys;
     private OverlayController? _overlay;
+    private PadService? _pads;
     private System.Drawing.Icon? _currentIcon;
     private bool _busy; // a mode switch is in progress
     private bool? _overlayOpenAtPress; // left button pressed on the tray icon: was the overlay open then
@@ -92,6 +93,7 @@ internal sealed class TrayController : IOverlayHost, IDisposable
         _hotkeys = new HotkeyService();
         _hotkeys.Pressed += OnHotkey;
         _ = RegisterHotkeysAsync();
+        StartPads();
 
         RefreshIcon();
         _icon.Visible = true;
@@ -168,8 +170,48 @@ internal sealed class TrayController : IOverlayHost, IDisposable
         });
     }
 
+    // --- pads -----------------------------------------------------------------
+
+    /// <summary>Starts gamepad input; without SDL3.dll it logs once and the rest keeps working.</summary>
+    private void StartPads()
+    {
+        try
+        {
+            _pads = new PadService(new PadInterpreter()) { CombosEnabled = _config.Current.ControllerEnabled };
+            _pads.ActionRaised += OnPadAction;
+            _pads.StateChanged += () => _overlay?.SetPadState(_pads.PadCount > 0, _pads.BatteryLevel);
+            if (_overlay is not null) _overlay.OpenChanged += open => { if (_pads is not null) _pads.OverlayOpen = open; };
+            _pads.Start();
+        }
+        catch (Exception e)
+        {
+            Log.Error("Pad start", e);
+        }
+    }
+
+    /// <summary>Runs on the pad thread.</summary>
+    private void OnPadAction(PadAction action)
+    {
+        switch (action.Kind)
+        {
+            case PadActionKind.ToggleOverlay:
+                _overlay?.Toggle();
+                break;
+            case PadActionKind.MonitorTv:
+                SwitchMonitor(() => _monitors.SwitchTo(MonitorRole.Tv));
+                break;
+            case PadActionKind.MonitorDesk:
+                SwitchMonitor(() => _monitors.SwitchTo(MonitorRole.Desk));
+                break;
+            case PadActionKind.Command:
+                _overlay?.Command(action.Command);
+                break;
+        }
+    }
+
     private void OnConfigChanged(AppConfig config)
     {
+        if (_pads is not null) _pads.CombosEnabled = config.ControllerEnabled;
         Loc.SetLanguage(config.Language);
         _ = ApplyHomeKeyAsync(config.HomeKeyMode, notifyIfBusy: true);
         OnUi(RefreshIcon);
@@ -488,6 +530,7 @@ internal sealed class TrayController : IOverlayHost, IDisposable
 
     public void Dispose()
     {
+        _pads?.Dispose();
         _hotkeys?.Dispose();
         _overlay?.Dispose();
         _icon.Visible = false;

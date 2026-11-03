@@ -141,13 +141,14 @@ public sealed class OverlayNavigator
 
     public string Description() => Selected?.Description() ?? "";
 
-    public IReadOnlyList<FooterHint> Footer()
+    /// <summary>Key hints for the selected row; <paramref name="pad"/> shows pad buttons instead of keys.</summary>
+    public IReadOnlyList<FooterHint> Footer(bool pad = false)
     {
         var hints = new List<FooterHint>();
         var item = Selected;
         if (item is not null)
         {
-            hints.Add(new FooterHint("Enter", Loc.T(item.Kind switch
+            hints.Add(new FooterHint(pad ? "A" : "Enter", Loc.T(item.Kind switch
             {
                 ItemKind.Choice when item.Apply == null => "Overlay.Footer.Change",
                 ItemKind.Toggle => "Overlay.Footer.Toggle",
@@ -162,12 +163,14 @@ public sealed class OverlayNavigator
         }
         if (Page == OverlayPage.Tabs)
         {
-            hints.Add(new FooterHint("Esc", Loc.T("Overlay.Footer.Close")));
-            hints.Add(new FooterHint("F2", Loc.T("Overlay.Footer.Settings")));
+            hints.Add(new FooterHint(pad ? "B" : "Esc", Loc.T("Overlay.Footer.Close")));
+            hints.Add(pad
+                ? new FooterHint("Back", Loc.T("Overlay.Footer.SettingsHold"))
+                : new FooterHint("F2", Loc.T("Overlay.Footer.Settings")));
         }
         else
         {
-            hints.Add(new FooterHint("Esc", Loc.T("Overlay.Footer.Back")));
+            hints.Add(new FooterHint(pad ? "B" : "Esc", Loc.T("Overlay.Footer.Back")));
         }
         return hints;
     }

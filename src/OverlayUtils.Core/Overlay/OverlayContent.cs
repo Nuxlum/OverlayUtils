@@ -205,6 +205,14 @@ public sealed class OverlayContent
             },
             new OverlayItem
             {
+                Kind = ItemKind.Toggle, Icon = Glyphs.Game,
+                Label = () => Loc.T("Settings.PadCombos"),
+                Description = () => Loc.T("Settings.PadCombos.Desc"),
+                IsOn = () => _config.Current.ControllerEnabled,
+                Toggle = () => _config.Update(c => c.ControllerEnabled = !c.ControllerEnabled),
+            },
+            new OverlayItem
+            {
                 Kind = ItemKind.Segmented, Icon = Glyphs.Home,
                 Label = () => Loc.T("Menu.HomeKey"),
                 Description = () => Loc.T("Settings.HomeKey.Desc"),
@@ -362,7 +370,12 @@ public sealed class OverlayContent
             Key("Overlay.Footer.Confirm", "Enter"),
             Key("Overlay.Info.Key.Back", "Esc"),
             Key("Overlay.Info.Key.Tabs", "Tab / PgUp / PgDn"),
-            Key("Overlay.Footer.Settings", "F2"));
+            Key("Overlay.Footer.Settings", "F2"),
+            Key("Overlay.Info.Pad.Toggle", "Back + RB"),
+            Key("Overlay.Info.Pad.Monitor", "Back + ↑ / ↓"),
+            Key("Overlay.Info.Pad.Confirm", "A / B"),
+            Key("Overlay.Info.Key.Tabs", "LT / RT"),
+            Key("Overlay.Info.Pad.SettingsHold", "Back"));
 
         var profiles = _monitors.List();
         Panel(MonitorPanel, Glyphs.Monitor, "Overlay.Info.Monitor",

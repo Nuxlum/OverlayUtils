@@ -346,6 +346,8 @@
                                            TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Border>
+                        <TextBlock Text="{Binding BatteryGlyph}" Margin="10,0,0,0" FontSize="14"
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" VerticalAlignment="Center" />
                         <TextBlock Text="{Binding Clock}" Margin="10,0,0,0" FontSize="14" FontWeight="SemiBold"
                                    VerticalAlignment="Center" />
                     </StackPanel>

@@ -41,6 +41,8 @@ internal sealed class OverlayController : IDisposable
     readonly DispatcherTimer _pendingTimer;
 
     volatile bool _open;
+    bool _padConnected;
+    int? _battery;
     nint _prev;            // foreground app when the overlay opened; kept after hiding for the action that follows
     bool _hadFocus;
     RectI _placement;
@@ -73,6 +75,20 @@ internal sealed class OverlayController : IDisposable
     }
 
     public bool IsOpen => _open;
+
+    /// <summary>Raised on the UI thread when the overlay opens (true) or hides (false).</summary>
+    public event Action<bool>? OpenChanged;
+
+    /// <summary>Runs a command as if the window had issued it (pad input). Any thread.</summary>
+    public void Command(OverlayCommand command) => OnUi(() => OnCommand(command));
+
+    /// <summary>Pad connected (footer shows pad buttons) and battery level for the header. Any thread.</summary>
+    public void SetPadState(bool padConnected, int? batteryLevel) => OnUi(() =>
+    {
+        _padConnected = padConnected;
+        _battery = batteryLevel;
+        if (_open) Render();
+    });
 
     /// <summary>
     /// True when the window that was in front when the overlay opened still exists and is the foreground app now;
@@ -133,6 +149,7 @@ internal sealed class OverlayController : IDisposable
             _window.Show();
             Place(); // Show must not have moved it
             _open = true;
+            RaiseOpenChanged(true);
             WindowFocus.Force(_hwnd);
             _window.Activate();
             _window.Focus();
@@ -161,6 +178,7 @@ internal sealed class OverlayController : IDisposable
             // Focus first, then hide: hidden first, Windows activates another window and refuses the hand-back.
             if (restoreFocus && WindowFocus.IsAlive(_prev)) WindowFocus.Force(_prev);
             _open = false;
+            RaiseOpenChanged(false);
             _focusTimer.Stop();
             _clockTimer.Stop();
             _pendingTimer.Stop(); // a pending confirm is dropped by Reset on the next open
@@ -246,6 +264,12 @@ internal sealed class OverlayController : IDisposable
 
     // --- commands -------------------------------------------------------------
 
+    void RaiseOpenChanged(bool open)
+    {
+        try { OpenChanged?.Invoke(open); }
+        catch (Exception e) { Log.Error("Overlay open changed", e); }
+    }
+
     void OnCommand(OverlayCommand command)
     {
         if (_open) Apply(_navigator.Handle(command));
@@ -297,7 +321,7 @@ internal sealed class OverlayController : IDisposable
             _navigator.Refresh();
             var profile = _monitors.List().Count > 0 ? _monitors.Current : "";
             (byte, byte, byte)? color = profile.Length > 0 ? _monitors.Style(profile).Color : null;
-            _vm.Refresh(_navigator, DateTime.Now.ToString("HH:mm"), color, profile);
+            _vm.Refresh(_navigator, DateTime.Now.ToString("HH:mm"), color, profile, _padConnected, _battery);
         }
         catch (Exception e)
         {

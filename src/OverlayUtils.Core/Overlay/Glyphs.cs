@@ -3,6 +3,8 @@ namespace OverlayUtils.Core.Overlay;
 /// <summary>Segoe Fluent Icons / Segoe MDL2 Assets code points (Python's ICON_* constants).</summary>
 public static class Glyphs
 {
+    /// <summary>Battery levels 0..3 (empty..full), as Python ICON_BATTERY_LEVELS.</summary>
+    public static readonly string[] Battery = ["", "", "", ""];
     public const string Monitor = "";
     public const string Game = "";
     public const string Desktop = "";
