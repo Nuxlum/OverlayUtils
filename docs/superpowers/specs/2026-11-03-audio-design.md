@@ -63,10 +63,24 @@ Python reference (`reference/python/app.py`, see `docs/PYTHON-CODEMAP.md`):
    - Volumes are applied when a program's session appears and whenever the
      user changes them in the overlay; changes made elsewhere (Windows
      mixer) are left alone until the next overlay change. (my call)
-3. **Media buttons from any tab** (Python): LB / RB = previous / next track,
+3. **Custom channels** (owner): Game, Chat, Media and Other exist by
+   default; the user can add their own channels, each with a name and an
+   icon. Settings → Audio → "Channels" page (my calls on the details):
+   - "Add channel": name typed in a text box (keyboard); a pad user can keep
+     the suggested name ("Channel 5", …) and rename it later with a keyboard.
+   - Icon: chosen with Left/Right from a fixed set of about 16 Segoe Fluent
+     glyphs (game, chat, music, video, browser, mic, headphones, speaker,
+     star, heart, …), no image files.
+   - Order of channels in the Audio tab: reorderable like the device lists.
+   - The four defaults can be renamed and re-iconed but not deleted; Other is
+     the fallback for unassigned programs. Deleting a custom channel moves its
+     programs to Other.
+   - Custom channels never get programs automatically: programs are moved
+     there by the user ("Programs" page or "Add program…").
+4. **Media buttons from any tab** (Python): LB / RB = previous / next track,
    X = play/pause, while the overlay is open (pad). These are added to
    `PadInterpreter` (they currently do nothing).
-4. **Device priority lists**, one for outputs and one for inputs, in
+5. **Device priority lists**, one for outputs and one for inputs, in
    Settings → Audio:
    - Each list holds every device seen on this PC (connected or not), new
      devices added at the bottom, stored in config (device id + last known
@@ -78,10 +92,10 @@ Python reference (`reference/python/app.py`, see `docs/PYTHON-CODEMAP.md`):
      to the highest-ranked device currently available. A manual pick from
      the Audio tab holds until the next such device change.
    - A Settings toggle per list turns auto-switching off (manual only).
-5. **Sonar coexistence:** Sonar's virtual devices are ordinary devices in
+6. **Sonar coexistence:** Sonar's virtual devices are ordinary devices in
    the lists. Ranked above the real devices, Sonar is used while it runs;
    ranked below, our auto-switch wins. No Sonar-specific code in this stage.
-6. Volume and mute changes are reflected live in the overlay if changed
+7. Volume and mute changes are reflected live in the overlay if changed
    elsewhere (Windows flyout, keyboard keys) while it is open.
 
 ## Changes from Python
@@ -127,8 +141,6 @@ Python reference (`reference/python/app.py`, see `docs/PYTHON-CODEMAP.md`):
   Sonar's devices ranked first in the priority lists, audio goes through
   Sonar (and its EQ) whenever it runs.
 - A game/chat balance slider (owner chose per-app and per-channel volumes).
-- Custom channels beyond Game/Chat/Media/Other (owner asked to edit and add
-  programs, not channels).
 - Sonar integration (backlog: show Sonar's real routed device, ChatMix).
 - Per-app output routing (sending one app to a different device).
 - YouTube Music / Spotify library integration (stage 6).
