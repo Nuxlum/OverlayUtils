@@ -22,4 +22,23 @@ public static class Glyphs
     public const string ChevronLeft = "";
     public const string ChevronRight = "";
     public const string Settings = "";
+
+    // Audio (Python ICON_SPEAKER, ICON_HEADPHONE, ICON_VOLUME*, ICON_MUTE, ICON_MIC*, ICON_PLAY ... ICON_MUSIC).
+    public const string Speaker = "";
+    public const string Headphone = "";
+    public const string Volume = "";
+    /// <summary>Volume levels 0..3 (low..high), as Python ICON_VOLUME_LEVELS.</summary>
+    public static readonly string[] VolumeLevels = ["", "", "", ""];
+    public const string Mute = "";
+    public const string Mic = "";
+    public const string MicOff = "";
+    public const string Play = "";
+    public const string Pause = "";
+    public const string Previous = "";
+    public const string Next = "";
+    public const string Music = "";
+
+    /// <summary>Python _volume_icon: mute, else one of four levels.</summary>
+    public static string VolumeIcon(double level, bool muted) =>
+        muted ? Mute : VolumeLevels[Math.Clamp((int)(level * 4), 0, 3)];
 }

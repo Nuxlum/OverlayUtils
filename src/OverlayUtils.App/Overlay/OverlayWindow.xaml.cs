@@ -117,8 +117,9 @@ internal sealed partial class OverlayWindow : Window
             e.Handled = true;
             return;
         }
-        // A held Enter must not confirm a pending Power option by itself; Esc and F2 would flicker pages.
-        if (e.IsRepeat && e.Key is Key.Enter or Key.Escape or Key.F2)
+        // A held Enter must not confirm a pending Power option by itself; Esc and F2 would flicker pages; a held
+        // Delete would remove one list entry after another.
+        if (e.IsRepeat && e.Key is Key.Enter or Key.Escape or Key.F2 or Key.Delete)
         {
             e.Handled = true;
             return;
@@ -136,6 +137,7 @@ internal sealed partial class OverlayWindow : Window
             Key.PageDown => OverlayCommand.NextTab,
             Key.PageUp => OverlayCommand.PrevTab,
             Key.F2 => OverlayCommand.Settings,
+            Key.Delete => OverlayCommand.Remove, // Y on the pad: removes a disconnected device from its list
             _ => null,
         };
         if (command is not { } c) return;
@@ -213,6 +215,9 @@ internal sealed class RowTemplateSelector : DataTemplateSelector
     public DataTemplate? Toggle { get; set; }
     public DataTemplate? Expander { get; set; }
     public DataTemplate? Info { get; set; }
+    public DataTemplate? Slider { get; set; }
+    public DataTemplate? Media { get; set; }
+    public DataTemplate? Reorder { get; set; }
 
     public override DataTemplate? SelectTemplate(object item, DependencyObject container) =>
         (item as RowVm)?.Kind switch
@@ -223,6 +228,9 @@ internal sealed class RowTemplateSelector : DataTemplateSelector
             ItemKind.Toggle => Toggle,
             ItemKind.Expander => Expander,
             ItemKind.Info => Info,
+            ItemKind.Slider => Slider,
+            ItemKind.Media => Media,
+            ItemKind.Reorder => Reorder,
             _ => null,
         };
 }

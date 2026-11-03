@@ -432,7 +432,7 @@ string RepoRoot()
     }
     var store = new ConfigStore(Path.Combine(temp, "ovc", "config.json"));
     var monitors = new MonitorProfiles(store, new MonitorSwitcherLocator(store), profilesDir);
-    var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), host, () => altF4++);
+    var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), host, new FakeAudio(), null, () => altF4++);
     OverlayNavigator NewNav()
     {
         var n = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
@@ -453,7 +453,7 @@ string RepoRoot()
     Check(monitorRow.Label() == Loc.T("Overlay.Monitor.Label") && !monitorRow.Visible(), "Monitor row hidden without profiles");
     Check(nav.Selected?.Label() == Loc.T("Overlay.BigPicture.Label"), "Big Picture is selected when Monitor is hidden");
     Check(nav.Description() == Loc.T("Overlay.BigPicture.Desc"), "description is Big Picture's, not Monitor's");
-    Check(content.Tabs.Count == 1 && content.Tabs[0].Id == OverlayContent.ControlsTabId, "only the Controls tab exists");
+    Check(content.Tabs.Count == 2 && content.Tabs[0].Id == OverlayContent.ControlsTabId, "Controls is the first tab");
 
     // Three profiles: segmented, cursor on the current profile.
     SetProfiles("Gaming", "Main", "TV");
@@ -745,7 +745,7 @@ string RepoRoot()
 {
     var store = new ConfigStore(Path.Combine(temp, "padui", "config.json"));
     var monitors = new MonitorProfiles(store, new MonitorSwitcherLocator(store), Path.Combine(temp, "padui", "none"));
-    var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), new FakeHost());
+    var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), new FakeHost(), new FakeAudio());
     var nav = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
     nav.Reset([]);
     var pad = nav.Footer(pad: true);
@@ -1069,6 +1069,201 @@ string RepoRoot()
     Check(p.Tick().SequenceEqual([volDown]), "duplicate pad: volume repeats once");
 }
 
+// --- Audio tab and Settings → Audio ------------------------------------------
+{
+    Loc.SetLanguage("en");
+    var store = new ConfigStore(Path.Combine(temp, "audiotab", "config.json"));
+    var monitors = new MonitorProfiles(store, new MonitorSwitcherLocator(store), Path.Combine(temp, "audiotab", "none"));
+    var audio = new FakeAudio();
+    audio.Outputs.AddRange([new AudioDeviceRef("spk", "Speakers"), new AudioDeviceRef("hs", "Headset")]);
+    audio.Inputs.Add(new AudioDeviceRef("mic", "Mic"));
+    audio.DefaultOutput = "spk";
+    audio.DefaultInput = "mic";
+    audio.Volume = 0.45;
+    var mediaLog = new List<string>();
+    var media = new FakeMedia(mediaLog);
+    var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), new FakeHost(), audio, media);
+    void Run(NavResult r) => r.Action?.Invoke();
+    OverlayNavigator Nav()
+    {
+        var n = new OverlayNavigator(content.Tabs, content.Settings, content.Info, media: content.Media);
+        content.ResetTransient();
+        n.Reset(store.Current.HiddenTabs);
+        return n;
+    }
+
+    Check(content.Media == media, "content exposes the media control for the navigator");
+    Check(content.Tabs.Select(t => t.Id).SequenceEqual([OverlayContent.ControlsTabId, OverlayContent.AudioTabId])
+        && OverlayContent.AudioTabId == "Audio", "Audio tab comes after Controls");
+    Check(content.Tabs[1].Title() == Loc.T("Overlay.Tab.Audio"), "Audio tab title");
+    var rows = content.Tabs[1].Items();
+    Check(rows.Select(r => r.Kind).SequenceEqual([ItemKind.Choice, ItemKind.Choice, ItemKind.Slider, ItemKind.Media]),
+        "Audio rows: Output, Input, Volume, Now playing");
+    Check(rows[0].Label() == Loc.T("Overlay.Audio.Output") && rows[1].Label() == Loc.T("Overlay.Audio.Input")
+        && rows[2].Label() == Loc.T("Overlay.Audio.Volume"), "Audio row labels");
+    Check(rows[0].Value() == "Speakers" && rows[1].Value() == "Mic", "Output and Input show the default devices");
+    audio.MicMuted = true;
+    rows = content.Tabs[1].Items();
+    Check(rows[1].Value() == Loc.T("Overlay.Audio.InputMuted", "Mic") && rows[1].Icon == Glyphs.MicOff, "Input shows muted");
+    audio.MicMuted = false;
+    rows = content.Tabs[1].Items();
+    Check(rows[1].Icon == Glyphs.Mic, "Input icon is the mic when not muted");
+    Check(rows[2].Value() == "45%" && !rows[2].IsOn() && rows[2].Icon == Glyphs.VolumeLevels[1], "Volume shows percent and level icon");
+    audio.Muted = true;
+    rows = content.Tabs[1].Items();
+    Check(rows[2].IsOn() && rows[2].Icon == Glyphs.Mute, "Volume muted: IsOn and mute icon");
+    audio.Muted = false;
+    audio.DefaultOutput = null;
+    Check(content.Tabs[1].Items()[0].Value() == Loc.T("Overlay.Audio.NoDevice"), "Output without a default device");
+    audio.DefaultOutput = "spk";
+
+    var nav = Nav();
+    Run(nav.Handle(OverlayCommand.NextTab));
+    Check(nav.CurrentTab.Id == OverlayContent.AudioTabId && nav.Selected?.Label() == Loc.T("Overlay.Audio.Output"),
+        "Audio tab opens on Output");
+    Run(nav.Handle(OverlayCommand.Right));
+    Run(nav.Handle(OverlayCommand.Left));
+    Check(audio.Calls.SequenceEqual(["Cycle:Output:1", "Cycle:Output:-1"]), "Output Left/Right cycle the output");
+    audio.Calls.Clear();
+    nav.Handle(OverlayCommand.Down);
+    Run(nav.Handle(OverlayCommand.Right));
+    Run(nav.Handle(OverlayCommand.A));
+    Check(audio.Calls.SequenceEqual(["Cycle:Input:1", "ToggleMicMute"]), "Input Right cycles, A toggles the mic mute");
+    audio.Calls.Clear();
+    nav.Handle(OverlayCommand.Down);
+    Run(nav.Handle(OverlayCommand.Right));
+    Run(nav.Handle(OverlayCommand.RightRepeat));
+    Run(nav.Handle(OverlayCommand.Left));
+    var muteRun = nav.Handle(OverlayCommand.A);
+    Run(muteRun);
+    Check(audio.Calls.SequenceEqual(["StepVolume:1", "StepVolume:1", "StepVolume:-1", "ToggleMute"])
+        && muteRun.Effect == NavEffect.RunHere, "Volume Right/Left step, A mutes with the overlay open");
+    audio.Calls.Clear();
+
+    Check(!content.Tabs[1].Items()[3].Visible(), "Now playing hidden with no media");
+    nav.Handle(OverlayCommand.Down);
+    Check(nav.Selected?.Label() == Loc.T("Overlay.Audio.Output"), "selection skips the hidden Now playing row");
+    media.Current = new NowPlaying("Song", "Artist", "Spotify", true);
+    var np = content.Tabs[1].Items()[3];
+    Check(np.Visible() && np.Label() == "Song" && np.Value() == "Artist · Spotify" && np.IsOn(), "Now playing shows title, artist · app");
+    media.Current = new NowPlaying("Song", "", "Spotify", false);
+    Check(np.Value() == "Spotify" && !np.IsOn(), "Now playing without artist, paused");
+    nav.Handle(OverlayCommand.Up);
+    Check(nav.Selected?.Kind == ItemKind.Media, "Now playing selectable with media");
+    Run(nav.Handle(OverlayCommand.A));
+    Check(mediaLog.SequenceEqual(["playpause"]), "Now playing A plays/pauses");
+    media.Current = null;
+    mediaLog.Clear();
+
+    // Settings → Audio.
+    OverlayItem SettingsRow(string key) => content.Settings().First(i => i.Label() == Loc.T(key));
+    var outputOrder = SettingsRow("Settings.Audio.OutputOrder");
+    var inputOrder = SettingsRow("Settings.Audio.InputOrder");
+    Check(outputOrder.Kind == ItemKind.Action && outputOrder.SubPage != null && inputOrder.SubPage != null,
+        "Output order and Input order open sub-pages");
+    var settingsLabels = content.Settings().Select(i => i.Label()).ToList();
+    var audioIndexes = new[] { "Settings.Audio.OutputOrder", "Settings.Audio.InputOrder", "Settings.Audio.AutoOutput",
+        "Settings.Audio.AutoInput", "Settings.Audio.MaxVolume" }.Select(k => settingsLabels.IndexOf(Loc.T(k))).ToList();
+    Check(audioIndexes[0] >= 0 && audioIndexes.Zip(audioIndexes.Skip(1)).All(p => p.Second == p.First + 1),
+        "Settings → Audio rows in order");
+    Check(outputOrder.Section?.Invoke() == Loc.T("Overlay.Section.Audio"), "Audio section header");
+
+    store.Update(c =>
+    {
+        c.AudioOutputOrder = [new("spk", "Speakers"), new("hs", "Headset"), new("old", "Old TV")];
+        c.AudioInputOrder = [new("mic", "Mic"), new("gone", "Old mic")];
+    });
+    var page = outputOrder.SubPage!();
+    Check(page.All(i => i.Kind == ItemKind.Reorder) && page.Select(i => i.Label()).SequenceEqual(["Speakers", "Headset", "Old TV"]),
+        "Output order lists the config entries");
+    Check(page.Select(i => i.Key).SequenceEqual(["spk", "hs", "old"]), "order rows keyed by device id");
+    Check(page[0].Value() == Loc.T("Settings.Audio.Connected") && page[2].Value() == Loc.T("Settings.Audio.Disconnected"),
+        "connected / disconnected shown");
+    Check(page[0].RemoveEntry == null && page[1].RemoveEntry == null && page[2].RemoveEntry != null,
+        "Remove only for disconnected entries");
+    Check(inputOrder.SubPage!().Select(i => i.Label()).SequenceEqual(["Mic", "Old mic"]), "Input order lists the input entries");
+
+    nav = Nav();
+    nav.Handle(OverlayCommand.Settings);
+    while (nav.Selected?.Label() != Loc.T("Settings.Audio.OutputOrder")) nav.Handle(OverlayCommand.Down);
+    Run(nav.Handle(OverlayCommand.A));
+    Check(nav.Page == OverlayPage.Sub && nav.Selected?.Key == "spk", "A opens the Output order page");
+    Run(nav.Handle(OverlayCommand.A));
+    Check(nav.Holding, "A picks up the entry");
+    Run(nav.Handle(OverlayCommand.Down));
+    Check(nav.Items.Select(i => i.Key).SequenceEqual(["hs", "spk", "old"]) && nav.Selected?.Key == "spk",
+        "moving down shows the new order");
+    Check(store.Current.AudioOutputOrder.Select(d => d.Id).SequenceEqual(["spk", "hs", "old"]), "config unchanged while holding");
+    Run(nav.Handle(OverlayCommand.A));
+    Check(!nav.Holding && store.Current.AudioOutputOrder.Select(d => d.Id).SequenceEqual(["hs", "spk", "old"]),
+        "dropping saves the new order");
+    Run(nav.Handle(OverlayCommand.A));
+    Run(nav.Handle(OverlayCommand.Down));
+    Run(nav.Handle(OverlayCommand.B));
+    Check(!nav.Holding && nav.Page == OverlayPage.Sub
+        && store.Current.AudioOutputOrder.Select(d => d.Id).SequenceEqual(["hs", "spk", "old"])
+        && nav.Items.Select(i => i.Key).SequenceEqual(["hs", "spk", "old"]), "B cancels: order and config unchanged");
+    Run(nav.Handle(OverlayCommand.A));
+    Run(nav.Handle(OverlayCommand.Up));
+    var dropped = nav.Reset([]);
+    Check(dropped != null, "Reset while holding returns the cancel");
+    dropped?.Invoke();
+    Check(store.Current.AudioOutputOrder.Select(d => d.Id).SequenceEqual(["hs", "spk", "old"])
+        && outputOrder.SubPage!().Select(i => i.Key).SequenceEqual(["hs", "spk", "old"]), "cancel after Reset restores the order");
+
+    nav = Nav();
+    nav.Handle(OverlayCommand.Settings);
+    while (nav.Selected?.Label() != Loc.T("Settings.Audio.OutputOrder")) nav.Handle(OverlayCommand.Down);
+    Run(nav.Handle(OverlayCommand.A));
+    Check(nav.Handle(OverlayCommand.Remove).Effect == NavEffect.None, "Remove does nothing on a connected entry");
+    while (nav.Selected?.Key != "old") nav.Handle(OverlayCommand.Down);
+    Run(nav.Handle(OverlayCommand.Remove));
+    nav.Refresh();
+    Check(store.Current.AudioOutputOrder.Select(d => d.Id).SequenceEqual(["hs", "spk"]), "Remove deletes the disconnected entry");
+    Check(nav.Selected?.Key == "spk", "selection moves to a neighbour after Remove");
+
+    var autoOut = SettingsRow("Settings.Audio.AutoOutput");
+    var autoIn = SettingsRow("Settings.Audio.AutoInput");
+    Check(autoOut.Kind == ItemKind.Toggle && autoOut.IsOn() && autoIn.IsOn(), "auto-switch toggles on by default");
+    autoOut.Toggle!();
+    Check(!store.Current.AudioAutoOutput && store.Current.AudioAutoInput, "Auto-switch output flips audio_auto_output");
+    autoIn.Toggle!();
+    Check(!store.Current.AudioAutoInput, "Auto-switch input flips audio_auto_input");
+
+    var maxVolume = SettingsRow("Settings.Audio.MaxVolume");
+    Check(maxVolume.Kind == ItemKind.Choice && maxVolume.Visible() && maxVolume.Value() == "100%", "Max volume starts at 100%");
+    Check(maxVolume.Description().Contains("Speakers"), "Max volume names the current output");
+    maxVolume.Step!(1);
+    Check(store.Current.AudioVolumeCaps.GetValueOrDefault("spk", 100) == 100, "Max volume never above 100%");
+    maxVolume.Step!(-1);
+    Check(store.Current.AudioVolumeCaps["spk"] == 95 && maxVolume.Value() == "95%", "Max volume steps down 5%");
+    for (var i = 0; i < 30; i++) maxVolume.Step!(-1);
+    Check(store.Current.AudioVolumeCaps["spk"] == 20, "Max volume never below 20%");
+    maxVolume.Step!(1);
+    Check(store.Current.AudioVolumeCaps["spk"] == 25 && !store.Current.AudioVolumeCaps.ContainsKey("hs"),
+        "Max volume is per device");
+    store.Update(c => c.AudioVolumeCaps["spk"] = 52);
+    maxVolume.Step!(1);
+    Check(store.Current.AudioVolumeCaps["spk"] == 55, "Max volume snaps a hand-edited cap to 5%");
+    audio.DefaultOutput = null;
+    Check(!maxVolume.Visible(), "Max volume hidden without a default output");
+    audio.DefaultOutput = "spk";
+
+    // Hiding the Audio tab.
+    var audioTabRow = content.Settings().First(i => i.Kind == ItemKind.Toggle && i.Label() == Loc.T("Overlay.Tab.Audio"));
+    Check(audioTabRow.IsOn(), "Audio tab shown by default");
+    audioTabRow.Toggle!();
+    Check(store.Current.HiddenTabs.Contains("Audio") && !audioTabRow.IsOn(), "Audio tab toggle hides it");
+    nav = Nav();
+    Check(nav.VisibleTabs.Select(t => t.Id).SequenceEqual([OverlayContent.ControlsTabId]), "hidden Audio tab is not shown");
+    audioTabRow.Toggle!();
+    Check(!store.Current.HiddenTabs.Contains("Audio") && Nav().VisibleTabs.Count == 2, "Audio tab shown again");
+
+    var shortcuts = content.Info().Where(i => i.Kind == ItemKind.Info && i.Visible()).Select(i => i.Value()).ToList();
+    foreach (var expected in new[] { "Back + ← / →", "Back + Y", "LB / RB / X" })
+        Check(shortcuts.Contains(expected), $"Info shortcuts list {expected}");
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;
@@ -1093,9 +1288,31 @@ sealed class FakeHost : IOverlayHost
 
 sealed class FakeMedia(List<string> log) : IMediaControl
 {
-    public NowPlaying? Current => null;
+    public NowPlaying? Current { get; set; }
     public event Action? Changed { add { } remove { } }
     public void Previous() => log.Add("prev");
     public void Next() => log.Add("next");
     public void PlayPause() => log.Add("playpause");
+}
+
+sealed class FakeAudio : IAudioView
+{
+    public List<string> Calls { get; } = [];
+    public List<AudioDeviceRef> Outputs { get; } = [];
+    public List<AudioDeviceRef> Inputs { get; } = [];
+    public string? DefaultOutput { get; set; }
+    public string? DefaultInput { get; set; }
+    public double Volume { get; set; }
+    public bool Muted { get; set; }
+    public bool MicMuted { get; set; }
+    public IReadOnlyList<AudioDeviceRef> Available(AudioFlow flow) => flow == AudioFlow.Output ? Outputs : Inputs;
+    public AudioDeviceRef? Default(AudioFlow flow)
+    {
+        var (list, id) = flow == AudioFlow.Output ? (Outputs, DefaultOutput) : (Inputs, DefaultInput);
+        return id is null ? null : list.Find(d => d.Id == id);
+    }
+    public void Cycle(AudioFlow flow, int direction) => Calls.Add($"Cycle:{flow}:{direction}");
+    public void StepVolume(int direction) => Calls.Add($"StepVolume:{direction}");
+    public void ToggleMute() => Calls.Add("ToggleMute");
+    public void ToggleMicMute() => Calls.Add("ToggleMicMute");
 }

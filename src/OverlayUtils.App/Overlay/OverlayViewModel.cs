@@ -1,5 +1,7 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Media;
 using OverlayUtils.Core;
 using OverlayUtils.Core.Localization;
@@ -13,10 +15,21 @@ internal sealed record OptionVm(int Index, string Label, bool IsCursor, bool IsA
 
 internal sealed record FooterVm(string Keys, string Label);
 
-/// <summary>One visible row. <see cref="Index"/> is the navigator index, so clicks map back to it.</summary>
+/// <summary>
+/// One visible row. <see cref="Index"/> is the navigator index, so clicks map back to it. <see cref="IsOn"/> is the
+/// switch for Toggle/Expander, the mute for Slider and "playing" for Media; <see cref="Level"/> is the Slider's 0..1;
+/// <see cref="IsHeld"/> marks a picked-up Reorder row.
+/// </summary>
 internal sealed record RowVm(
     int Index, string? Section, string Icon, string Label, ItemKind Kind, string Value, bool IsOn, string Hint,
-    bool HasChevron, bool IsSelected, IReadOnlyList<OptionVm> Options);
+    bool HasChevron, bool IsSelected, IReadOnlyList<OptionVm> Options, double Level = 0, bool IsHeld = false)
+{
+    public const double SliderWidth = 120; // Python _render_slider bar length
+    const double KnobRadius = 7;
+
+    public double SliderFill => Level * SliderWidth;
+    public Thickness KnobMargin => new(SliderFill - KnobRadius, 0, 0, 0);
+}
 
 /// <summary>
 /// What the overlay window shows, rebuilt from the navigator by <see cref="Refresh"/> after every command.
@@ -75,6 +88,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         {
             OverlayPage.Settings => Loc.T("Overlay.Page.Settings"),
             OverlayPage.Info => Loc.T("Overlay.Page.Info"),
+            OverlayPage.Sub => nav.SubTitle,
             _ => "",
         };
         IsOnPage = nav.Page != OverlayPage.Tabs;
@@ -99,17 +113,27 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
             }
             var hint = item.Hint?.Invoke() ?? "";
             var section = item.Section?.Invoke();
+            var value = item.Kind is ItemKind.Choice or ItemKind.Info or ItemKind.Slider or ItemKind.Media or ItemKind.Reorder
+                ? item.Value()
+                : "";
+            var isOn = item.Kind is ItemKind.Toggle or ItemKind.Expander or ItemKind.Slider or ItemKind.Media && item.IsOn();
+            var sliderLevel = item.Kind == ItemKind.Slider ? SliderLevel(value) : 0;
+            if (item.Kind == ItemKind.Slider && isOn) value = Loc.T("Overlay.Audio.Muted");
             rows.Add(new RowVm(i, string.IsNullOrEmpty(section) ? null : section.ToUpper(Loc.Culture), item.Icon,
-                item.Label(), item.Kind,
-                item.Kind is ItemKind.Choice or ItemKind.Info ? item.Value() : "",
-                item.Kind is ItemKind.Toggle or ItemKind.Expander && item.IsOn(), hint,
-                item.Kind == ItemKind.Action && hint.Length == 0 && (item.Stay || item.OpensInfo),
-                selected, options));
+                item.Label(), item.Kind, value, isOn, hint,
+                item.Kind == ItemKind.Action && hint.Length == 0 && (item.Stay || item.OpensInfo || item.SubPage != null),
+                selected, options, sliderLevel, selected && nav.Holding));
         }
         Rows = rows;
         Description = nav.Description();
         Footer = nav.Footer(pad).Select(h => new FooterVm(h.Keys, h.Label)).ToList();
     }
+
+    /// <summary>A Slider's Value is its percent ("45%").</summary>
+    static double SliderLevel(string percent) =>
+        double.TryParse(percent.TrimEnd('%', ' '), NumberStyles.Number, CultureInfo.InvariantCulture, out var p)
+            ? Math.Clamp(p / 100, 0, 1)
+            : 0;
 
     static SolidColorBrush Frozen(Color color)
     {

@@ -41,6 +41,7 @@ internal sealed class OverlayController : IDisposable
     readonly DispatcherTimer _pendingTimer;
 
     volatile bool _open;
+    int _renderQueued;
     bool _padConnected;
     int? _battery;
     nint _prev;            // foreground app when the overlay opened; kept after hiding for the action that follows
@@ -54,7 +55,7 @@ internal sealed class OverlayController : IDisposable
         _config = config;
         _monitors = monitors;
         _content = content;
-        _navigator = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
+        _navigator = new OverlayNavigator(content.Tabs, content.Settings, content.Info, media: content.Media);
 
         _window.Bind(_vm);
         _window.CommandIssued += OnCommand;
@@ -81,6 +82,20 @@ internal sealed class OverlayController : IDisposable
 
     /// <summary>Runs a command as if the window had issued it (pad input). Any thread.</summary>
     public void Command(OverlayCommand command) => OnUi(() => OnCommand(command));
+
+    /// <summary>
+    /// Something the rows show changed (audio devices, volume, media session). Any thread; coalesced, so a burst of
+    /// events renders once.
+    /// </summary>
+    public void Invalidate()
+    {
+        if (!_open || Interlocked.Exchange(ref _renderQueued, 1) == 1) return;
+        _app.Dispatcher.BeginInvoke(() =>
+        {
+            Volatile.Write(ref _renderQueued, 0);
+            if (_open) Render();
+        });
+    }
 
     /// <summary>Pad connected (footer shows pad buttons) and battery level for the header. Any thread.</summary>
     public void SetPadState(bool padConnected, int? batteryLevel) => OnUi(() =>
@@ -138,7 +153,7 @@ internal sealed class OverlayController : IDisposable
             var (work, dpiScale) = _prev != 0 ? DisplayArea.ForWindow(_prev) : DisplayArea.ForCursor();
 
             _content.ResetTransient();
-            _navigator.Reset(cfg.HiddenTabs);
+            RunCancel(_navigator.Reset(cfg.HiddenTabs));
             UpdateAccent();
 
             // Placed while still hidden, so a DPI change on the target monitor happens before the first frame.
@@ -182,6 +197,8 @@ internal sealed class OverlayController : IDisposable
             _focusTimer.Stop();
             _clockTimer.Stop();
             _pendingTimer.Stop(); // a pending confirm is dropped by Reset on the next open
+            // A picked-up list entry must not stay moved but unsaved: put it back now.
+            if (_navigator.Holding) RunCancel(_navigator.Reset(_config.Current.HiddenTabs));
             _window.Hide();
         }
         catch (Exception e)
@@ -318,7 +335,7 @@ internal sealed class OverlayController : IDisposable
         try
         {
             // Always: a row that became hidden must not stay selected until the next clock tick.
-            _navigator.Refresh();
+            RunCancel(_navigator.Refresh());
             var profile = _monitors.List().Count > 0 ? _monitors.Current : "";
             (byte, byte, byte)? color = profile.Length > 0 ? _monitors.Style(profile).Color : null;
             _vm.Refresh(_navigator, DateTime.Now.ToString("HH:mm"), color, profile, _padConnected, _battery);
@@ -327,6 +344,14 @@ internal sealed class OverlayController : IDisposable
         {
             Log.Error("Overlay render", e);
         }
+    }
+
+    /// <summary>Runs the Cancel of a picked-up entry the navigator dropped (Reset / Refresh).</summary>
+    static void RunCancel(Action? cancel)
+    {
+        if (cancel is null) return;
+        try { cancel(); }
+        catch (Exception e) { Log.Error("Overlay reorder cancel", e); }
     }
 
     void OnConfigChanged(AppConfig config) => OnUi(() =>

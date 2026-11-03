@@ -1,3 +1,4 @@
+using OverlayUtils.Core.Audio;
 using OverlayUtils.Core.Config;
 using OverlayUtils.Core.Input;
 using OverlayUtils.Core.Localization;
@@ -7,15 +8,20 @@ using OverlayUtils.Core.Platform;
 namespace OverlayUtils.Core.Overlay;
 
 /// <summary>
-/// The rows of the overlay: Controls tab, Settings page and Info page (Python OVERLAY_ITEMS, SETTINGS_ITEMS and
-/// _info_panels). Only features that exist in the .NET app are listed. Lists are rebuilt on every call, so row
-/// kinds, icons and labels follow the current profiles, config and language; the only state kept here is the
-/// monitor pick and the open Info panel, both cleared by <see cref="ResetTransient"/>.
+/// The rows of the overlay: Controls and Audio tabs, Settings page and Info page (Python OVERLAY_ITEMS,
+/// SETTINGS_ITEMS and _info_panels). Only features that exist in the .NET app are listed. Lists are rebuilt on every
+/// call, so row kinds, icons and labels follow the current profiles, devices, config and language; the only state
+/// kept here is the monitor pick, the open Info panel and a device list being reordered, all cleared by
+/// <see cref="ResetTransient"/>.
 /// </summary>
 public sealed class OverlayContent
 {
     public const string ControlsTabId = "Controlli"; // Python tab name, kept as the stored id
+    public const string AudioTabId = "Audio";
     public const int MonitorMaxPills = 3;
+    public const int MinVolumeCap = 20;
+    public const int MaxVolumeCap = 100;
+    const int CapStep = 5;
 
     const string ShortcutsPanel = "shortcuts";
     const string MonitorPanel = "monitor";
@@ -26,28 +32,43 @@ public sealed class OverlayContent
     readonly MonitorSwitcherLocator _locator;
     readonly IOverlayHost _host;
     readonly Action _sendAltF4;
+    readonly IAudioView _audio;
 
     string? _monitorPick;
     string _openPanel = ShortcutsPanel;
+    // A priority list while an entry is picked up: moves change only this copy; drop saves it, cancel drops it.
+    List<AudioDeviceRef>? _outputDraft;
+    List<AudioDeviceRef>? _inputDraft;
 
     public OverlayContent(ConfigStore config, MonitorProfiles monitors, MonitorSwitcherLocator locator,
-        IOverlayHost host, Action? sendAltF4 = null)
+        IOverlayHost host, IAudioView audio, IMediaControl? media = null, Action? sendAltF4 = null)
     {
         _config = config;
         _monitors = monitors;
         _locator = locator;
         _host = host;
+        _audio = audio;
+        Media = media;
         _sendAltF4 = sendAltF4 ?? KeySender.AltF4;
-        Tabs = [new OverlayTab(ControlsTabId, () => Loc.T("Overlay.Tab.Controls"), Controls)];
+        Tabs =
+        [
+            new OverlayTab(ControlsTabId, () => Loc.T("Overlay.Tab.Controls"), Controls),
+            new OverlayTab(AudioTabId, () => Loc.T("Overlay.Tab.Audio"), Audio),
+        ];
     }
 
     public IReadOnlyList<OverlayTab> Tabs { get; }
 
-    /// <summary>Called when the overlay opens: monitor pick cleared, Info shows Shortcuts.</summary>
+    /// <summary>The media session the Now playing row shows; the navigator takes it for LB / RB / X.</summary>
+    public IMediaControl? Media { get; }
+
+    /// <summary>Called when the overlay opens: monitor pick cleared, Info shows Shortcuts, no list being reordered.</summary>
     public void ResetTransient()
     {
         _monitorPick = null;
         _openPanel = ShortcutsPanel;
+        _outputDraft = null;
+        _inputDraft = null;
     }
 
     // --- Controls -------------------------------------------------------------
@@ -155,6 +176,212 @@ public sealed class OverlayContent
         return list.Count > 0 ? list[0] : "";
     }
 
+    // --- Audio ----------------------------------------------------------------
+
+    public IReadOnlyList<OverlayItem> Audio()
+    {
+        var output = _audio.Default(AudioFlow.Output);
+        var input = _audio.Default(AudioFlow.Input);
+        var micMuted = _audio.MicMuted;
+        return
+        [
+            new OverlayItem
+            {
+                Kind = ItemKind.Choice, Icon = OutputIcon(output?.Name), Key = "audio.output",
+                Section = () => Loc.T("Overlay.Section.Devices"),
+                Label = () => Loc.T("Overlay.Audio.Output"),
+                Description = () => Loc.T("Overlay.Audio.Output.Desc"),
+                Value = () => _audio.Default(AudioFlow.Output)?.Name ?? Loc.T("Overlay.Audio.NoDevice"),
+                Step = direction => _audio.Cycle(AudioFlow.Output, direction),
+            },
+            new OverlayItem
+            {
+                Kind = ItemKind.Choice, Icon = micMuted ? Glyphs.MicOff : Glyphs.Mic, Key = "audio.input",
+                Label = () => Loc.T("Overlay.Audio.Input"),
+                Description = () => Loc.T("Overlay.Audio.Input.Desc"),
+                Value = () => _audio.Default(AudioFlow.Input) is { } device
+                    ? _audio.MicMuted ? Loc.T("Overlay.Audio.InputMuted", device.Name) : device.Name
+                    : Loc.T("Overlay.Audio.NoDevice"),
+                Step = direction => _audio.Cycle(AudioFlow.Input, direction),
+                Toggle = _audio.ToggleMicMute,
+            },
+            new OverlayItem
+            {
+                // Value is the percent; IsOn is the mute (the view draws the bar from both).
+                Kind = ItemKind.Slider, Icon = Glyphs.VolumeIcon(_audio.Volume, _audio.Muted), Key = "audio.volume",
+                Section = () => Loc.T("Overlay.Section.Volume"),
+                Label = () => Loc.T("Overlay.Audio.Volume"),
+                Description = () => Loc.T("Overlay.Audio.Volume.Desc"),
+                Value = () => Percent(_audio.Volume),
+                IsOn = () => _audio.Muted,
+                Step = _audio.StepVolume,
+                Toggle = _audio.ToggleMute,
+            },
+            new OverlayItem
+            {
+                Kind = ItemKind.Media, Icon = Glyphs.Music, Key = "audio.media",
+                Section = () => Loc.T("Overlay.Section.NowPlaying"),
+                Visible = () => Media?.Current is not null,
+                Label = () => Media?.Current?.Title is { Length: > 0 } title ? title : Loc.T("Overlay.Audio.UnknownTitle"),
+                Value = () => Media?.Current is { } now
+                    ? string.Join(" · ", new[] { now.Artist, now.App }.Where(p => p.Length > 0))
+                    : "",
+                IsOn = () => Media?.Current?.Playing == true,
+                Description = () => Loc.T("Overlay.Audio.Media.Desc"),
+            },
+        ];
+    }
+
+    /// <summary>Python _audio_icon without Sonar: headphones by name, else a speaker.</summary>
+    static string OutputIcon(string? name)
+    {
+        var lower = (name ?? "").ToLowerInvariant();
+        return new[] { "headphone", "headset", "cuffie", "auricolar" }.Any(lower.Contains) ? Glyphs.Headphone : Glyphs.Speaker;
+    }
+
+    static string Percent(double level) => $"{Math.Round(level * 100)}%";
+
+    /// <summary>Rows of the Output order / Input order page: the stored list, best first.</summary>
+    IReadOnlyList<OverlayItem> OrderPage(AudioFlow flow)
+    {
+        var list = Draft(flow) ?? Stored(flow);
+        var connected = _audio.Available(flow).Select(d => d.Id).ToHashSet();
+        var icon = flow == AudioFlow.Output ? Glyphs.Speaker : Glyphs.Mic;
+        if (list.Count == 0)
+            return [new OverlayItem { Kind = ItemKind.Info, Label = () => Loc.T("Settings.Audio.NoDevices"), Value = () => "" }];
+
+        return list.Select(device =>
+        {
+            var id = device.Id;
+            var isConnected = connected.Contains(id);
+            return new OverlayItem
+            {
+                Kind = ItemKind.Reorder, Key = id, Icon = icon,
+                Label = () => device.Name,
+                Value = () => Loc.T(isConnected ? "Settings.Audio.Connected" : "Settings.Audio.Disconnected"),
+                Description = () => Loc.T(isConnected ? "Settings.Audio.Order.Desc" : "Settings.Audio.Order.RemoveDesc"),
+                Move = direction => MoveEntry(flow, id, direction),
+                Commit = () => CommitDraft(flow),
+                Cancel = () => SetDraft(flow, null),
+                RemoveEntry = isConnected ? null : () => RemoveEntry(flow, id),
+            };
+        }).ToList();
+    }
+
+    List<AudioDeviceRef> Stored(AudioFlow flow)
+    {
+        var config = _config.Current;
+        return flow == AudioFlow.Output ? config.AudioOutputOrder : config.AudioInputOrder;
+    }
+
+    List<AudioDeviceRef>? Draft(AudioFlow flow) => flow == AudioFlow.Output ? _outputDraft : _inputDraft;
+
+    void SetDraft(AudioFlow flow, List<AudioDeviceRef>? draft)
+    {
+        if (flow == AudioFlow.Output) _outputDraft = draft;
+        else _inputDraft = draft;
+    }
+
+    void MoveEntry(AudioFlow flow, string id, int direction)
+    {
+        var draft = Draft(flow) ?? [.. Stored(flow)];
+        SetDraft(flow, draft);
+        var from = draft.FindIndex(d => d.Id == id);
+        var to = from + Math.Sign(direction);
+        if (from < 0 || to < 0 || to >= draft.Count) return;
+        (draft[from], draft[to]) = (draft[to], draft[from]);
+    }
+
+    /// <summary>Saves the moved order; devices the service added meanwhile keep their place at the bottom.</summary>
+    void CommitDraft(AudioFlow flow)
+    {
+        if (Draft(flow) is not { } draft) return;
+        SetDraft(flow, null);
+        _config.Update(c =>
+        {
+            var current = flow == AudioFlow.Output ? c.AudioOutputOrder : c.AudioInputOrder;
+            var ids = current.Select(d => d.Id).ToHashSet();
+            var merged = AudioRules.Merge(draft.Where(d => ids.Contains(d.Id)).ToList(), current);
+            if (flow == AudioFlow.Output) c.AudioOutputOrder = merged;
+            else c.AudioInputOrder = merged;
+        });
+    }
+
+    void RemoveEntry(AudioFlow flow, string id) => _config.Update(c =>
+    {
+        if (flow == AudioFlow.Output) c.AudioOutputOrder.RemoveAll(d => d.Id == id);
+        else c.AudioInputOrder.RemoveAll(d => d.Id == id);
+    });
+
+    /// <summary>Cap of the current default output in percent (100 when none is stored).</summary>
+    int CurrentCap(string id) =>
+        _config.Current.AudioVolumeCaps.TryGetValue(id, out var cap) ? Math.Clamp(cap, MinVolumeCap, MaxVolumeCap) : MaxVolumeCap;
+
+    void StepCap(int direction)
+    {
+        if (_audio.Default(AudioFlow.Output) is not { } device || direction == 0) return;
+        var snapped = (int)Math.Round(CurrentCap(device.Id) / (double)CapStep) * CapStep;
+        var next = Math.Clamp(snapped + Math.Sign(direction) * CapStep, MinVolumeCap, MaxVolumeCap);
+        _config.Update(c => c.AudioVolumeCaps[device.Id] = next);
+    }
+
+    IEnumerable<OverlayItem> AudioSettings()
+    {
+        OverlayItem Order(AudioFlow flow, string labelKey, string descKey, string? sectionKey) => new()
+        {
+            Kind = ItemKind.Action, Icon = Glyphs.List, Key = "settings." + labelKey,
+            Section = sectionKey is null ? null : () => Loc.T(sectionKey),
+            Label = () => Loc.T(labelKey),
+            Description = () => Loc.T(descKey),
+            SubPage = () => OrderPage(flow),
+        };
+
+        yield return Order(AudioFlow.Output, "Settings.Audio.OutputOrder", "Settings.Audio.OutputOrder.Desc", "Overlay.Section.Audio");
+        yield return Order(AudioFlow.Input, "Settings.Audio.InputOrder", "Settings.Audio.InputOrder.Desc", null);
+        yield return new OverlayItem
+        {
+            Kind = ItemKind.Toggle, Icon = Glyphs.Speaker,
+            Label = () => Loc.T("Settings.Audio.AutoOutput"),
+            Description = () => Loc.T("Settings.Audio.AutoOutput.Desc"),
+            IsOn = () => _config.Current.AudioAutoOutput,
+            Toggle = () => _config.Update(c => c.AudioAutoOutput = !c.AudioAutoOutput),
+        };
+        yield return new OverlayItem
+        {
+            Kind = ItemKind.Toggle, Icon = Glyphs.Mic,
+            Label = () => Loc.T("Settings.Audio.AutoInput"),
+            Description = () => Loc.T("Settings.Audio.AutoInput.Desc"),
+            IsOn = () => _config.Current.AudioAutoInput,
+            Toggle = () => _config.Update(c => c.AudioAutoInput = !c.AudioAutoInput),
+        };
+        yield return new OverlayItem
+        {
+            Kind = ItemKind.Choice, Icon = Glyphs.Volume,
+            Visible = () => _audio.Default(AudioFlow.Output) is not null,
+            Label = () => Loc.T("Settings.Audio.MaxVolume"),
+            Description = () => Loc.T("Settings.Audio.MaxVolume.Desc", _audio.Default(AudioFlow.Output)?.Name ?? ""),
+            Value = () => _audio.Default(AudioFlow.Output) is { } device ? $"{CurrentCap(device.Id)}%" : "",
+            Step = StepCap,
+        };
+    }
+
+    OverlayItem TabRow(string tabId, string titleKey, string? sectionKey) => new()
+    {
+        Kind = ItemKind.Toggle, Icon = tabId == AudioTabId ? Glyphs.Volume : Glyphs.List,
+        Section = sectionKey is null ? null : () => Loc.T(sectionKey),
+        Label = () => Loc.T(titleKey),
+        Description = () => Loc.T("Settings.Tab.Desc", Loc.T(titleKey)),
+        IsOn = () => tabId == ControlsTabId || !_config.Current.HiddenTabs.Contains(tabId),
+        Toggle = () =>
+        {
+            if (tabId == ControlsTabId) return; // always visible, so one tab stays
+            _config.Update(c =>
+            {
+                if (!c.HiddenTabs.Remove(tabId)) c.HiddenTabs.Add(tabId);
+            });
+        },
+    };
+
     // --- Settings -------------------------------------------------------------
 
     public IReadOnlyList<OverlayItem> Settings()
@@ -165,15 +392,8 @@ public sealed class OverlayContent
 
         return
         [
-            new OverlayItem
-            {
-                Kind = ItemKind.Toggle, Icon = Glyphs.List,
-                Section = () => Loc.T("Overlay.Section.Tabs"),
-                Label = () => Loc.T("Overlay.Tab.Controls"),
-                Description = () => Loc.T("Settings.Tab.Desc", Loc.T("Overlay.Tab.Controls")),
-                IsOn = () => true,
-                Toggle = () => { }, // the only tab: it cannot be hidden
-            },
+            TabRow(ControlsTabId, "Overlay.Tab.Controls", "Overlay.Section.Tabs"),
+            TabRow(AudioTabId, "Overlay.Tab.Audio", null),
             RoleRow(MonitorRole.Desk, "Settings.Desk.Label", "Settings.Desk.Desc", hasProfiles, Glyphs.Pc, "Overlay.Section.Monitor"),
             RoleRow(MonitorRole.Tv, "Settings.Tv.Label", "Settings.Tv.Desc", hasProfiles, Glyphs.Monitor, null),
             new OverlayItem
@@ -231,6 +451,7 @@ public sealed class OverlayContent
                 Value = LanguageValue,
                 Step = StepLanguage,
             },
+            .. AudioSettings(),
             new OverlayItem
             {
                 Kind = ItemKind.Segmented, Icon = Glyphs.Monitor,
@@ -375,7 +596,10 @@ public sealed class OverlayContent
             Key("Overlay.Info.Pad.Monitor", "Back + ↑ / ↓"),
             Key("Overlay.Info.Pad.Confirm", "A / B"),
             Key("Overlay.Info.Key.Tabs", "LT / RT"),
-            Key("Overlay.Info.Pad.SettingsHold", "Back"));
+            Key("Overlay.Info.Pad.SettingsHold", "Back"),
+            Key("Overlay.Info.Pad.Volume", "Back + ← / →"),
+            Key("Overlay.Info.Pad.Mic", "Back + Y"),
+            Key("Overlay.Info.Pad.Media", "LB / RB / X"));
 
         var profiles = _monitors.List();
         Panel(MonitorPanel, Glyphs.Monitor, "Overlay.Info.Monitor",

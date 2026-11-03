@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
+using OverlayUtils.App.Audio;
 using OverlayUtils.App.Overlay;
 using OverlayUtils.Core;
+using OverlayUtils.Core.Audio;
 using OverlayUtils.Core.Config;
 using OverlayUtils.Core.Diagnostics;
 using OverlayUtils.Core.Input;
@@ -23,8 +25,9 @@ namespace OverlayUtils.App.Tray;
 /// <summary>
 /// Owns the tray icon and its menu, and wires stage-1 features together:
 /// monitor profiles, Home key remapping, global hotkeys, language, start-up,
-/// full mode, and the overlay (Shift+F1 or a left click on the icon), whose host it is.
-/// Lives on the WPF UI thread; hotkey callbacks are marshalled here.
+/// full mode, audio devices and the media session, and the overlay (Shift+F1 or a left
+/// click on the icon), whose host it is. Lives on the WPF UI thread; hotkey, pad and
+/// audio callbacks are marshalled here.
 /// </summary>
 internal sealed class TrayController : IOverlayHost, IDisposable
 {
@@ -43,6 +46,10 @@ internal sealed class TrayController : IOverlayHost, IDisposable
     private HotkeyService? _hotkeys;
     private OverlayController? _overlay;
     private PadService? _pads;
+    private AudioService? _audio;
+    private MediaSession? _media;
+    private VolumeIndicator? _indicator; // UI thread; created on first use
+    private bool _indicatorShowsMic;     // UI thread
     private System.Drawing.Icon? _currentIcon;
     private bool _busy; // a mode switch is in progress
     private bool? _overlayOpenAtPress; // left button pressed on the tray icon: was the overlay open then
@@ -82,9 +89,11 @@ internal sealed class TrayController : IOverlayHost, IDisposable
     public void Start(bool migrated, bool finishDisableFullMode)
     {
         _locator.StartSearch();
+        StartAudio();
         try
         {
-            _overlay = new OverlayController(_app, _config, _monitors, new OverlayContent(_config, _monitors, _locator, this));
+            var content = new OverlayContent(_config, _monitors, _locator, this, new AudioServiceView(_audio!), _media);
+            _overlay = new OverlayController(_app, _config, _monitors, content);
         }
         catch (Exception e)
         {
@@ -170,6 +179,78 @@ internal sealed class TrayController : IOverlayHost, IDisposable
         });
     }
 
+    // --- audio ----------------------------------------------------------------
+
+    /// <summary>
+    /// Audio devices and the media session run for the whole session, overlay open or not. Both only queue work
+    /// and raise <c>Changed</c> on their own threads; failures are logged and the rest keeps working.
+    /// </summary>
+    private void StartAudio()
+    {
+        _audio = new AudioService(_config);
+        _audio.Changed += OnAudioChanged;
+        try { _audio.Start(); }
+        catch (Exception e) { Log.Error("Audio start", e); }
+        try
+        {
+            _media = new MediaSession();
+            _media.Changed += () => _overlay?.Invalidate();
+        }
+        catch (Exception e)
+        {
+            Log.Error("Media session start", e);
+        }
+    }
+
+    /// <summary>Runs on the audio thread.</summary>
+    private void OnAudioChanged()
+    {
+        _overlay?.Invalidate();
+        OnUi(() =>
+        {
+            if (_indicator?.IsShowing != true || _audio is null) return;
+            if (_indicatorShowsMic) _indicator.SetMic(_audio.MicMuted);
+            else _indicator.SetVolume(_audio.Volume, _audio.Muted);
+        });
+    }
+
+    /// <summary>Back + Left / Right with the overlay closed. Pad thread.</summary>
+    private void StepVolumeFromPad(int direction)
+    {
+        if (_audio?.Default(AudioFlow.Output) is not { } output) return;
+        // Shown right away with the value the service will set (same rule); OnAudioChanged corrects it if needed.
+        var cap = AudioRules.CapFor(_config.Current.AudioVolumeCaps, output.Id);
+        var level = AudioRules.StepVolume(_audio.Volume, direction, cap);
+        var muted = _audio.Muted && direction < 0;
+        _audio.StepVolume(direction);
+        OnUi(() => ShowIndicator(mic: false, level, muted));
+    }
+
+    /// <summary>Back + Y with the overlay closed. Pad thread.</summary>
+    private void ToggleMicFromPad()
+    {
+        if (_audio?.Default(AudioFlow.Input) is null) return;
+        var muted = !_audio.MicMuted;
+        _audio.ToggleMicMute();
+        OnUi(() => ShowIndicator(mic: true, 0, muted));
+    }
+
+    private void ShowIndicator(bool mic, double level, bool muted)
+    {
+        try
+        {
+            _indicator ??= new VolumeIndicator();
+            _indicatorShowsMic = mic;
+            if (mic) _indicator.SetMic(muted);
+            else _indicator.SetVolume(level, muted);
+            _indicator.Flash();
+        }
+        catch (Exception e)
+        {
+            Log.Error("Volume indicator", e);
+        }
+    }
+
     // --- pads -----------------------------------------------------------------
 
     /// <summary>Starts gamepad input; without SDL3.dll it logs once and the rest keeps working.</summary>
@@ -205,6 +286,17 @@ internal sealed class TrayController : IOverlayHost, IDisposable
                 break;
             case PadActionKind.Command:
                 _overlay?.Command(action.Command);
+                break;
+            case PadActionKind.VolumeDown or PadActionKind.VolumeUp or PadActionKind.MicMute:
+                try
+                {
+                    if (action.Kind == PadActionKind.MicMute) ToggleMicFromPad();
+                    else StepVolumeFromPad(action.Kind == PadActionKind.VolumeUp ? 1 : -1);
+                }
+                catch (Exception e)
+                {
+                    Log.Error("Pad audio shortcut", e);
+                }
                 break;
         }
     }
@@ -534,6 +626,9 @@ internal sealed class TrayController : IOverlayHost, IDisposable
     public void Dispose()
     {
         _pads?.Dispose();
+        _audio?.Dispose();
+        _media?.Dispose();
+        _indicator?.Dismiss();
         _hotkeys?.Dispose();
         _overlay?.Dispose();
         _icon.Visible = false;

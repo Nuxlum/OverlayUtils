@@ -277,13 +277,133 @@
                 </DataTemplate.Triggers>
             </DataTemplate>
 
+            <!-- Python _render_slider: thin bar filled with the accent (grey when muted), knob, then the percent. -->
+            <DataTemplate x:Key="SliderRow">
+                <ContentControl Style="{StaticResource RowFrame}">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,4,0">
+                        <Grid Width="134" Height="14" VerticalAlignment="Center">
+                            <Grid Margin="7,0">
+                                <Border Height="4" CornerRadius="2" Background="{StaticResource Line}" />
+                                <Border x:Name="Fill" Height="4" CornerRadius="2" HorizontalAlignment="Left"
+                                        Width="{Binding SliderFill}" Background="{DynamicResource Accent}" />
+                                <Ellipse x:Name="Knob" Width="14" Height="14" HorizontalAlignment="Left"
+                                         Margin="{Binding KnobMargin}" Fill="{StaticResource Muted}" />
+                            </Grid>
+                        </Grid>
+                        <TextBlock x:Name="Percent" Text="{Binding Value}" Width="48" TextAlignment="Right" FontSize="13"
+                                   VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
+                    </StackPanel>
+                </ContentControl>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsOn}" Value="True">
+                        <Setter TargetName="Fill" Property="Background" Value="{StaticResource Subtle}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                        <Setter TargetName="Knob" Property="Fill" Value="{StaticResource Text}" />
+                        <Setter TargetName="Percent" Property="Foreground" Value="{StaticResource Text}" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <!--
+              Python _render_media: a card with the music tile, title and artist · app, and previous / play-pause /
+              next on the right; the selected card gets an accent outline.
+            -->
+            <DataTemplate x:Key="MediaRow">
+                <StackPanel>
+                    <TextBlock Text="{Binding Section}" Margin="12,8,0,0" Height="20" FontSize="11"
+                               FontWeight="SemiBold" Foreground="{StaticResource Muted}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Section}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Grid Height="64" Margin="2,2,2,4" Background="Transparent" MouseLeftButtonDown="OnRowMouseDown">
+                        <Border x:Name="Outline" CornerRadius="10" Margin="-2" BorderThickness="2"
+                                BorderBrush="Transparent" />
+                        <Border CornerRadius="8" Background="{StaticResource Surface}" />
+                        <Grid Margin="12,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="40" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="40" Height="40" CornerRadius="6" Background="{StaticResource SegmentActive}">
+                                <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Music}" FontSize="18"
+                                           Foreground="{StaticResource Muted}" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Label}" FontSize="14" FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock x:Name="Subtitle" Text="{Binding Value}" Margin="0,2,0,0" FontSize="12"
+                                           Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Previous}" FontSize="14"
+                                           Width="22" />
+                                <Grid Width="32" Height="32" Margin="6,0">
+                                    <Ellipse Fill="{DynamicResource Accent}" />
+                                    <TextBlock x:Name="PlayGlyph" Style="{StaticResource Icon}" FontSize="14"
+                                               Text="{x:Static core:Glyphs.Play}" Foreground="{StaticResource Bg}" />
+                                </Grid>
+                                <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Next}" FontSize="14"
+                                           Width="22" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </StackPanel>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                        <Setter TargetName="Outline" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsOn}" Value="True">
+                        <Setter TargetName="PlayGlyph" Property="Text" Value="{x:Static core:Glyphs.Pause}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding Value}" Value="">
+                        <Setter TargetName="Subtitle" Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <!-- Entry of a priority list: status on the right; while picked up, an accent ↑ ↓ pill replaces it. -->
+            <DataTemplate x:Key="ReorderRow">
+                <ContentControl Style="{StaticResource RowFrame}">
+                    <Grid Margin="0,0,4,0">
+                        <TextBlock x:Name="Status" Text="{Binding Value}" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{StaticResource Muted}" />
+                        <Border x:Name="Held" Height="22" Padding="10,0" CornerRadius="11" BorderThickness="1"
+                                BorderBrush="{DynamicResource Accent}" Visibility="Collapsed">
+                            <TextBlock Text="↑ ↓" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Accent}" />
+                        </Border>
+                    </Grid>
+                </ContentControl>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                        <Setter TargetName="Status" Property="Foreground" Value="{StaticResource Text}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsHeld}" Value="True">
+                        <Setter TargetName="Status" Property="Visibility" Value="Collapsed" />
+                        <Setter TargetName="Held" Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
             <local:RowTemplateSelector x:Key="RowTemplates"
                                        Action="{StaticResource ActionRow}"
                                        Segmented="{StaticResource SegmentedRow}"
                                        Choice="{StaticResource ChoiceRow}"
                                        Toggle="{StaticResource ToggleRow}"
                                        Expander="{StaticResource ExpanderRow}"
-                                       Info="{StaticResource InfoRow}" />
+                                       Info="{StaticResource InfoRow}"
+                                       Slider="{StaticResource SliderRow}"
+                                       Media="{StaticResource MediaRow}"
+                                       Reorder="{StaticResource ReorderRow}" />
         </ResourceDictionary>
     </Window.Resources>
 

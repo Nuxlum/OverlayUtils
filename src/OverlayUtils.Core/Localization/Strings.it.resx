@@ -72,6 +72,19 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Notify.StartupOn" xml:space="preserve"><value>OverlayUtils partirà all'avvio di Windows.</value></data>
   <data name="Notify.SwitcherFailed" xml:space="preserve"><value>Impossibile avviare MonitorSwitcher.</value></data>
   <data name="Notify.SwitcherMissing" xml:space="preserve"><value>MonitorSwitcher non trovato: scaricalo o indica dove si trova dal menu dell'icona (Monitor).</value></data>
+  <data name="Overlay.Audio.Input" xml:space="preserve"><value>Ingresso</value></data>
+  <data name="Overlay.Audio.Input.Desc" xml:space="preserve"><value>Sinistra / destra: cambia il microfono predefinito. A: lo silenzia in tutte le app.</value></data>
+  <data name="Overlay.Audio.InputMuted" xml:space="preserve"><value>{0} (muto)</value></data>
+  <data name="Overlay.Audio.Media.Desc" xml:space="preserve"><value>Sinistra / destra: brano precedente / successivo. A: play / pausa. LB / RB / X funzionano in ogni tab.</value></data>
+  <data name="Overlay.Audio.MicMuted" xml:space="preserve"><value>Microfono muto</value></data>
+  <data name="Overlay.Audio.MicOn" xml:space="preserve"><value>Microfono attivo</value></data>
+  <data name="Overlay.Audio.Muted" xml:space="preserve"><value>Muto</value></data>
+  <data name="Overlay.Audio.NoDevice" xml:space="preserve"><value>Nessuno</value></data>
+  <data name="Overlay.Audio.Output" xml:space="preserve"><value>Uscita</value></data>
+  <data name="Overlay.Audio.Output.Desc" xml:space="preserve"><value>Sinistra / destra: cambia subito l'uscita predefinita di Windows.</value></data>
+  <data name="Overlay.Audio.UnknownTitle" xml:space="preserve"><value>Titolo sconosciuto</value></data>
+  <data name="Overlay.Audio.Volume" xml:space="preserve"><value>Volume</value></data>
+  <data name="Overlay.Audio.Volume.Desc" xml:space="preserve"><value>Sinistra / destra: volume generale dell'uscita predefinita. A: muto.</value></data>
   <data name="Overlay.BigPicture.Desc" xml:space="preserve"><value>Apre o chiude Steam Big Picture.</value></data>
   <data name="Overlay.BigPicture.Exit" xml:space="preserve"><value>Esci</value></data>
   <data name="Overlay.BigPicture.Label" xml:space="preserve"><value>Big Picture</value></data>
@@ -109,9 +122,12 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.Info.Monitor" xml:space="preserve"><value>Monitor</value></data>
   <data name="Overlay.Info.NoProfiles" xml:space="preserve"><value>nessuno: salvali con MonitorSwitcher</value></data>
   <data name="Overlay.Info.Pad.Confirm" xml:space="preserve"><value>Conferma / indietro</value></data>
+  <data name="Overlay.Info.Pad.Media" xml:space="preserve"><value>Brano precedente / successivo, play / pausa</value></data>
+  <data name="Overlay.Info.Pad.Mic" xml:space="preserve"><value>Silenzia il microfono (overlay chiuso)</value></data>
   <data name="Overlay.Info.Pad.Monitor" xml:space="preserve"><value>Monitor TV / Scrivania</value></data>
   <data name="Overlay.Info.Pad.SettingsHold" xml:space="preserve"><value>Impostazioni (tieni premuto)</value></data>
   <data name="Overlay.Info.Pad.Toggle" xml:space="preserve"><value>Apri / chiudi l'overlay (pad)</value></data>
+  <data name="Overlay.Info.Pad.Volume" xml:space="preserve"><value>Volume giù / su (overlay chiuso)</value></data>
   <data name="Overlay.Info.Profiles" xml:space="preserve"><value>Profili</value></data>
   <data name="Overlay.Info.Roles" xml:space="preserve"><value>Scrivania · TV</value></data>
   <data name="Overlay.Info.Shortcuts" xml:space="preserve"><value>Scorciatoie</value></data>
@@ -128,18 +144,38 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.Power.Restart" xml:space="preserve"><value>Riavvia</value></data>
   <data name="Overlay.Power.ShutDown" xml:space="preserve"><value>Spegni</value></data>
   <data name="Overlay.Power.Sleep" xml:space="preserve"><value>Sospendi</value></data>
+  <data name="Overlay.Section.Audio" xml:space="preserve"><value>Audio</value></data>
+  <data name="Overlay.Section.Devices" xml:space="preserve"><value>Dispositivi</value></data>
   <data name="Overlay.Section.General" xml:space="preserve"><value>Generale</value></data>
   <data name="Overlay.Section.Monitor" xml:space="preserve"><value>Monitor</value></data>
+  <data name="Overlay.Section.NowPlaying" xml:space="preserve"><value>In riproduzione</value></data>
   <data name="Overlay.Section.Other" xml:space="preserve"><value>Altro</value></data>
   <data name="Overlay.Section.Overlay" xml:space="preserve"><value>Overlay</value></data>
   <data name="Overlay.Section.Screen" xml:space="preserve"><value>Schermo</value></data>
   <data name="Overlay.Section.Steam" xml:space="preserve"><value>Steam</value></data>
   <data name="Overlay.Section.System" xml:space="preserve"><value>Sistema</value></data>
   <data name="Overlay.Section.Tabs" xml:space="preserve"><value>Tab</value></data>
+  <data name="Overlay.Section.Volume" xml:space="preserve"><value>Volume</value></data>
   <data name="Overlay.Section.Windows" xml:space="preserve"><value>Finestre</value></data>
   <data name="Overlay.ShowDesktop.Desc" xml:space="preserve"><value>Riduce a icona tutte le finestre (Win+D).</value></data>
   <data name="Overlay.ShowDesktop.Label" xml:space="preserve"><value>Mostra desktop</value></data>
+  <data name="Overlay.Tab.Audio" xml:space="preserve"><value>Audio</value></data>
   <data name="Overlay.Tab.Controls" xml:space="preserve"><value>Controlli</value></data>
+  <data name="Settings.Audio.AutoInput" xml:space="preserve"><value>Cambio automatico ingresso</value></data>
+  <data name="Settings.Audio.AutoInput.Desc" xml:space="preserve"><value>Segue l'Ordine ingressi quando un microfono viene collegato o scollegato. Spento: solo manuale.</value></data>
+  <data name="Settings.Audio.AutoOutput" xml:space="preserve"><value>Cambio automatico uscita</value></data>
+  <data name="Settings.Audio.AutoOutput.Desc" xml:space="preserve"><value>Segue l'Ordine uscite quando un'uscita viene collegata o scollegata. Spento: solo manuale.</value></data>
+  <data name="Settings.Audio.Connected" xml:space="preserve"><value>Connesso</value></data>
+  <data name="Settings.Audio.Disconnected" xml:space="preserve"><value>Scollegato</value></data>
+  <data name="Settings.Audio.InputOrder" xml:space="preserve"><value>Ordine ingressi</value></data>
+  <data name="Settings.Audio.InputOrder.Desc" xml:space="preserve"><value>Priorità dei microfoni: quando ne colleghi o scolleghi uno, diventa predefinito il più alto connesso.</value></data>
+  <data name="Settings.Audio.MaxVolume" xml:space="preserve"><value>Volume massimo</value></data>
+  <data name="Settings.Audio.MaxVolume.Desc" xml:space="preserve"><value>Volume generale massimo di {0} da overlay e pad. Vale dalla prossima modifica del volume.</value></data>
+  <data name="Settings.Audio.NoDevices" xml:space="preserve"><value>Nessun dispositivo rilevato</value></data>
+  <data name="Settings.Audio.Order.Desc" xml:space="preserve"><value>A: prendi, Su / Giù: sposta, A: lascia (B annulla). Si usa il dispositivo connesso più in alto.</value></data>
+  <data name="Settings.Audio.Order.RemoveDesc" xml:space="preserve"><value>Non connesso. A: prendi e sposta. Y / Canc: toglilo dalla lista.</value></data>
+  <data name="Settings.Audio.OutputOrder" xml:space="preserve"><value>Ordine uscite</value></data>
+  <data name="Settings.Audio.OutputOrder.Desc" xml:space="preserve"><value>Priorità delle uscite: quando ne colleghi o scolleghi una, diventa predefinita la più alta connessa.</value></data>
   <data name="Settings.Desk.Desc" xml:space="preserve"><value>Profilo caricato da Ctrl+Alt+Giù.</value></data>
   <data name="Settings.Desk.Label" xml:space="preserve"><value>Scrivania</value></data>
   <data name="Settings.Exit.Desc" xml:space="preserve"><value>Chiude OverlayUtils (anche il tray). Chiede conferma con una seconda pressione.</value></data>
@@ -164,7 +200,7 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Settings.MonitorSwitcher.Searching" xml:space="preserve"><value>ricerca…</value></data>
   <data name="Settings.Notifications.Desc" xml:space="preserve"><value>Avvisi di Windows quando cambi profilo monitor.</value></data>
   <data name="Settings.PadCombos" xml:space="preserve"><value>Combo del pad</value></data>
-  <data name="Settings.PadCombos.Desc" xml:space="preserve"><value>Back + croce Su / Giù cambiano profilo monitor. Back + RB apre sempre l'overlay.</value></data>
+  <data name="Settings.PadCombos.Desc" xml:space="preserve"><value>Back + croce Su / Giù cambiano profilo monitor, Sinistra / Destra il volume, Y silenzia il microfono. Back + RB apre sempre l'overlay.</value></data>
   <data name="Settings.Position.Desc" xml:space="preserve"><value>Lato dello schermo in cui compare l'overlay.</value></data>
   <data name="Settings.Position.Label" xml:space="preserve"><value>Posizione</value></data>
   <data name="Settings.Position.Left" xml:space="preserve"><value>Sinistra</value></data>
