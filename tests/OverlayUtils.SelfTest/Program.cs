@@ -795,6 +795,11 @@ string RepoRoot()
     Check(AudioRules.StepVolume(0.03, -1, 1) == 0.0, "Audio step clamps to 0");
     Check(Math.Abs(AudioRules.StepVolume(0.70, +1, 0.6) - 0.6) < 1e-9, "Audio step up clamps to cap");
     Check(Math.Abs(AudioRules.StepVolume(0.70, -1, 0.6) - 0.6) < 1e-9, "Audio step down then clamps to cap");
+    bool Near(double a, double b) => Math.Abs(a - b) < 1e-9;
+    Check(Near(AudioRules.StepVolume(0.55, +1, 1), 0.60) && Near(AudioRules.StepVolume(0.55, -1, 1), 0.50), "Audio step from exact 0.55 both ways");
+    Check(Near(AudioRules.StepVolume(0.5499999999, +1, 1), 0.60) && Near(AudioRules.StepVolume(0.5499999999, -1, 1), 0.50), "Audio step from 0.5499999999 both ways");
+    Check(Near(AudioRules.StepVolume((double)0.55f, +1, 1), 0.60) && Near(AudioRules.StepVolume((double)0.55f, -1, 1), 0.50), "Audio step from float32 0.55 both ways");
+    Check(Near(AudioRules.StepVolume((double)0.7f, +1, 1), 0.75) && Near(AudioRules.StepVolume((double)0.7f, -1, 1), 0.65), "Audio step from float32 0.7 both ways");
     var caps = new Dictionary<string, int> { ["A"] = 60 };
     Check(Math.Abs(AudioRules.CapFor(caps, "A") - 0.6) < 1e-9 && AudioRules.CapFor(caps, "B") == 1.0, "Audio CapFor");
 

@@ -42,12 +42,12 @@ public static class AudioRules
     /// <summary>One step up (+1) or down (-1) on exact 5 % multiples, clamped to [0, cap].</summary>
     public static double StepVolume(double current, int direction, double cap)
     {
-        var steps = (int)Math.Round(current / Step, MidpointRounding.AwayFromZero);
-        var onGrid = Math.Round(current / Step) * Step;
-        if (Math.Abs(onGrid - current) > 1e-9)
-            steps = direction > 0 ? (int)Math.Floor(current / Step) + 1 : (int)Math.Ceiling(current / Step) - 1;
-        else
-            steps += direction > 0 ? 1 : -1;
+        // Windows volumes are float32, so treat values within 1e-4 of a step as on the grid.
+        var q = current / Step;
+        var r = Math.Round(q);
+        var steps = Math.Abs(q - r) < 1e-4
+            ? (int)r + direction
+            : direction > 0 ? (int)Math.Floor(q) + 1 : (int)Math.Ceiling(q) - 1;
         var value = steps * 5 / 100.0;
         return Math.Clamp(value, 0.0, cap);
     }
