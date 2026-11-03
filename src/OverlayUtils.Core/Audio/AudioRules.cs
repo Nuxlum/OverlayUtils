@@ -40,6 +40,9 @@ public static class AudioRules
     }
 
     /// <summary>One step up (+1) or down (-1) on exact 5 % multiples, clamped to [0, cap].</summary>
+    /// <summary>A level set directly (volume bar), clamped to [0, cap].</summary>
+    public static double ClampVolume(double level, double cap) => Math.Min(Math.Max(level, 0.0), cap);
+
     public static double StepVolume(double current, int direction, double cap)
     {
         // Windows volumes are float32, so treat values within 1e-4 of a step as on the grid.

@@ -215,6 +215,7 @@ public sealed class OverlayContent
                 Value = () => Percent(_audio.Volume),
                 IsOn = () => _audio.Muted,
                 Step = _audio.StepVolume,
+                SetLevel = _audio.SetVolume,
                 Toggle = _audio.ToggleMute,
             },
             new OverlayItem

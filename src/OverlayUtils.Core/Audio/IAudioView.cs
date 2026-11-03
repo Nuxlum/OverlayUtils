@@ -23,6 +23,9 @@ public interface IAudioView
 
     void StepVolume(int direction);
 
+    /// <summary>Sets the master volume directly (0..1), within the device cap; above 0 unmutes.</summary>
+    void SetVolume(double level);
+
     void ToggleMute();
 
     /// <summary>Mute of the default input.</summary>

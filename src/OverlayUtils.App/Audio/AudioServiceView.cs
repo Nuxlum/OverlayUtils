@@ -12,6 +12,7 @@ internal sealed class AudioServiceView(AudioService service) : IAudioView
     public double Volume => service.Volume;
     public bool Muted => service.Muted;
     public void StepVolume(int direction) => service.StepVolume(direction);
+    public void SetVolume(double level) => service.SetVolume(level);
     public void ToggleMute() => service.ToggleMute();
     public bool MicMuted => service.MicMuted;
     public void ToggleMicMute() => service.ToggleMicMute();

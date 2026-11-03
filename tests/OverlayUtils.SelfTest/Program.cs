@@ -1366,6 +1366,27 @@ string RepoRoot()
     Check(nav.Footer().Where(h => h.Keys == "← →").All(h => h.Command == null), "arrow hints have no single command");
 }
 
+// --- Volume bar -------------------------------------------------------------
+{
+    Check(AudioRules.ClampVolume(1.2, 0.6) == 0.6, "bar level clamps to the cap");
+    Check(AudioRules.ClampVolume(-0.1, 1) == 0.0, "bar level clamps to 0");
+    Check(AudioRules.ClampVolume(0.37, 1) == 0.37, "bar level inside the range is kept");
+
+    var store = new ConfigStore(Path.Combine(temp, "volbar", "config.json"));
+    var monitors = new MonitorProfiles(store, new MonitorSwitcherLocator(store), Path.Combine(temp, "volbar", "none"));
+    var audio = new FakeAudio();
+    audio.Outputs.Add(new AudioDeviceRef("spk", "Speakers"));
+    audio.DefaultOutput = "spk";
+    var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), new FakeHost(), audio);
+    var nav = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
+    nav.Reset([]);
+    nav.ClickTab(1);
+    var volumeRow = nav.Items.ToList().FindIndex(i => i.Key == "audio.volume");
+    Check(volumeRow >= 0, "Volume row found");
+    nav.ClickLevel(volumeRow, 0.5).Action?.Invoke();
+    Check(audio.Calls.Contains("SetVolume:0.5"), "clicking the middle of the bar sets 50 %");
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;
@@ -1415,6 +1436,7 @@ sealed class FakeAudio : IAudioView
     }
     public void Cycle(AudioFlow flow, int direction) => Calls.Add($"Cycle:{flow}:{direction}");
     public void StepVolume(int direction) => Calls.Add($"StepVolume:{direction}");
+    public void SetVolume(double level) => Calls.Add("SetVolume:" + level.ToString(CultureInfo.InvariantCulture));
     public void ToggleMute() => Calls.Add("ToggleMute");
     public void ToggleMicMute() => Calls.Add("ToggleMicMute");
 }

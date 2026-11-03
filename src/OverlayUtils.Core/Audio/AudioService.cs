@@ -120,6 +120,17 @@ public sealed partial class AudioService : IDisposable
         ReadVolumes();
     });
 
+    /// <summary>Sets the master volume directly (volume bar), within the device cap; above 0 unmutes.</summary>
+    public void SetVolume(double level) => Post(() =>
+    {
+        if (_outputVolume is null || _boundOutput is null) return;
+        var cap = AudioRules.CapFor(_config.Current.AudioVolumeCaps, _boundOutput);
+        var value = AudioRules.ClampVolume(level, cap);
+        _outputVolume.SetMasterVolumeLevelScalar((float)value, EventContext);
+        if (value > 0 && _outputVolume.GetMute() != 0) _outputVolume.SetMute(0, EventContext);
+        ReadVolumes();
+    });
+
     public void ToggleMute() => Post(() =>
     {
         if (_outputVolume is null) return;
