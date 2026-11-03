@@ -103,7 +103,11 @@ public sealed class OverlayNavigator
         return cancel;
     }
 
-    public void Refresh()
+    /// <summary>
+    /// Re-validates the selection after the lists changed. If the picked-up Reorder entry is gone the hold is
+    /// dropped and its Cancel is returned for the caller to run (null otherwise).
+    /// </summary>
+    public Action? Refresh()
     {
         var items = Items;
         if (_selectedKey != null)
@@ -112,17 +116,19 @@ public sealed class OverlayNavigator
             {
                 if (items[i].Key != _selectedKey || !IsSelectable(items[i])) continue;
                 if (i != Index) Select(i);
-                return;
+                return null;
             }
         }
-        if (Index >= 0 && Index < items.Count && IsSelectable(items[Index])) return;
+        var cancel = _selectedKey != null ? TakeHold() : null; // keyed entry is gone
+        if (Index >= 0 && Index < items.Count && IsSelectable(items[Index])) return cancel;
 
         var from = Math.Clamp(Index, 0, Math.Max(items.Count - 1, 0));
         for (var i = from; i >= 0; i--)
-            if (i < items.Count && IsSelectable(items[i])) { Select(i); return; }
+            if (i < items.Count && IsSelectable(items[i])) { Select(i); return cancel; }
         for (var i = from + 1; i < items.Count; i++)
-            if (IsSelectable(items[i])) { Select(i); return; }
+            if (IsSelectable(items[i])) { Select(i); return cancel; }
         Select(0);
+        return cancel;
     }
 
     public NavResult Handle(OverlayCommand command)

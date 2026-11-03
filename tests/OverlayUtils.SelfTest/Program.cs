@@ -966,6 +966,20 @@ string RepoRoot()
     nav.Refresh();
     Check(nav.Selected!.Key == "c" && nav.Index == 1, "Refresh keeps selection by Key when an earlier item disappears");
 
+    // Held entry vanishes (device unplugged mid-reorder)
+    nav.Reset([]); log.Clear();
+    order.Clear(); order.AddRange(["a", "b", "c"]);
+    nav.Handle(OverlayCommand.NextTab);
+    nav.Handle(OverlayCommand.Down);
+    nav.Handle(OverlayCommand.A);
+    Check(nav.Holding && nav.Selected!.Key == "b", "holding b");
+    order.Remove("b");
+    var vanishCancel = nav.Refresh();
+    Check(!nav.Holding, "Refresh drops the hold when the held entry vanished");
+    vanishCancel?.Invoke(); log.Clear();
+    Run(nav.Handle(OverlayCommand.Down)); Run(nav.Handle(OverlayCommand.A));
+    Check(!log.Any(l => l.StartsWith("move") || l == "commit"), "neighbour's Move/Commit not called after the hold was dropped");
+
     // Selected media row hides
     nav.Reset([]);
     nav.Handle(OverlayCommand.Down); nav.Handle(OverlayCommand.Down);
