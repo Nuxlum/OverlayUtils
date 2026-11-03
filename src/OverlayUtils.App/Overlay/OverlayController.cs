@@ -358,6 +358,7 @@ internal sealed class OverlayController : IDisposable
     {
         if (!_open) return;
         Relayout(config); // overlay size, side or monitor profile may have changed
+        RunCancel(_navigator.SetHiddenTabs(config.HiddenTabs)); // a tab hidden or shown in Settings follows at once
         Render();
     });
 

@@ -1259,6 +1259,30 @@ string RepoRoot()
     audioTabRow.Toggle!();
     Check(!store.Current.HiddenTabs.Contains("Audio") && Nav().VisibleTabs.Count == 2, "Audio tab shown again");
 
+    // Same navigator, toggled from Settings while open: the tab strip follows at once (Python visible_tabs()).
+    nav = Nav();
+    Run(nav.Handle(OverlayCommand.NextTab));
+    nav.Handle(OverlayCommand.Settings);
+    while (nav.Selected?.Label() != Loc.T("Overlay.Tab.Audio")) nav.Handle(OverlayCommand.Down);
+    Run(nav.Handle(OverlayCommand.A));
+    Check(nav.SetHiddenTabs(store.Current.HiddenTabs) == null, "updating hidden tabs drops no hold");
+    Check(nav.Page == OverlayPage.Settings && nav.Selected?.Label() == Loc.T("Overlay.Tab.Audio"),
+        "updating hidden tabs keeps the page and the selection");
+    Check(nav.VisibleTabs.Select(t => t.Id).SequenceEqual([OverlayContent.ControlsTabId]), "hidden at once on the open navigator");
+    nav.Handle(OverlayCommand.B);
+    Check(nav.Page == OverlayPage.Tabs && nav.CurrentTab.Id == OverlayContent.ControlsTabId && nav.Selected != null,
+        "back on the tabs, the current tab falls back to Controls");
+    audioTabRow.Toggle!();
+    nav.SetHiddenTabs(store.Current.HiddenTabs);
+    Check(nav.VisibleTabs.Count == 2 && nav.CurrentTab.Id == OverlayContent.ControlsTabId, "shown again at once, still on Controls");
+    Run(nav.Handle(OverlayCommand.NextTab));
+    Check(nav.CurrentTab.Id == OverlayContent.AudioTabId, "the Audio tab is reachable again");
+    store.Update(c => c.HiddenTabs.Add("Audio"));
+    nav.SetHiddenTabs(store.Current.HiddenTabs);
+    Check(nav.CurrentTab.Id == OverlayContent.ControlsTabId && nav.Selected?.Label() == content.Controls().First(i => i.Visible()).Label(),
+        "hiding the open tab moves to Controls and selects its first row");
+    store.Update(c => c.HiddenTabs.Remove("Audio"));
+
     var shortcuts = content.Info().Where(i => i.Kind == ItemKind.Info && i.Visible()).Select(i => i.Value()).ToList();
     foreach (var expected in new[] { "Back + ← / →", "Back + Y", "LB / RB / X" })
         Check(shortcuts.Contains(expected), $"Info shortcuts list {expected}");

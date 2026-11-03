@@ -104,6 +104,32 @@ public sealed class OverlayNavigator
     }
 
     /// <summary>
+    /// The hidden tabs changed while open (Settings → Tabs): the tab strip follows at once, page and selection stay.
+    /// If the current tab was hidden, the nearest visible one becomes current (its first row when the tabs are
+    /// shown, the first row on return from Settings). Returns the Cancel of a picked-up Reorder row that was on the
+    /// hidden tab (or null), for the caller to run.
+    /// </summary>
+    public Action? SetHiddenTabs(IReadOnlyCollection<string> hiddenTabIds)
+    {
+        var currentId = CurrentTab.Id;
+        _hidden = hiddenTabIds;
+        var tabs = VisibleTabs;
+        var index = tabs.ToList().FindIndex(t => t.Id == currentId);
+        if (index >= 0)
+        {
+            _tabIndex = index;
+            return null;
+        }
+        _tabIndex = Math.Clamp(_tabIndex, 0, tabs.Count - 1);
+        _savedIndex = 0;
+        _savedSegment = 0;
+        if (Page != OverlayPage.Tabs) return null;
+        var cancel = TakeHold();
+        SelectFirst();
+        return cancel;
+    }
+
+    /// <summary>
     /// Re-validates the selection after the lists changed. If the picked-up Reorder entry is gone the hold is
     /// dropped and its Cancel is returned for the caller to run (null otherwise).
     /// </summary>
