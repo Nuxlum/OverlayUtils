@@ -264,7 +264,10 @@ gets channel volume x app volume.
   notifications (COM threads) only queue a rescan. `AskName` / `ChooseProgram`
   are opened with `Dispatcher.BeginInvoke`, after the navigator action has
   returned; the name dialog is modeless (no nested loop) and its callback
-  runs on the UI thread only for OK with a non-empty trimmed name. Hiding the
+  runs on the UI thread only for OK with a non-empty trimmed name. Each
+  caller passes a title; a new request replaces an open prompt. While it is
+  open, `TrayController.OnPadAction` routes pad commands to it on the UI
+  thread (`DialogPad.Route`: A accept, B cancel, rest swallowed). Hiding the
   overlay closes an open name dialog.
 - **Footer.** `OverlayItem.ActionLabel` names the A action when the kind's
   default does not fit ("Apply" on Presets, "Rename" on Rename...).

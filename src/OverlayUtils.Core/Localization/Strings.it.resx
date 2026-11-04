@@ -33,8 +33,11 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
 Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Dialog.Legacy.Done" xml:space="preserve"><value>La vecchia AppUtili è stata rimossa.</value></data>
   <data name="Dialog.Name.Cancel" xml:space="preserve"><value>Annulla</value></data>
+  <data name="Dialog.Name.NewChannel" xml:space="preserve"><value>Nuovo canale</value></data>
   <data name="Dialog.Name.Ok" xml:space="preserve"><value>OK</value></data>
-  <data name="Dialog.Name.Title" xml:space="preserve"><value>Nome</value></data>
+  <data name="Dialog.Name.PadHint" xml:space="preserve"><value>A OK · B Annulla</value></data>
+  <data name="Dialog.Name.RenameChannel" xml:space="preserve"><value>Rinomina canale</value></data>
+  <data name="Dialog.Name.SavePreset" xml:space="preserve"><value>Salva preset</value></data>
   <data name="Channel.chat" xml:space="preserve"><value>Chat</value></data>
   <data name="Channel.game" xml:space="preserve"><value>Gioco</value></data>
   <data name="Channel.media" xml:space="preserve"><value>Media</value></data>

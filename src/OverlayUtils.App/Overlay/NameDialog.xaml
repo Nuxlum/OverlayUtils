@@ -1,5 +1,5 @@
 <!--
-  Small name prompt opened from the overlay (add / rename a channel, save a preset). Topmost and owned by the overlay
+  Small name prompt opened from the overlay (add / rename a channel, save a preset), titled with what it names. Topmost and owned by the overlay
   so the panel never covers it; dark like the overlay. The text box starts with the suggested name selected, so
   Enter (or OK) accepts it as is. Colours and fonts from OverlayTheme.xaml.
 -->
@@ -58,10 +58,15 @@
                      Foreground="{StaticResource Text}" Background="{StaticResource SegmentBg}"
                      BorderBrush="{DynamicResource Accent}" BorderThickness="1" CaretBrush="{StaticResource Text}"
                      SelectionBrush="{DynamicResource Accent}" MaxLength="40" />
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
-                <Button x:Name="OkButton" Style="{StaticResource DialogButton}" Click="OnOk" />
-                <Button x:Name="CancelButton" Style="{StaticResource DialogButton}" Click="OnCancel" />
-            </StackPanel>
+            <Grid Margin="0,14,0,0">
+                <!-- Shown when a pad is connected: A and B work on the dialog while it is open. -->
+                <TextBlock x:Name="PadHint" FontSize="12" Foreground="{StaticResource Muted}" VerticalAlignment="Center"
+                           Visibility="Collapsed" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="OkButton" Style="{StaticResource DialogButton}" Click="OnOk" />
+                    <Button x:Name="CancelButton" Style="{StaticResource DialogButton}" Click="OnCancel" />
+                </StackPanel>
+            </Grid>
         </StackPanel>
     </Border>
 </Window>

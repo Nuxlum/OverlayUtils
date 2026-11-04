@@ -163,8 +163,10 @@ game. Nothing is changed in Windows until an app plays or a row is touched.
    tab or plug it in): the first time the headset starts from the speakers'
    mix; change it, switch back: each device keeps its own mix and every
    playing app follows at once.
-4. Presets: "Save preset..." -> the name dialog opens over the overlay with
-   "Preset 1" selected; Enter saves it (Esc or Cancel saves nothing). Change
+4. Presets: "Save preset..." -> the "Save preset" dialog opens over the
+   overlay with "Preset 1" selected; Enter saves it (Esc or Cancel saves
+   nothing). With only the pad: the dialog shows "A OK · B Cancel", A saves
+   the suggested name, B cancels, D-pad does nothing behind it. Change
    the channels, pick the preset on the Preset row and press A ("Apply" in
    the footer): the channel levels come back on the current device.
 5. Settings -> Audio -> Channels: "Add channel..." (type a name), change its
@@ -183,8 +185,10 @@ game. Nothing is changed in Windows until an app plays or a row is touched.
    automatic switches the app stops switching that direction, errors.log has
    one "Audio auto-switch (Output) paused" line, and the next device event
    after 10 quiet seconds switches normally again.
-9. Hide the overlay (B or a click outside) while the name dialog is open: the
-   dialog closes and nothing is saved. Apps already playing when the app
+9. Hide the overlay (a click outside, or Back+RB) while the name dialog is
+   open: the dialog closes and nothing is saved. Open "Add channel..." and,
+   with the prompt still open, click "Save preset...": the prompt becomes
+   "Save preset" and only the preset is saved. Apps already playing when the app
    starts keep their level until a row is touched or the output changes.
 
 ## Testing on Windows (stage 3)

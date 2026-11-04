@@ -65,8 +65,9 @@ their own mix.
 Presets: "Save preset..." stores the channel volumes under a name; on the
 Preset row Left/Right pick one and A applies it to the current device.
 Settings -> Audio -> Channels: A picks a channel up to reorder it, Left/Right
-change its icon, "Add channel..." and "Rename..." ask for a name (Enter keeps
-the suggested one), Y deletes a channel you added (its programs go to Other).
+change its icon, "Add channel..." and "Rename..." ask for a name (Enter or A
+on the pad keeps the suggested one, Esc or B cancels), Y deletes a channel
+you added (its programs go to Other).
 Settings -> Audio -> Programs: Left/Right move a program to another channel;
 "Add program..." picks an .exe before it ever plays.
 
@@ -172,8 +173,9 @@ Preset: "Salva preset..." salva i volumi dei canali con un nome; sulla riga
 Preset Sinistra/Destra ne scelgono uno e A lo applica all'uscita attuale.
 Impostazioni -> Audio -> Canali: A solleva un canale per riordinarlo,
 Sinistra/Destra cambiano l'icona, "Aggiungi canale..." e "Rinomina..."
-chiedono un nome (Invio tiene quello proposto), Y elimina un canale aggiunto
-da te (i suoi programmi vanno in Altro).
+chiedono un nome (Invio o A sul pad tengono quello proposto, Esc o B
+annullano), Y elimina un canale aggiunto da te (i suoi programmi vanno in
+Altro).
 Impostazioni -> Audio -> Programmi: Sinistra/Destra spostano un programma in
 un altro canale; "Aggiungi programma..." sceglie un .exe prima ancora che
 suoni.

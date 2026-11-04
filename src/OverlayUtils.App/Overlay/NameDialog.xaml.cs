@@ -10,18 +10,23 @@ namespace OverlayUtils.App.Overlay;
 /// <summary>
 /// Modeless name prompt (add / rename a channel, save a preset). Shown with <see cref="Show"/> rather than
 /// ShowDialog, so no nested message loop runs inside the navigator's action and the overlay keeps rendering.
-/// <see cref="Accepted"/> is raised only for OK / Enter with a non-empty trimmed name; Cancel, Esc, the overlay
-/// hiding or <see cref="Dismiss"/> close it without it. UI thread only.
+/// <see cref="Accepted"/> is raised only for OK / Enter / pad A (<see cref="Accept"/>) with a non-empty trimmed name;
+/// Cancel, Esc, pad B, the overlay hiding or <see cref="Dismiss"/> close it without it. UI thread only.
 /// </summary>
 internal sealed partial class NameDialog : Window
 {
     bool _done;
 
-    public NameDialog(string suggested, nint owner, Color accent)
+    public NameDialog(string title, string suggested, nint owner, Color accent, bool padConnected)
     {
         InitializeComponent();
         Resources["Accent"] = Frozen(accent);
-        Prompt.Text = Loc.T("Dialog.Name.Title");
+        Prompt.Text = title;
+        if (padConnected)
+        {
+            PadHint.Text = Loc.T("Dialog.Name.PadHint");
+            PadHint.Visibility = Visibility.Visible;
+        }
         OkButton.Content = Loc.T("Dialog.Name.Ok");
         CancelButton.Content = Loc.T("Dialog.Name.Cancel");
         NameBox.Text = suggested;
@@ -64,7 +69,8 @@ internal sealed partial class NameDialog : Window
 
     void OnCancel(object sender, RoutedEventArgs e) => Dismiss();
 
-    void Accept()
+    /// <summary>OK: the name in the box (the suggestion unless typed over); an empty name keeps the prompt open.</summary>
+    public void Accept()
     {
         if (_done) return;
         var name = NameBox.Text.Trim();

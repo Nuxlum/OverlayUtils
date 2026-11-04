@@ -33,8 +33,11 @@ Windows will ask for administrator permission once.</value></data>
 Windows will ask for administrator permission once.</value></data>
   <data name="Dialog.Legacy.Done" xml:space="preserve"><value>The old AppUtili has been removed.</value></data>
   <data name="Dialog.Name.Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Dialog.Name.NewChannel" xml:space="preserve"><value>New channel</value></data>
   <data name="Dialog.Name.Ok" xml:space="preserve"><value>OK</value></data>
-  <data name="Dialog.Name.Title" xml:space="preserve"><value>Name</value></data>
+  <data name="Dialog.Name.PadHint" xml:space="preserve"><value>A OK · B Cancel</value></data>
+  <data name="Dialog.Name.RenameChannel" xml:space="preserve"><value>Rename channel</value></data>
+  <data name="Dialog.Name.SavePreset" xml:space="preserve"><value>Save preset</value></data>
   <data name="Channel.chat" xml:space="preserve"><value>Chat</value></data>
   <data name="Channel.game" xml:space="preserve"><value>Game</value></data>
   <data name="Channel.media" xml:space="preserve"><value>Media</value></data>

@@ -117,9 +117,12 @@ The stage checklist lives in `PORTING.md`.
   pauses until a device event after 10 s of quiet, with one `Log.Info`.
   Guards against switch loops with Sonar or flaky devices.
 - 2026-11-04 - **Name dialog is modeless and owned by the overlay** (no
-  nested message loop inside a navigator action); pad A/B do not drive it,
-  a pad user accepts the suggested name with Enter or by clicking OK, or
-  renames later with a keyboard. Hiding the overlay cancels it.
+  nested message loop inside a navigator action), titled with what it names
+  (New channel / Rename channel / Save preset). While it is open the pad
+  drives it: A accepts the name shown (the suggestion unless typed over), B
+  cancels, other pad input is swallowed (`DialogPad.Route`); with a pad
+  connected the dialog shows "A OK · B Cancel". A new request replaces an
+  open prompt (the old one is cancelled). Hiding the overlay cancels it.
 - 2026-11-04 - **A row can name its A action** (`OverlayItem.ActionLabel`):
   "Apply" on Presets, "Rename" on Rename, instead of the kind's "Turn on/off".
 

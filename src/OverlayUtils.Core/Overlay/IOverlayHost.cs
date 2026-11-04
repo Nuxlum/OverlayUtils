@@ -26,10 +26,11 @@ public interface IOverlayHost
     void Exit();
 
     /// <summary>
-    /// Small name dialog owned by the overlay, prefilled with <paramref name="suggested"/>; <paramref name="done"/>
-    /// runs on the UI thread with the accepted text, and not at all on cancel.
+    /// Small name dialog owned by the overlay, titled <paramref name="title"/> (what is being named) and prefilled with
+    /// <paramref name="suggested"/>; <paramref name="done"/> runs on the UI thread with the accepted text, and not at
+    /// all on cancel. A new request replaces a prompt still open (that one is cancelled).
     /// </summary>
-    void AskName(string suggested, Action<string> done);
+    void AskName(string title, string suggested, Action<string> done);
 
     /// <summary>File picker for a program (.exe); <paramref name="done"/> runs on the UI thread with the full path, not on cancel.</summary>
     void ChooseProgram(Action<string> done);

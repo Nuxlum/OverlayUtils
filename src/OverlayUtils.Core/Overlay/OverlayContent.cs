@@ -330,7 +330,7 @@ public sealed class OverlayContent
                 Section = hasPresets ? null : () => Loc.T("Overlay.Section.Presets"),
                 Label = () => Loc.T("Overlay.Audio.SavePreset"),
                 Description = () => Loc.T("Overlay.Audio.SavePreset.Desc"),
-                Action = () => _host.AskName(SuggestedPresetName(), name =>
+                Action = () => _host.AskName(Loc.T("Dialog.Name.SavePreset"), SuggestedPresetName(), name =>
                 {
                     Mix.SavePreset(name);
                     _presetPick = name.Trim();
@@ -412,7 +412,8 @@ public sealed class OverlayContent
             Kind = ItemKind.Action, Icon = Glyphs.Add, Key = "channels.add", Stay = true,
             Label = () => Loc.T("Settings.Audio.AddChannel"),
             Description = () => Loc.T("Settings.Audio.AddChannel.Desc"),
-            Action = () => _host.AskName(Loc.T("Settings.Audio.ChannelName", Mix.Channels.Count + 1), Mix.AddChannel),
+            Action = () => _host.AskName(Loc.T("Dialog.Name.NewChannel"), Loc.T("Settings.Audio.ChannelName", Mix.Channels.Count + 1),
+                Mix.AddChannel),
         });
         rows.Add(new OverlayItem
         {
@@ -430,7 +431,8 @@ public sealed class OverlayContent
             Toggle = () =>
             {
                 if (RenamePick() is not { } channel) return;
-                _host.AskName(ChannelName(channel), name => Mix.RenameChannel(channel.Id, StoredName(channel.Id, name)));
+                _host.AskName(Loc.T("Dialog.Name.RenameChannel"), ChannelName(channel),
+                    name => Mix.RenameChannel(channel.Id, StoredName(channel.Id, name)));
             },
         });
         return rows;

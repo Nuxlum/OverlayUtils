@@ -289,7 +289,28 @@ internal sealed class TrayController : IOverlayHost, IDisposable
                 SwitchMonitor(() => _monitors.SwitchTo(MonitorRole.Desk));
                 break;
             case PadActionKind.Command:
-                _overlay?.Command(action.Command);
+                var command = action.Command;
+                OnUi(() =>
+                {
+                    // An open name prompt takes the pad: A accepts, B cancels, the rest is swallowed.
+                    if (_nameDialog is not { } dialog)
+                    {
+                        _overlay?.Command(command);
+                        return;
+                    }
+                    try
+                    {
+                        switch (DialogPad.Route(command))
+                        {
+                            case DialogPadAction.Accept: dialog.Accept(); break;
+                            case DialogPadAction.Cancel: dialog.Dismiss(); break;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error("Name dialog pad", e);
+                    }
+                });
                 break;
             case PadActionKind.VolumeDown or PadActionKind.VolumeUp or PadActionKind.MicMute:
                 try
@@ -386,19 +407,18 @@ internal sealed class TrayController : IOverlayHost, IDisposable
     /// <summary>
     /// Add / rename a channel, save a preset. Opened after the navigator's action has returned (BeginInvoke), modeless
     /// and owned by the overlay; <paramref name="done"/> runs on the UI thread, only for OK with a non-empty name.
-    /// A second request while one is open just brings it to the front; the overlay hiding cancels it.
+    /// A new request replaces a prompt still open (cancelling it), so the prompt shown always matches its callback;
+    /// the overlay hiding cancels it. While it is open, pad A / B accept / cancel it (<see cref="OnPadAction"/>).
     /// </summary>
-    public void AskName(string suggested, Action<string> done) => _app.Dispatcher.BeginInvoke(() =>
+    public void AskName(string title, string suggested, Action<string> done) => _app.Dispatcher.BeginInvoke(() =>
     {
         try
         {
-            if (_nameDialog is { } open)
-            {
-                open.Activate();
-                return;
-            }
+            var previous = _nameDialog; // replaced: cancelled without handing the focus back to the overlay
+            _nameDialog = null;
+            previous?.Dismiss();
             var owner = _overlay is { IsOpen: true } overlay ? overlay.Handle : 0;
-            var dialog = new NameDialog(suggested, owner, WindowEffects.Accent());
+            var dialog = new NameDialog(title, suggested, owner, WindowEffects.Accent(), _pads?.PadCount > 0);
             dialog.Accepted += name =>
             {
                 try { done(name); }
@@ -406,7 +426,8 @@ internal sealed class TrayController : IOverlayHost, IDisposable
             };
             dialog.Closed += (_, _) =>
             {
-                if (_nameDialog == dialog) _nameDialog = null;
+                if (_nameDialog != dialog) return; // replaced by a newer prompt, which keeps the focus
+                _nameDialog = null;
                 _overlay?.Refocus();
             };
             _nameDialog = dialog;

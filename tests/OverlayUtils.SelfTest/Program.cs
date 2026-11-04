@@ -1484,6 +1484,7 @@ string RepoRoot()
     Run(addChannel);
     nav.Refresh();
     Check(host.Calls.Contains("AskName:" + Loc.T("Settings.Audio.ChannelName", 5)), "Add channel suggests Channel 5");
+    Check(host.LastTitle == Loc.T("Dialog.Name.NewChannel"), "Add channel titles the prompt");
     Check(store.Current.AudioChannels.Last() is { Id: "c1", Name: "Channel 5" }, "Add channel appends c1 with the name");
     host.NextName = "   ";
     Run(nav.Handle(OverlayCommand.A));
@@ -1494,6 +1495,7 @@ string RepoRoot()
     while (nav.Selected?.Value() != "Channel 5") Run(nav.Handle(OverlayCommand.Right));
     Run(nav.Handle(OverlayCommand.A));
     Check(host.Calls.Last() == "AskName:Channel 5" && store.Current.AudioChannels.Last().Name == "Voice", "Rename asks with the current name and saves it");
+    Check(host.LastTitle == Loc.T("Dialog.Name.RenameChannel"), "Rename titles the prompt");
     Check(nav.Selected?.Value() == "Voice", "Rename keeps the renamed channel picked");
 
     store.Update(c => c.AudioPrograms[spotify] = "c1");
@@ -1528,6 +1530,7 @@ string RepoRoot()
     host.NextName = null;
     content.Audio().First(r => r.Key == "audio.savepreset").Action!();
     Check(host.Calls.Last() == "AskName:" + Loc.T("Overlay.Audio.PresetName", 3), "suggested name skips names in use");
+    Check(host.LastTitle == Loc.T("Dialog.Name.SavePreset"), "Save preset titles the prompt");
     store.Update(c => c.AudioPresets.RemoveAt(2));
     store.Update(c => c.AudioMix["spk"] = new DeviceMix(new() { ["game"] = new MixLevel(1.0, false), ["chat"] = new MixLevel(1.0, false) }, []));
     nav = Nav();
@@ -1615,6 +1618,17 @@ string RepoRoot()
     Check(nav.Footer()[0].Label == Loc.T("Overlay.Footer.Toggle"), "without ActionLabel the kind rule applies");
     nav.Handle(OverlayCommand.Down);
     Check(nav.Footer()[0].Label == "Silence" && nav.Footer().Any(f => f.Label == Loc.T("Overlay.Footer.Volume")), "ActionLabel on a slider");
+}
+
+// --- Pad while the name dialog is open ---------------------------------------
+{
+    Check(DialogPad.Route(OverlayCommand.A) == DialogPadAction.Accept, "pad A accepts the open name dialog");
+    Check(DialogPad.Route(OverlayCommand.B) == DialogPadAction.Cancel, "pad B cancels the open name dialog");
+    foreach (var command in Enum.GetValues<OverlayCommand>().Where(c => c is not (OverlayCommand.A or OverlayCommand.B)))
+        Check(DialogPad.Route(command) == DialogPadAction.Ignore, $"pad {command} is swallowed while the name dialog is open");
+    var strings = Loc.AllStrings(CultureInfo.InvariantCulture);
+    foreach (var key in new[] { "Dialog.Name.NewChannel", "Dialog.Name.RenameChannel", "Dialog.Name.SavePreset", "Dialog.Name.PadHint" })
+        Check(strings.ContainsKey(key), $"string {key} exists");
 }
 
 // --- Mouse entry points -----------------------------------------------------
@@ -1867,8 +1881,11 @@ sealed class FakeHost : IOverlayHost
     /// <summary>What the name dialog returns: null accepts the suggestion.</summary>
     public string? NextName { get; set; }
     public string? NextProgram { get; set; }
-    public void AskName(string suggested, Action<string> done)
+    /// <summary>Title of the last name prompt.</summary>
+    public string? LastTitle { get; private set; }
+    public void AskName(string title, string suggested, Action<string> done)
     {
+        LastTitle = title;
         Calls.Add("AskName:" + suggested);
         done(NextName ?? suggested);
     }
