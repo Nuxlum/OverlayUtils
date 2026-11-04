@@ -142,6 +142,15 @@ public sealed class PadInterpreter
         return percent switch { <= 10 => 0, <= 40 => 1, <= 70 => 2, _ => 3 };
     }
 
+    /// <summary>SDL power state and percent to a 0..100 percent (charged reports 100), or null if unknown or wired.</summary>
+    public static int? BatteryPercent(int sdlPowerState, int percent)
+    {
+        const int onBattery = 1, charging = 3, charged = 4;
+        if (sdlPowerState == charged) return 100;
+        if (sdlPowerState is not (onBattery or charging) || percent < 0) return null;
+        return Math.Min(percent, 100);
+    }
+
     /// <summary>Drops actions a duplicate pad already produced (see <see cref="DuplicateWindow"/>).</summary>
     private IReadOnlyList<PadAction> Emit(uint pad, IReadOnlyList<PadAction> actions)
     {

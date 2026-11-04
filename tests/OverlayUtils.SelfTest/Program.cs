@@ -713,6 +713,10 @@ string RepoRoot()
         && PadInterpreter.BatteryLevel(3, 70) == 2 && PadInterpreter.BatteryLevel(1, 71) == 3, "battery levels");
     Check(PadInterpreter.BatteryLevel(4, -1) == 3 && PadInterpreter.BatteryLevel(2, -1) == null
         && PadInterpreter.BatteryLevel(1, -1) == null && PadInterpreter.BatteryLevel(0, 50) == null, "battery unknown cases");
+    Check(PadInterpreter.BatteryPercent(1, 84) == 84 && PadInterpreter.BatteryPercent(3, 40) == 40
+        && PadInterpreter.BatteryPercent(4, -1) == 100, "battery percent known cases");
+    Check(PadInterpreter.BatteryPercent(2, -1) == null && PadInterpreter.BatteryPercent(1, -1) == null
+        && PadInterpreter.BatteryPercent(0, 50) == null, "battery percent unknown cases");
 }
 
 // --- Pad interpreter: duplicate pads and stale Back hold --------------------

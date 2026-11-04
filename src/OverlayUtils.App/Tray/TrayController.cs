@@ -271,7 +271,7 @@ internal sealed class TrayController : IOverlayHost, IDisposable
         {
             _pads = new PadService(new PadInterpreter()) { CombosEnabled = _config.Current.ControllerEnabled };
             _pads.ActionRaised += OnPadAction;
-            _pads.StateChanged += () => _overlay?.SetPadState(_pads.PadCount > 0, _pads.BatteryLevel);
+            _pads.StateChanged += () => _overlay?.SetPadState(_pads.PadCount > 0, _pads.BatteryLevel, _pads.BatteryPercent);
             if (_overlay is not null) _overlay.OpenChanged += open => { if (_pads is not null) _pads.OverlayOpen = open; };
             _pads.Start();
         }

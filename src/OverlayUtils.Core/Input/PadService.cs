@@ -19,6 +19,7 @@ public sealed class PadService : IDisposable
     private Thread? _thread;
     private volatile bool _stop;
     private int? _battery;
+    private int? _batteryPercent;
 
     public PadService(PadInterpreter interpreter) => _interpreter = interpreter;
 
@@ -33,6 +34,7 @@ public sealed class PadService : IDisposable
     public int PadCount { get { lock (_lock) return _pads.Count; } }
 
     public int? BatteryLevel { get { lock (_lock) return _battery; } }
+    public int? BatteryPercent { get { lock (_lock) return _batteryPercent; } }
 
     public bool OverlayOpen { set { lock (_lock) _interpreter.OverlayOpen = value; } }
 
@@ -154,7 +156,7 @@ public sealed class PadService : IDisposable
 
     private void UpdateBattery(bool force = false)
     {
-        int? level = null;
+        int? level = null, shown = null;
         lock (_lock)
         {
             var order = _interpreter.LastUsedPad is { } last && _pads.ContainsKey(last)
@@ -162,11 +164,14 @@ public sealed class PadService : IDisposable
                 : _pads.Keys.AsEnumerable();
             foreach (var id in order.ToList())
             {
-                level = PadInterpreter.BatteryLevel(Sdl.GetGamepadPowerInfo(_pads[id], out var percent), percent);
+                var state = Sdl.GetGamepadPowerInfo(_pads[id], out var percent);
+                level = PadInterpreter.BatteryLevel(state, percent);
+                shown = PadInterpreter.BatteryPercent(state, percent);
                 if (level is not null) break;
             }
-            if (!force && level == _battery) return;
+            if (!force && level == _battery && shown == _batteryPercent) return;
             _battery = level;
+            _batteryPercent = shown;
         }
         try { StateChanged?.Invoke(); }
         catch (Exception e) { Log.Error("Pad state", e); }

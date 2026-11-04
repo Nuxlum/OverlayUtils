@@ -44,6 +44,9 @@ internal sealed class OverlayController : IDisposable
     int _renderQueued;
     bool _padConnected;
     int? _battery;
+
+    /// <summary>Pad battery percent; drawn by the full-screen frame (Task 7).</summary>
+    public int? BatteryPercent { get; private set; }
     nint _prev;            // foreground app when the overlay opened; kept after hiding for the action that follows
     bool _hadFocus;
     RectI _placement;
@@ -110,10 +113,11 @@ internal sealed class OverlayController : IDisposable
     }
 
     /// <summary>Pad connected (footer shows pad buttons) and battery level for the header. Any thread.</summary>
-    public void SetPadState(bool padConnected, int? batteryLevel) => OnUi(() =>
+    public void SetPadState(bool padConnected, int? batteryLevel, int? batteryPercent) => OnUi(() =>
     {
         _padConnected = padConnected;
         _battery = batteryLevel;
+        BatteryPercent = batteryPercent;
         if (_open) Render();
     });
 
