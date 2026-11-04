@@ -71,7 +71,8 @@ public static class SteamLibrary
             if (ExcludedAppIds.Contains(appid) || name.Contains("redistributable", StringComparison.OrdinalIgnoreCase)) continue;
             long.TryParse(state.Value("LastPlayed"), out var lastPlayed);
             yield return new GameEntry($"steam:{appid}", GameSource.Steam, name, $"steam://rungameid/{appid}",
-                lastPlayed, Art(root, appid), null);
+                lastPlayed, Art(root, appid), null,
+                InstallDir: state.Value("installdir") is { Length: > 0 } dir ? GamePaths.Full(Path.Combine(steamapps, "common", dir)) : null);
         }
     }
 
@@ -126,7 +127,8 @@ public static class SteamLibrary
             int.TryParse(entry.Value("lastplaytime"), out var lastPlayed);
             var name = entry.Value("appname") is { Length: > 0 } n ? n : $"Shortcut {appid}";
             games.Add(new GameEntry($"steam:{gameId}", GameSource.Steam, name, $"steam://rungameid/{gameId}",
-                Math.Max(0, lastPlayed), ShortcutArt(grid, appid, entry.Value("icon")), ShortcutExe(entry.Value("exe"))));
+                Math.Max(0, lastPlayed), ShortcutArt(grid, appid, entry.Value("icon")), ShortcutExe(entry.Value("exe")),
+                InstallDir: GamePaths.Full(Path.GetDirectoryName(entry.Value("exe")?.Trim().Trim('"')))));
         }
         return games;
     }

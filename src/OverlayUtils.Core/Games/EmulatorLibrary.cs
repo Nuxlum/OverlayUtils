@@ -53,7 +53,8 @@ public static class EmulatorLibrary
                           ?? FromIcon(registry.GetString(hive, key, "DisplayIcon"), known.Exes);
                 if (exe is null) continue;
                 var id = "emulator:" + exe.ToLowerInvariant();
-                found.TryAdd(id, new GameEntry(id, GameSource.Emulator, name, exe, 0, null, exe, Path.GetDirectoryName(exe)));
+                found.TryAdd(id, new GameEntry(id, GameSource.Emulator, name, exe, 0, null, exe, Path.GetDirectoryName(exe),
+                    InstallDir: GamePaths.Full(Path.GetDirectoryName(exe))));
             }
         }
         return found.Values.ToList();

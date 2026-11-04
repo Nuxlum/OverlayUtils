@@ -13,7 +13,8 @@ public static class ManualApps
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) continue;
             var id = "app:" + path.ToLowerInvariant();
             if (games.Any(g => g.Id == id)) continue;
-            games.Add(new GameEntry(id, GameSource.App, TitleOf(path), path, 0, null, path, Path.GetDirectoryName(path)));
+            games.Add(new GameEntry(id, GameSource.App, TitleOf(path), path, 0, null, path, Path.GetDirectoryName(path),
+                InstallDir: GamePaths.Full(Path.GetDirectoryName(path))));
         }
         return games;
     }

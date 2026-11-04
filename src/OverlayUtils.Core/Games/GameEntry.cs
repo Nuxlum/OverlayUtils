@@ -15,4 +15,16 @@ public sealed record GameEntry(
     string? ArtPath,
     string? IconPath,
     string? WorkingDir = null,
-    string? Arguments = null); // for an exe target (GOG launchParam)
+    string? Arguments = null, // for an exe target (GOG launchParam)
+    string? InstallDir = null); // the game's install folder, for matching the running game
+
+static class GamePaths
+{
+    /// <summary>The full form of a folder path, or null when it is empty or not a valid path.</summary>
+    public static string? Full(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        try { return Path.GetFullPath(path.Trim()); }
+        catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException) { return null; }
+    }
+}

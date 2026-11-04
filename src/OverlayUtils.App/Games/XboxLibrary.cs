@@ -40,7 +40,7 @@ internal static class XboxLibrary
                 var title = entry.DisplayInfo.DisplayName is { Length: > 0 } name ? name
                     : configTitle ?? package.DisplayName;
                 games.Add(new GameEntry("xbox:" + package.Id.FamilyName.ToLowerInvariant(), GameSource.Xbox, title,
-                    @"shell:AppsFolder\" + entry.AppUserModelId, 0, null, logo));
+                    @"shell:AppsFolder\" + entry.AppUserModelId, 0, null, logo, InstallDir: GamePaths.Full(folder)));
             }
             catch (Exception e)
             {

@@ -46,8 +46,10 @@ public static class EpicLibrary
             return null;
         var title = Text(m, "DisplayName") ?? app;
         var exe = Text(m, "InstallLocation") is { } dir && Text(m, "LaunchExecutable") is { } launch ? Path.Combine(dir, launch) : null;
+        var installDir = GamePaths.Full(Text(m, "InstallLocation"));
         return new GameEntry($"epic:{app}", GameSource.Epic, title,
-            $"com.epicgames.launcher://apps/{Uri.EscapeDataString(app)}?action=launch&silent=true", 0, null, exe);
+            $"com.epicgames.launcher://apps/{Uri.EscapeDataString(app)}?action=launch&silent=true", 0, null, exe,
+            InstallDir: installDir);
     }
 
     static string? Text(JsonElement m, string name) =>

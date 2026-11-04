@@ -1972,11 +1972,12 @@ string RepoRoot()
     Directory.CreateDirectory(Path.Combine(lib2, "steamapps"));
     File.WriteAllText(Path.Combine(root, "steamapps", "libraryfolders.vdf"),
         "\"libraryfolders\"\n{\n \"0\"\n {\n  \"path\" \"" + root.Replace("\\", "\\\\") + "\"\n }\n \"1\"\n {\n  \"path\" \"" + lib2.Replace("\\", "\\\\") + "\"\n  \"label\" \"say \\\"hi\\\"\"\n }\n}\n");
-    void Manifest(string lib, int appid, string name, long lastPlayed) =>
+    void Manifest(string lib, int appid, string name, long lastPlayed, string? installDir = null) =>
         File.WriteAllText(Path.Combine(lib, "steamapps", $"appmanifest_{appid}.acf"),
-            $"\"AppState\"\n{{\n \"appid\" \"{appid}\"\n \"name\" \"{name}\"\n \"LastPlayed\" \"{lastPlayed}\"\n}}\n");
+            $"\"AppState\"\n{{\n \"appid\" \"{appid}\"\n \"name\" \"{name}\"\n \"LastPlayed\" \"{lastPlayed}\"\n"
+            + (installDir is null ? "" : $" \"installdir\" \"{installDir}\"\n") + "}\n");
     Manifest(root, 10, "Alpha™", 100);
-    Manifest(lib2, 20, "ゼルダ Beta", 300);
+    Manifest(lib2, 20, "ゼルダ Beta", 300, "Ember Hollow");
     Manifest(root, 228980, "Steamworks Common Redistributables", 0);
     File.WriteAllText(Path.Combine(root, "steamapps", "appmanifest_99.acf"), "garbage {{{");
 
@@ -2021,6 +2022,9 @@ string RepoRoot()
         && shortcut.LaunchTarget == $"steam://rungameid/{gameId}" && shortcut.LastPlayed == 200, "non-Steam shortcut read");
     Check(shortcut?.ArtPath?.EndsWith("p.png") == true, "shortcut grid art found");
     Check(games.Count == 3, "garbled manifest ignored");
+    Check(beta?.InstallDir == Path.Combine(lib2, "steamapps", "common", "Ember Hollow"), "Steam installdir resolved under the library's steamapps/common");
+    Check(alpha?.InstallDir is null, "Steam manifest without installdir: no install folder");
+    Check(shortcut?.InstallDir == @"C:\Games\My Emu", "Steam shortcut: install folder is the exe's folder");
 
     Check(SteamLibrary.Read(new FakeRegistry()).Count == 0, "no Steam installed: empty, no throw");
     var truncated = Path.Combine(config, "shortcuts.vdf");
@@ -2045,6 +2049,7 @@ string RepoRoot()
     var epic = EpicLibrary.Read(reg);
     Check(epic.Count == 1 && epic[0].Id == "epic:Fort" && epic[0].Title == "Fortnite & Friends"
         && epic[0].LaunchTarget == "com.epicgames.launcher://apps/Fort?action=launch&silent=true", "Epic game read, DLC/apps/garbage skipped");
+    Check(epic[0].InstallDir == @"D:\Epic Games\Fort", "Epic InstallLocation is the install folder");
     Check(EpicLibrary.Read(new FakeRegistry()).Count == 0, "no Epic: empty");
 
     // GOG: games from GOG's registry entries.
@@ -2058,10 +2063,20 @@ string RepoRoot()
     reg.Set(hk, gogKey + @"\1207664643", "exe", gogExe);
     reg.Set(hk, gogKey + @"\1207664643", "workingDir", gogDir);
     reg.Set(hk, gogKey + @"\1207664643", "launchParam", "-conf \"witcher.conf\"");
+    reg.Set(hk, gogKey + @"\1207664643", "path", gogDir);
     reg.Set(hk, gogKey + @"\555", "gameName", "A DLC");
-    var gog = GogLibrary.Read(reg);
-    Check(gog.Count == 1 && gog[0].Id == "gog:1207664643" && gog[0].LaunchTarget == gogExe && gog[0].WorkingDir == gogDir,
+    var gogDir2 = Path.Combine(temp, "gog", "Other Game");
+    Directory.CreateDirectory(gogDir2);
+    var gogExe2 = Path.Combine(gogDir2, "other.exe");
+    File.WriteAllText(gogExe2, "x");
+    reg.Set(hk, gogKey + @"\777", "gameName", "Other Game");
+    reg.Set(hk, gogKey + @"\777", "exe", gogExe2);
+    var gogAll = GogLibrary.Read(reg);
+    var gog = gogAll.Where(g => g.Id == "gog:1207664643").ToList();
+    Check(gogAll.Count == 2 && gog.Count == 1 && gog[0].LaunchTarget == gogExe && gog[0].WorkingDir == gogDir,
         "GOG game read with its working directory; entry without exe skipped");
+    Check(gog[0].InstallDir == gogDir, "GOG registry path is the install folder");
+    Check(gogAll.Single(g => g.Id == "gog:777").InstallDir == gogDir2, "GOG without path: the exe's folder");
     Check(gog[0].Arguments == "-conf \"witcher.conf\"", "GOG launchParam kept as the arguments (DOSBox / ScummVM games)");
 
     // Emulators: uninstall entries matched by name, exe must exist.
@@ -2090,6 +2105,7 @@ string RepoRoot()
     Check(emulators.ContainsKey("RetroArch 1.19") && emulators.ContainsKey("Dolphin"), "installed emulators detected");
     Check(!emulators.ContainsKey("Notepad++") && !emulators.ContainsKey("PCSX2"), "unrelated apps and missing exes skipped");
     Check(emulators["Dolphin"].LaunchTarget == dolphinExe && emulators["Dolphin"].Source == GameSource.Emulator, "emulator exe from DisplayIcon");
+    Check(emulators["Dolphin"].InstallDir == Path.GetDirectoryName(dolphinExe) && emulators["RetroArch 1.19"].InstallDir == raDir, "emulator install folder is the exe's folder");
     Check(emulators["melonDS"].LaunchTarget == Path.Combine(meloDir, "melonDS.exe"), "a DisplayIcon pointing at the uninstaller is not used");
 
     // Hand-added apps.
@@ -2099,6 +2115,8 @@ string RepoRoot()
     var apps = ManualApps.Read([appExe, Path.Combine(temp, "apps", "gone.exe")]);
     Check(apps.Count == 1 && apps[0].Title == "quiver" && apps[0].LaunchTarget == appExe && apps[0].Id == "app:" + appExe.ToLowerInvariant(),
         "hand-added app read (path with spaces and &), missing one skipped");
+
+    Check(apps[0].InstallDir == Path.GetDirectoryName(appExe), "hand-added app install folder is the exe's folder");
 
     // Library rules.
     GameEntry G(string id, GameSource src, string title, long played = 0) => new(id, src, title, "x", played, null, null);
