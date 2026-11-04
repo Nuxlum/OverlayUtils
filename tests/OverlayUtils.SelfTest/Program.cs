@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using OverlayUtils.Core;
 using OverlayUtils.Core.Audio;
 using OverlayUtils.Core.Config;
+using OverlayUtils.Core.Games;
 using OverlayUtils.Core.Input;
 using OverlayUtils.Core.Legacy;
 using OverlayUtils.Core.Localization;
@@ -1948,6 +1949,70 @@ string RepoRoot()
     Check(noSwitch.Check(At(28.5), true) == BreakerDecision.Allowed, "resumes after 10 s without events");
 }
 
+// --- Steam library ----------------------------------------------------------
+{
+    var root = Path.Combine(temp, "steam", "Steam Root");
+    var lib2 = Path.Combine(temp, "steam", "Library Two");
+    Directory.CreateDirectory(Path.Combine(root, "steamapps"));
+    Directory.CreateDirectory(Path.Combine(lib2, "steamapps"));
+    File.WriteAllText(Path.Combine(root, "steamapps", "libraryfolders.vdf"),
+        "\"libraryfolders\"\n{\n \"0\"\n {\n  \"path\" \"" + root.Replace("\\", "\\\\") + "\"\n }\n \"1\"\n {\n  \"path\" \"" + lib2.Replace("\\", "\\\\") + "\"\n  \"label\" \"say \\\"hi\\\"\"\n }\n}\n");
+    void Manifest(string lib, int appid, string name, long lastPlayed) =>
+        File.WriteAllText(Path.Combine(lib, "steamapps", $"appmanifest_{appid}.acf"),
+            $"\"AppState\"\n{{\n \"appid\" \"{appid}\"\n \"name\" \"{name}\"\n \"LastPlayed\" \"{lastPlayed}\"\n}}\n");
+    Manifest(root, 10, "Alpha™", 100);
+    Manifest(lib2, 20, "ゼルダ Beta", 300);
+    Manifest(root, 228980, "Steamworks Common Redistributables", 0);
+    File.WriteAllText(Path.Combine(root, "steamapps", "appmanifest_99.acf"), "garbage {{{");
+
+    var cache = Path.Combine(root, "appcache", "librarycache");
+    Directory.CreateDirectory(Path.Combine(cache, "20", "abcdef"));
+    File.WriteAllText(Path.Combine(cache, "20", "abcdef", "library_600x900.jpg"), "x");
+    File.WriteAllText(Path.Combine(cache, "10_library_600x900.jpg"), "x");
+
+    // Binary shortcuts.vdf: 0x00 map, 0x01 string, 0x02 int32, 0x08 end.
+    var user = "123";
+    var config = Path.Combine(root, "userdata", user, "config");
+    Directory.CreateDirectory(Path.Combine(config, "grid"));
+    var bytes = new List<byte>();
+    void Str(string s) { bytes.AddRange(System.Text.Encoding.UTF8.GetBytes(s)); bytes.Add(0); }
+    void Map(string key) { bytes.Add(0x00); Str(key); }
+    void Text(string key, string value) { bytes.Add(0x01); Str(key); Str(value); }
+    void Int(string key, int value) { bytes.Add(0x02); Str(key); bytes.AddRange(BitConverter.GetBytes(value)); }
+    Map("shortcuts"); Map("0");
+    Text("AppName", "My Emu & Co"); Text("Exe", "\"C:\\Games\\My Emu\\emu.exe\""); Int("appid", unchecked((int)0x9ABCDEF0)); Int("LastPlayTime", 200);
+    bytes.Add(0x08); bytes.Add(0x08); bytes.Add(0x08);
+    File.WriteAllBytes(Path.Combine(config, "shortcuts.vdf"), bytes.ToArray());
+    File.WriteAllText(Path.Combine(config, "grid", $"{0x9ABCDEF0u}p.png"), "x");
+
+    var reg = new FakeRegistry();
+    reg.Set(Microsoft.Win32.RegistryHive.CurrentUser, @"Software\Valve\Steam", "SteamPath", root);
+    reg.Set(Microsoft.Win32.RegistryHive.CurrentUser, @"Software\Valve\Steam\ActiveProcess", "ActiveUser", user);
+
+    var text = Vdf.ParseText("\"a\" { \"b\" \"1\" \"c\" { \"d\" \"x \\\"y\\\"\" } }");
+    Check(text.Get("a")?.Get("c")?.Value("d") == "x \"y\"", "text VDF: nested blocks and escaped quotes");
+
+    var games = SteamLibrary.Read(reg);
+    var byId = games.ToDictionary(g => g.Id);
+    Check(byId.ContainsKey("steam:10") && byId.ContainsKey("steam:20"), "both library folders scanned");
+    Check(!byId.ContainsKey("steam:228980"), "redistributables skipped");
+    Check(byId.TryGetValue("steam:10", out var alpha) && alpha.Title == "Alpha™" && alpha.LastPlayed == 100
+        && alpha.LaunchTarget == "steam://rungameid/10", "manifest fields and launch URL");
+    Check(byId.TryGetValue("steam:20", out var beta) && beta.Title == "ゼルダ Beta", "unicode title kept");
+    Check(beta?.ArtPath?.EndsWith("library_600x900.jpg") == true, "art found in the per-game folder");
+    Check(alpha?.ArtPath?.EndsWith("10_library_600x900.jpg") == true, "art found in the flat layout");
+    var gameId = ((ulong)0x9ABCDEF0u << 32) | 0x02000000;
+    Check(byId.TryGetValue($"steam:{gameId}", out var shortcut) && shortcut.Title == "My Emu & Co"
+        && shortcut.LaunchTarget == $"steam://rungameid/{gameId}" && shortcut.LastPlayed == 200, "non-Steam shortcut read");
+    Check(shortcut?.ArtPath?.EndsWith("p.png") == true, "shortcut grid art found");
+    Check(games.Count == 3, "garbled manifest ignored");
+
+    Check(SteamLibrary.Read(new FakeRegistry()).Count == 0, "no Steam installed: empty, no throw");
+    var truncated = Path.Combine(config, "shortcuts.vdf");
+    File.WriteAllBytes(truncated, bytes.Take(bytes.Count / 2).ToArray());
+    Check(SteamLibrary.Read(reg).Count == 2, "truncated shortcuts.vdf: shortcuts skipped, games kept");
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;
@@ -2019,4 +2084,27 @@ sealed class FakeAudio : IAudioView
     public List<AudioApp> AppList { get; } = [];
     public IReadOnlyList<AudioApp> Apps => AppList;
     public void ApplyMix() => Calls.Add("ApplyMix");
+}
+
+sealed class FakeRegistry : IRegistryView
+{
+    readonly Dictionary<string, string> _values = new(StringComparer.OrdinalIgnoreCase);
+    readonly Dictionary<string, List<string>> _subKeys = new(StringComparer.OrdinalIgnoreCase);
+    static string K(Microsoft.Win32.RegistryHive hive, string key, bool wow64) => $"{hive}|{wow64}|{key}";
+    public void Set(Microsoft.Win32.RegistryHive hive, string key, string value, string data, bool wow64 = false)
+    {
+        _values[K(hive, key, wow64) + "|" + value] = data;
+        var slash = key.LastIndexOf((char)92);
+        if (slash > 0)
+        {
+            var parent = K(hive, key[..slash], wow64);
+            if (!_subKeys.TryGetValue(parent, out var list)) _subKeys[parent] = list = [];
+            var child = key[(slash + 1)..];
+            if (!list.Contains(child, StringComparer.OrdinalIgnoreCase)) list.Add(child);
+        }
+    }
+    public string? GetString(Microsoft.Win32.RegistryHive hive, string key, string value, bool wow64 = false) =>
+        _values.TryGetValue(K(hive, key, wow64) + "|" + value, out var data) ? data : null;
+    public IReadOnlyList<string> SubKeys(Microsoft.Win32.RegistryHive hive, string key, bool wow64 = false) =>
+        _subKeys.TryGetValue(K(hive, key, wow64), out var list) ? list : [];
 }
