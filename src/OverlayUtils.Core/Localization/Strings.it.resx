@@ -6,6 +6,7 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="Dialog.AlreadyRunning" xml:space="preserve"><value>OverlayUtils è già in esecuzione: cerca la sua icona vicino all'orologio.</value></data>
+  <data name="Dialog.ChooseProgram.Filter" xml:space="preserve"><value>Programmi|*.exe</value></data>
   <data name="Dialog.ChooseSwitcher.Filter" xml:space="preserve"><value>MonitorSwitcher|MonitorSwitcher.exe|Programmi|*.exe</value></data>
   <data name="Dialog.FullMode.Cancelled" xml:space="preserve"><value>Non sono stati concessi i permessi di amministratore, quindi non è cambiato niente.</value></data>
   <data name="Dialog.FullMode.CopyFailed" xml:space="preserve"><value>Impossibile copiare OverlayUtils. I dettagli sono in errors.log (menu dell'icona → Apri la cartella delle impostazioni).</value></data>
@@ -31,6 +32,9 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
 
 Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Dialog.Legacy.Done" xml:space="preserve"><value>La vecchia AppUtili è stata rimossa.</value></data>
+  <data name="Dialog.Name.Cancel" xml:space="preserve"><value>Annulla</value></data>
+  <data name="Dialog.Name.Ok" xml:space="preserve"><value>OK</value></data>
+  <data name="Dialog.Name.Title" xml:space="preserve"><value>Nome</value></data>
   <data name="Channel.chat" xml:space="preserve"><value>Chat</value></data>
   <data name="Channel.game" xml:space="preserve"><value>Gioco</value></data>
   <data name="Channel.media" xml:space="preserve"><value>Media</value></data>
@@ -119,6 +123,7 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.CloseWindow.Desc" xml:space="preserve"><value>Chiude la finestra che era in primo piano prima dell'overlay.</value></data>
   <data name="Overlay.CloseWindow.Label" xml:space="preserve"><value>Chiudi finestra</value></data>
   <data name="Overlay.ConfirmPending" xml:space="preserve"><value>Conferma?</value></data>
+  <data name="Overlay.Footer.Apply" xml:space="preserve"><value>Applica</value></data>
   <data name="Overlay.Footer.Back" xml:space="preserve"><value>Indietro</value></data>
   <data name="Overlay.Footer.Change" xml:space="preserve"><value>Cambia</value></data>
   <data name="Overlay.Footer.Close" xml:space="preserve"><value>Chiudi</value></data>
@@ -135,6 +140,7 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.Footer.Mute" xml:space="preserve"><value>Muto</value></data>
   <data name="Overlay.Footer.PickUp" xml:space="preserve"><value>Prendi</value></data>
   <data name="Overlay.Footer.PlayPause" xml:space="preserve"><value>Play / pausa</value></data>
+  <data name="Overlay.Footer.Rename" xml:space="preserve"><value>Rinomina</value></data>
   <data name="Overlay.Footer.Track" xml:space="preserve"><value>Traccia</value></data>
   <data name="Overlay.Footer.Volume" xml:space="preserve"><value>Volume</value></data>
   <data name="Overlay.Footer.Toggle" xml:space="preserve"><value>Attiva/disattiva</value></data>

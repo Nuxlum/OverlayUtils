@@ -315,6 +315,7 @@ public sealed class OverlayContent
                 Description = () => Loc.T("Overlay.Audio.Presets.Desc"),
                 Value = PresetPick,
                 Step = StepPreset,
+                ActionLabel = () => Loc.T("Overlay.Footer.Apply"),
                 Toggle = () =>
                 {
                     if (PresetPick() is { Length: > 0 } name) Mix.ApplyPreset(name);
@@ -419,6 +420,7 @@ public sealed class OverlayContent
             Label = () => Loc.T("Settings.Audio.Rename"),
             Description = () => Loc.T("Settings.Audio.Rename.Desc"),
             Value = () => RenamePick() is { } pick ? ChannelName(pick) : "",
+            ActionLabel = () => Loc.T("Overlay.Footer.Rename"),
             Step = direction =>
             {
                 var channels = Mix.Channels;

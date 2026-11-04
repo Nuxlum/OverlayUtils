@@ -21,11 +21,12 @@ internal sealed record FooterVm(string Keys, string Label, OverlayCommand? Comma
 /// <summary>
 /// One visible row. <see cref="Index"/> is the navigator index, so clicks map back to it. <see cref="IsOn"/> is the
 /// switch for Toggle/Expander, the mute for Slider and "playing" for Media; <see cref="Level"/> is the Slider's 0..1;
-/// <see cref="IsHeld"/> marks a picked-up Reorder row.
+/// <see cref="IsHeld"/> marks a picked-up Reorder row; <see cref="Child"/> an indented row (an app under its channel).
 /// </summary>
 internal sealed record RowVm(
     int Index, string? Section, string Icon, string Label, ItemKind Kind, string Value, bool IsOn, string Hint,
-    bool HasChevron, bool IsSelected, IReadOnlyList<OptionVm> Options, double Level = 0, bool IsHeld = false)
+    bool HasChevron, bool IsSelected, IReadOnlyList<OptionVm> Options, double Level = 0, bool IsHeld = false,
+    bool Child = false)
 {
     public const double SliderWidth = 120; // Python _render_slider bar length
     const double KnobRadius = 7;
@@ -125,7 +126,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
             rows.Add(new RowVm(i, string.IsNullOrEmpty(section) ? null : section.ToUpper(Loc.Culture), item.Icon,
                 item.Label(), item.Kind, value, isOn, hint,
                 item.Kind == ItemKind.Action && hint.Length == 0 && (item.Stay || item.OpensInfo || item.SubPage != null),
-                selected, options, sliderLevel, selected && nav.Holding));
+                selected, options, sliderLevel, selected && nav.Holding, item.Child));
         }
         Rows = rows;
         Description = nav.Description();

@@ -1,0 +1,67 @@
+<!--
+  Small name prompt opened from the overlay (add / rename a channel, save a preset). Topmost and owned by the overlay
+  so the panel never covers it; dark like the overlay. The text box starts with the suggested name selected, so
+  Enter (or OK) accepts it as is. Colours and fonts from OverlayTheme.xaml.
+-->
+<Window x:Class="OverlayUtils.App.Overlay.NameDialog" x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" ShowActivated="True"
+        AllowsTransparency="True" Background="Transparent" SizeToContent="Height" Width="340"
+        WindowStartupLocation="CenterOwner" FontFamily="{DynamicResource TextFont}"
+        Foreground="{DynamicResource Text}" UseLayoutRounding="True" PreviewKeyDown="OnPreviewKeyDown">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="OverlayTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="DialogButton" TargetType="Button">
+                <Setter Property="MinWidth" Value="88" />
+                <Setter Property="Height" Value="32" />
+                <Setter Property="Margin" Value="8,0,0,0" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Foreground" Value="{StaticResource Text}" />
+                <Setter Property="Background" Value="{StaticResource Surface}" />
+                <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Grid>
+                                <Border CornerRadius="6" Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" />
+                                <Border x:Name="HoverLayer" CornerRadius="6" Background="{StaticResource Hover}"
+                                        Visibility="Collapsed" />
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Margin="14,0" />
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="HoverLayer" Property="Visibility" Value="Visible" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Border CornerRadius="10" Background="{StaticResource Bg}" BorderBrush="{StaticResource Line}" BorderThickness="1">
+        <StackPanel Margin="18,16,18,16">
+            <TextBlock x:Name="Prompt" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10" />
+            <TextBox x:Name="NameBox" Height="34" FontSize="14" Padding="8,0" VerticalContentAlignment="Center"
+                     Foreground="{StaticResource Text}" Background="{StaticResource SegmentBg}"
+                     BorderBrush="{DynamicResource Accent}" BorderThickness="1" CaretBrush="{StaticResource Text}"
+                     SelectionBrush="{DynamicResource Accent}" MaxLength="40" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                <Button x:Name="OkButton" Style="{StaticResource DialogButton}" Click="OnOk" />
+                <Button x:Name="CancelButton" Style="{StaticResource DialogButton}" Click="OnCancel" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

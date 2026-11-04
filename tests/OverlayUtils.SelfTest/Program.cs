@@ -1462,6 +1462,8 @@ string RepoRoot()
     Check(store.Current.AudioChannels[0].Icon == Glyphs.ChannelIconNames[^1], "Left wraps the icons");
     Run(nav.Handle(OverlayCommand.Right));
     Check(nav.Footer().Any(f => f.Keys == "← →" && f.Label == Loc.T("Overlay.Footer.Icon")), "footer: arrows change the icon");
+    Check(channels.SubPage!().First(r => r.Key == "channels.rename").ActionLabel?.Invoke() == Loc.T("Overlay.Footer.Rename"),
+        "Rename names its A action");
     Run(nav.Handle(OverlayCommand.A));
     Run(nav.Handle(OverlayCommand.Down));
     Check(nav.Holding && store.Current.AudioChannels[0].Id == "game", "picked up; config unchanged while holding");
@@ -1532,6 +1534,7 @@ string RepoRoot()
     Run(nav.Handle(OverlayCommand.NextTab));
     while (nav.Selected?.Key != "audio.presets") nav.Handle(OverlayCommand.Down);
     Check(nav.Selected?.Value() == "preset 1", "Presets starts on the first preset");
+    Check(nav.Footer()[0] == new FooterHint("Enter", Loc.T("Overlay.Footer.Apply"), OverlayCommand.A), "footer: A applies on Presets");
     Run(nav.Handle(OverlayCommand.Right));
     Check(nav.Selected?.Value() == "Night" && Stored("spk").Channels["game"].Volume == 1.0, "Right picks the next preset without applying");
     Run(nav.Handle(OverlayCommand.Right));
@@ -1593,6 +1596,25 @@ string RepoRoot()
         Loc.SetLanguage("en");
     }
     Check(content.Audio().First(r => r.Key == "ch.other").Label() == "Other", "English: default names as stored");
+}
+
+// --- Footer: an item names its A action --------------------------------------
+{
+    OverlayItem[] rows =
+    [
+        new() { Kind = ItemKind.Choice, Label = () => "Named", Step = _ => { }, Toggle = () => { }, ActionLabel = () => "Go" },
+        new() { Kind = ItemKind.Choice, Label = () => "Plain", Step = _ => { }, Toggle = () => { } },
+        new() { Kind = ItemKind.Slider, Label = () => "Level", Value = () => "50%", Toggle = () => { }, ActionLabel = () => "Silence" },
+    ];
+    var nav = new OverlayNavigator([new OverlayTab("t", () => "T", () => rows)], () => [], () => []);
+    nav.Reset([]);
+    Check(nav.Footer()[0] == new FooterHint("Enter", "Go", OverlayCommand.A), "ActionLabel replaces the A label");
+    Check(nav.Footer(pad: true)[0] == new FooterHint("A", "Go", OverlayCommand.A), "ActionLabel on the pad footer too");
+    Check(nav.Footer().Any(f => f.Keys == "← →" && f.Label == Loc.T("Overlay.Footer.Change")), "ActionLabel keeps the arrow hint");
+    nav.Handle(OverlayCommand.Down);
+    Check(nav.Footer()[0].Label == Loc.T("Overlay.Footer.Toggle"), "without ActionLabel the kind rule applies");
+    nav.Handle(OverlayCommand.Down);
+    Check(nav.Footer()[0].Label == "Silence" && nav.Footer().Any(f => f.Label == Loc.T("Overlay.Footer.Volume")), "ActionLabel on a slider");
 }
 
 // --- Mouse entry points -----------------------------------------------------

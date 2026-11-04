@@ -53,6 +53,23 @@ connected (turn this off per list in Settings). A choice made by hand in the
 Audio tab holds until the next device change. "Max volume" limits the volume
 of an output device from the overlay and the pad.
 
+CHANNELS AND PRESETS
+--------------------
+Under Channels the Audio tab shows Game, Chat, Media and Other, each followed
+by the programs playing sound in it. Left/Right change the volume of a channel
+or of one program, A mutes it; a program's real volume is channel x program.
+Programs land in a channel by themselves the first time they play (voice apps
+in Chat, browsers and players in Media, games in Game, the rest in Other).
+Volumes are kept per output device: the headset and the speakers each have
+their own mix.
+Presets: "Save preset..." stores the channel volumes under a name; on the
+Preset row Left/Right pick one and A applies it to the current device.
+Settings -> Audio -> Channels: A picks a channel up to reorder it, Left/Right
+change its icon, "Add channel..." and "Rename..." ask for a name (Enter keeps
+the suggested one), Y deletes a channel you added (its programs go to Other).
+Settings -> Audio -> Programs: Left/Right move a program to another channel;
+"Add program..." picks an .exe before it ever plays.
+
 OVERLAY OVER FULLSCREEN GAMES (optional)
 ----------------------------------------
 By default the overlay works over the desktop, windows, borderless games and
@@ -141,6 +158,25 @@ scolleghi un dispositivo, Windows passa al primo della lista tra quelli
 collegati (si disattiva per ogni lista nelle Impostazioni). Una scelta fatta
 a mano nella scheda Audio vale fino al prossimo cambio di dispositivi.
 "Volume massimo" limita il volume di un'uscita dall'overlay e dal pad.
+
+CANALI E PRESET
+---------------
+Sotto Canali la scheda Audio mostra Gioco, Chat, Media e Altro, ognuno
+seguito dai programmi che vi stanno suonando. Sinistra/Destra cambiano il
+volume di un canale o di un programma, A lo silenzia; il volume reale di un
+programma è canale x programma. I programmi finiscono da soli in un canale la
+prima volta che suonano (app vocali in Chat, browser e lettori in Media,
+giochi in Gioco, il resto in Altro). I volumi sono salvati per ogni uscita:
+cuffie e casse hanno ciascuna il proprio mix.
+Preset: "Salva preset..." salva i volumi dei canali con un nome; sulla riga
+Preset Sinistra/Destra ne scelgono uno e A lo applica all'uscita attuale.
+Impostazioni -> Audio -> Canali: A solleva un canale per riordinarlo,
+Sinistra/Destra cambiano l'icona, "Aggiungi canale..." e "Rinomina..."
+chiedono un nome (Invio tiene quello proposto), Y elimina un canale aggiunto
+da te (i suoi programmi vanno in Altro).
+Impostazioni -> Audio -> Programmi: Sinistra/Destra spostano un programma in
+un altro canale; "Aggiungi programma..." sceglie un .exe prima ancora che
+suoni.
 
 OVERLAY SOPRA I GIOCHI A SCHERMO INTERO (facoltativo)
 -----------------------------------------------------

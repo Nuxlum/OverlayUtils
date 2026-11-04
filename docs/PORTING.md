@@ -57,8 +57,8 @@ warnings, self-test passes; nothing tested with a real pad yet.
 
 ### Stage 4 - audio and media  `[~]`
 Design: `docs/superpowers/specs/2026-11-03-audio-design.md`, built in two
-parts. Part 4a builds with 0 warnings and the self-test passes; nothing tested
-with real devices yet.
+parts. Parts 4a and 4b build with 0 warnings and the self-test passes; nothing
+tested with real devices yet.
 
 #### 4a - devices  `[~]`
 - [~] Audio tab: Output and Input pickers, Volume, Now playing  *(VOLUME..., USCITA AUDIO, MEDIA IN RIPRODUZIONE)*
@@ -69,10 +69,12 @@ with real devices yet.
 - [~] Now playing from the Windows media session (GlobalSystemMediaTransportControls), no Spotify-specific code
 - [~] Overlay entry in the tray menu
 
-#### 4b - mixing  `[ ]`
-- [ ] Channels (Game, Chat, Media, Other) with per-app volumes, automatic assignment, Programs page
-- [ ] Custom channels, mix per output device, presets
-- [ ] Sonar: no integration planned; its virtual devices are ordinary entries in the priority lists
+#### 4b - mixing  `[~]`
+Plan: `docs/superpowers/plans/2026-11-04-audio-mixing.md`.
+- [~] Channels (Game, Chat, Media, Other) with per-app volumes, automatic assignment, Programs page (+ "Add program..." file picker)
+- [~] Custom channels (add, rename, icon, order, delete), mix per output device, presets; name dialog owned by the overlay
+- [~] Auto-switch circuit breaker (3 switches per direction in 10 s, then paused until a quiet device event)
+- [~] Sonar: no integration planned; its virtual devices are ordinary entries in the priority lists
 
 ### Stage 5 - Steam library  `[ ]`
 - [ ] Installed games, non-Steam shortcuts (binary VDF), artwork, launch  *(LIBRERIA GIOCHI)*
@@ -146,6 +148,44 @@ so the first tests change the default devices on purpose.
 9. Open the overlay, change the volume from the Windows flyout: the Volume
    row updates at once. Hide the Audio tab in Settings -> Tabs while the
    overlay is open: it disappears at once.
+
+## Testing on Windows (stage 4b)
+
+Needs the headset and the speakers (two outputs), Discord, a browser and a
+game. Nothing is changed in Windows until an app plays or a row is touched.
+1. Audio tab with Chrome playing in two tabs and Discord in a call: one row
+   for Chrome and one for Discord (indented under Media / Chat), however many
+   processes they run. Right on Chrome changes every Chrome tab at once.
+2. Lower Media to 50 % and Chrome to 50 %: Chrome plays at 25 % in the
+   Windows volume mixer; Spotify under Media keeps its balance with Chrome.
+   A on Media mutes Chrome and Spotify; A again restores the same levels.
+3. Per-device mix: set a mix on the speakers, switch to the headset (Audio
+   tab or plug it in): the first time the headset starts from the speakers'
+   mix; change it, switch back: each device keeps its own mix and every
+   playing app follows at once.
+4. Presets: "Save preset..." -> the name dialog opens over the overlay with
+   "Preset 1" selected; Enter saves it (Esc or Cancel saves nothing). Change
+   the channels, pick the preset on the Preset row and press A ("Apply" in
+   the footer): the channel levels come back on the current device.
+5. Settings -> Audio -> Channels: "Add channel..." (type a name), change its
+   icon with Left/Right, move it with A / Up / Down / A; "Rename..." (footer
+   says "Rename") on Game; the new name shows in the Audio tab. Move Discord
+   to the new channel in Programs, then delete the channel with Y: Discord is
+   back under Other with its own volume unchanged.
+6. Settings -> Audio -> Programs: move Chrome to Chat by hand; restart the
+   app and play in Chrome: it stays in Chat. "Add program..." opens a file
+   picker over the overlay; pick an .exe that never played, give it a
+   channel, then start it: it plays in that channel.
+7. A preset saved while a custom channel existed: delete the channel, apply
+   the preset: the other channels are set, no error in errors.log.
+8. Circuit breaker: with auto-switch on, make Windows flip outputs quickly
+   (e.g. unplug / replug the headset several times within 10 s): after 3
+   automatic switches the app stops switching that direction, errors.log has
+   one "Audio auto-switch (Output) paused" line, and the next device event
+   after 10 quiet seconds switches normally again.
+9. Hide the overlay (B or a click outside) while the name dialog is open: the
+   dialog closes and nothing is saved. Apps already playing when the app
+   starts keep their level until a row is touched or the output changes.
 
 ## Testing on Windows (stage 3)
 

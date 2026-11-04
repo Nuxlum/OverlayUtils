@@ -340,7 +340,7 @@ public sealed class OverlayNavigator
         var item = Selected;
         if (item is not null)
         {
-            hints.Add(new FooterHint(pad ? "A" : "Enter", Loc.T(item.Kind switch
+            hints.Add(new FooterHint(pad ? "A" : "Enter", item.ActionLabel?.Invoke() ?? Loc.T(item.Kind switch
             {
                 ItemKind.Choice when item.Apply == null && item.Toggle != null => "Overlay.Footer.Toggle",
                 ItemKind.Choice when item.Apply == null => "Overlay.Footer.Change",

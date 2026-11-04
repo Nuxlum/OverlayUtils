@@ -53,6 +53,8 @@ internal sealed class TrayController : IOverlayHost, IDisposable
     private System.Drawing.Icon? _currentIcon;
     private bool _busy; // a mode switch is in progress
     private bool? _overlayOpenAtPress; // left button pressed on the tray icon: was the overlay open then
+    private NameDialog? _nameDialog;   // UI thread; the open name prompt, if any
+    private bool _choosingProgram;     // UI thread; the program picker is open
 
     public TrayController(Application app, ConfigStore config, LauncherKind kind)
     {
@@ -94,6 +96,7 @@ internal sealed class TrayController : IOverlayHost, IDisposable
         {
             var content = new OverlayContent(_config, _monitors, _locator, this, new AudioServiceView(_audio!), _media);
             _overlay = new OverlayController(_app, _config, _monitors, content);
+            _overlay.OpenChanged += OnOverlayOpenChanged;
         }
         catch (Exception e)
         {
@@ -380,10 +383,81 @@ internal sealed class TrayController : IOverlayHost, IDisposable
 
     void IOverlayHost.Exit() => OnUi(Exit);
 
-    // The name dialog and the program picker come with the mixing UI (stage 4b, task 4); until then these rows do nothing.
-    public void AskName(string suggested, Action<string> done) { }
+    /// <summary>
+    /// Add / rename a channel, save a preset. Opened after the navigator's action has returned (BeginInvoke), modeless
+    /// and owned by the overlay; <paramref name="done"/> runs on the UI thread, only for OK with a non-empty name.
+    /// A second request while one is open just brings it to the front; the overlay hiding cancels it.
+    /// </summary>
+    public void AskName(string suggested, Action<string> done) => _app.Dispatcher.BeginInvoke(() =>
+    {
+        try
+        {
+            if (_nameDialog is { } open)
+            {
+                open.Activate();
+                return;
+            }
+            var owner = _overlay is { IsOpen: true } overlay ? overlay.Handle : 0;
+            var dialog = new NameDialog(suggested, owner, WindowEffects.Accent());
+            dialog.Accepted += name =>
+            {
+                try { done(name); }
+                catch (Exception e) { Log.Error("Name dialog action", e); }
+            };
+            dialog.Closed += (_, _) =>
+            {
+                if (_nameDialog == dialog) _nameDialog = null;
+                _overlay?.Refocus();
+            };
+            _nameDialog = dialog;
+            dialog.Show();
+        }
+        catch (Exception e)
+        {
+            _nameDialog = null;
+            Log.Error("Name dialog", e);
+        }
+    });
 
-    public void ChooseProgram(Action<string> done) { }
+    /// <summary>
+    /// "Add program…": an .exe file picker owned by the overlay (or the topmost panel would cover it), opened after the
+    /// navigator's action has returned. <paramref name="done"/> gets the full path on the UI thread.
+    /// </summary>
+    public void ChooseProgram(Action<string> done) => _app.Dispatcher.BeginInvoke(() =>
+    {
+        if (_choosingProgram) return;
+        _choosingProgram = true;
+        try
+        {
+            string? path = null;
+            using (var dialog = new OpenFileDialog
+                   {
+                       Title = Loc.T("Settings.Audio.AddProgram"),
+                       Filter = Loc.T("Dialog.ChooseProgram.Filter"),
+                       CheckFileExists = true,
+                   })
+            {
+                var owner = _overlay is { IsOpen: true } overlay ? new WindowOwner(overlay.Handle) : null;
+                if (dialog.ShowDialog(owner) == DialogResult.OK) path = dialog.FileName;
+            }
+            _overlay?.Refocus();
+            if (!string.IsNullOrEmpty(path)) done(path);
+        }
+        catch (Exception e)
+        {
+            Log.Error("Choose program", e);
+        }
+        finally
+        {
+            _choosingProgram = false;
+        }
+    });
+
+    /// <summary>The overlay hid: an open name prompt is cancelled (it would float alone over the game).</summary>
+    private void OnOverlayOpenChanged(bool open)
+    {
+        if (!open) _nameDialog?.Dismiss();
+    }
 
     private sealed class WindowOwner(nint handle) : IWin32Window
     {
@@ -641,6 +715,7 @@ internal sealed class TrayController : IOverlayHost, IDisposable
         _audio?.Dispose();
         _media?.Dispose();
         _indicator?.Dismiss();
+        _nameDialog?.Dismiss();
         _hotkeys?.Dispose();
         _overlay?.Dispose();
         _icon.Visible = false;

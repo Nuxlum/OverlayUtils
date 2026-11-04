@@ -51,4 +51,5 @@ public sealed class OverlayItem
     public Action? Cancel { get; init; }                 // Reorder: put the picked-up entry back
     public Action? RemoveEntry { get; init; }            // any row: the Remove command (Y on the pad)
     public bool Child { get; init; }                     // drawn indented under the row above (an app under its channel)
+    public Func<string>? ActionLabel { get; init; }      // footer label of A when the kind's default does not fit
 }

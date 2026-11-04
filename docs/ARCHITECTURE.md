@@ -221,6 +221,63 @@ Stage 4a. Pure rules and COM in Core, the media session in App.
 - **Tabs.** Audio is a tab after Controls and can be hidden in Settings
   (`hidden_tabs`); the change applies to the open overlay at once.
 
+### Mixing
+
+Stage 4b. Channels group programs; every Windows audio session of a program
+gets channel volume x app volume.
+
+| Core | App |
+|---|---|
+| `MixRules` (pure): default channels, `Classify` / `ChannelOf` / `ChannelFor`, `Effective`, `MixFor`, `AppLevel`, `DeleteChannel`, `NextCustomId`, `ApplyPreset`, `GroupByProgram` | `TrayController.AskName`: modeless `NameDialog`, owned by the overlay |
+| `MixController`: every mix / channel / preset / program edit (one `ConfigStore.Update`, then `IAudioView.ApplyMix`) | `TrayController.ChooseProgram`: `OpenFileDialog` for an .exe, owned by the overlay |
+| `AudioService` (`AudioService.Sessions.cs`): sessions of the default output, apply rules | `OverlayWindow`: `Child` rows indented 24 DIP with a smaller label |
+| `OverlayContent`: Channels / Presets rows in the Audio tab, Settings -> Audio -> Channels and Programs | |
+
+- **Programs.** Identified by full exe path, case-insensitive. Sessions are
+  grouped per program (`GroupByProgram`); our own process, pid 0 and the
+  system sounds session are excluded. A program seen for the first time is
+  stored in `audio_programs` with `MixRules.ChannelOf` (Discord & co. -> chat,
+  browsers and players -> media, game library folders or fullscreen
+  foreground -> game, else other); a stored choice always wins and custom
+  channels never get programs automatically. A stored id that no longer
+  exists counts as `other` (`ChannelFor`).
+- **Apply rules.** The service writes a session's volume (`Effective`,
+  clamped) and its mute flag (channel or app muted); muting never changes
+  the stored or the session volume. It writes: to every session of a program
+  when that program gets a new session; to all live sessions when the default
+  output changes (that device's mix) and on `ApplyMix()` (after every overlay
+  edit). Never at startup: apps already playing keep their level until a row
+  is touched or the output changes. Changes made in the Windows mixer stay
+  until then too.
+- **Per device.** `audio_mix` is keyed by output device id. A device seen for
+  the first time gets a copy of the previous device's mix (`MixFor`, stored by
+  `EnsureMix`). Presets store channel levels only and apply to the current
+  device; ids missing from the channel list are ignored.
+- **Channels.** `game`, `chat`, `media`, `other` are fixed ids (renamable,
+  re-iconable, not deletable); custom ones are `c1`, `c2`, ... Deleting one
+  moves its programs to `other` and removes its id from every device mix and
+  preset. A default channel whose stored name is still the English default
+  is shown in the UI language (`OverlayContent.ChannelName`); accepting the
+  suggested name in the dialog keeps it that way.
+- **Threads.** `MixController` runs on the UI thread (overlay actions) and
+  only edits config; `ApplyMix` queues the writes to the audio thread. Session
+  notifications (COM threads) only queue a rescan. `AskName` / `ChooseProgram`
+  are opened with `Dispatcher.BeginInvoke`, after the navigator action has
+  returned; the name dialog is modeless (no nested loop) and its callback
+  runs on the UI thread only for OK with a non-empty trimmed name. Hiding the
+  overlay closes an open name dialog.
+- **Footer.** `OverlayItem.ActionLabel` names the A action when the kind's
+  default does not fit ("Apply" on Presets, "Rename" on Rename...).
+- **Auto-switch circuit breaker.** `SwitchBreaker` (pure, per direction):
+  at most 3 automatic default switches within 10 s; the 4th trips it (one
+  `Log.Info`), and auto-switch for that direction stays paused until a device
+  event arrives after 10 s without events.
+- **Config keys.** `audio_channels` (list of `{id, name, icon}` in display
+  order), `audio_programs` (exe -> channel id), `audio_mix` (device id ->
+  `{channels: {id: {volume, muted}}, apps: {exe: {volume, muted}}}`),
+  `audio_presets` (list of `{name, channels}`). Null collections in the file
+  load as empty.
+
 ## Configuration
 
 `ConfigStore` owns `%APPDATA%\OverlayUtils\config.json`:

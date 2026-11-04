@@ -95,6 +95,34 @@ The stage checklist lives in `PORTING.md`.
   keyboard take the selection back until the next move. Every visible
   control is clickable, clickables get a hand cursor and a hover highlight.
 
+- 2026-11-04 - **Mix not applied at startup:** apps already playing when the
+  app starts keep their level; the stored mix applies to sessions created
+  later, on the next overlay change and on a default output change (same
+  stance as 4a's volume cap; "changes made elsewhere stay").
+- 2026-11-04 - **Muting sets only the session mute flag:** the session volume
+  stays at channel x app, so unmuting (here or in the Windows mixer) brings
+  back the same level.
+- 2026-11-04 - **Default channel names follow the UI language** until
+  renamed: the four defaults are stored with their English names and shown
+  translated while the stored name is still the default; accepting the
+  suggested name in Rename keeps it that way.
+- 2026-11-04 - **"Save preset..." hidden when no channel row is visible**
+  (nothing playing, nothing to look at); the Preset row stays whenever
+  presets exist.
+- 2026-11-04 - **Channel and app steps don't change the mute** (unlike the
+  master Volume row, which unmutes above 0): a muted channel stays muted
+  while its level is adjusted.
+- 2026-11-04 - **Auto-switch circuit breaker:** at most 3 automatic default
+  switches per direction within 10 s; then auto-switch for that direction
+  pauses until a device event after 10 s of quiet, with one `Log.Info`.
+  Guards against switch loops with Sonar or flaky devices.
+- 2026-11-04 - **Name dialog is modeless and owned by the overlay** (no
+  nested message loop inside a navigator action); pad A/B do not drive it,
+  a pad user accepts the suggested name with Enter or by clicking OK, or
+  renames later with a keyboard. Hiding the overlay cancels it.
+- 2026-11-04 - **A row can name its A action** (`OverlayItem.ActionLabel`):
+  "Apply" on Presets, "Rename" on Rename, instead of the kind's "Turn on/off".
+
 ## Open questions
 
 - Signing: stay self-signed, or get a CA-issued certificate (Azure Artifact
@@ -129,6 +157,12 @@ The stage checklist lives in `PORTING.md`.
 
 ## Session log
 
+- 2026-11-04 - Stage 4b (mixing) written in 4 tasks: mixing rules
+  (self-tested), audio sessions with per-app mix and the auto-switch circuit
+  breaker, channels / presets / Channels and Programs pages in the overlay,
+  name dialog, program picker, indented app rows, footer action labels,
+  docs. Builds with 0 warnings, self-test green; nothing tested with real
+  devices yet (stage 4b list in PORTING).
 - 2026-11-04 - Mouse: hover selection, clickable tabs/arrows/volume bar/media
   buttons/footer hints, hover highlights; self-tested navigator entry points;
   not yet tried by hand.
