@@ -18,7 +18,9 @@ public static class GogLibrary
             var title = registry.GetString(RegistryHive.LocalMachine, key, "gameName") is { Length: > 0 } name ? name : Path.GetFileNameWithoutExtension(exe);
             var gameId = registry.GetString(RegistryHive.LocalMachine, key, "gameID") is { Length: > 0 } g ? g : id;
             var workingDir = registry.GetString(RegistryHive.LocalMachine, key, "workingDir") is { Length: > 0 } w ? w : Path.GetDirectoryName(exe);
-            games.Add(new GameEntry($"gog:{gameId}", GameSource.Gog, title, exe, 0, null, exe, workingDir));
+            // DOSBox / ScummVM classics: exe is the emulator and launchParam has the -conf / game arguments.
+            var arguments = registry.GetString(RegistryHive.LocalMachine, key, "launchParam") is { Length: > 0 } a ? a.Trim() : null;
+            games.Add(new GameEntry($"gog:{gameId}", GameSource.Gog, title, exe, 0, null, exe, workingDir, arguments));
         }
         return games;
     }

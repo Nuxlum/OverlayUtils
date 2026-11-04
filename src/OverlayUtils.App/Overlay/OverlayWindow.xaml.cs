@@ -34,6 +34,7 @@ internal sealed partial class OverlayWindow : Window
             WindowEffects.ApplyChrome(this);
             RefreshBackdrop();
         };
+        Scroller.ScrollChanged += (_, _) => UpdateArtRange();
     }
 
     public event Action<OverlayCommand>? CommandIssued;
@@ -56,11 +57,11 @@ internal sealed partial class OverlayWindow : Window
     /// <summary>A media button was clicked (row, -1 previous / 0 play-pause / +1 next).</summary>
     public event Action<int, int>? MediaClicked;
 
-    /// <summary>The mouse really moved onto a game tile (tile index).</summary>
-    public event Action<int>? TileHovered;
+    /// <summary>The mouse really moved onto a game tile (game id).</summary>
+    public event Action<string>? TileHovered;
 
-    /// <summary>A game tile was clicked (tile index).</summary>
-    public event Action<int>? TileClicked;
+    /// <summary>A game tile was clicked (game id: the list may have changed since it was drawn).</summary>
+    public event Action<string>? TileClicked;
 
     // Last cursor position seen, in screen pixels: hover acts only when the mouse really moves, not when the
     // overlay opens under a still cursor or the list scrolls under it.
@@ -98,6 +99,8 @@ internal sealed partial class OverlayWindow : Window
         else if (e.PropertyName is nameof(OverlayViewModel.Rows) or nameof(OverlayViewModel.SelectedTile))
             // After the new rows are laid out, so their containers exist.
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, BringSelectedIntoView);
+        else if (e.PropertyName is nameof(OverlayViewModel.Tiles) or nameof(OverlayViewModel.ShowTiles))
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, UpdateArtRange);
     }
 
     /// <summary>
@@ -138,6 +141,26 @@ internal sealed partial class OverlayWindow : Window
             new DoubleAnimation(0, 1, OpenDuration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
         Slide.BeginAnimation(TranslateTransform.XProperty,
             new DoubleAnimation(from, 0, OpenDuration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
+    }
+
+    /// <summary>Asks for the art of the grid rows in view, plus one row above and below.</summary>
+    void UpdateArtRange()
+    {
+        try
+        {
+            if (_vm is not { ShowTiles: true } vm || vm.Tiles.Count == 0 || !IsVisible) return;
+            if (TileList.ItemContainerGenerator.ContainerFromIndex(0) is not FrameworkElement first || first.ActualHeight <= 0) return;
+            var rowHeight = first.ActualHeight;
+            var top = TileList.TranslatePoint(new Point(0, 0), Scroller).Y; // negative once scrolled past the grid top
+            var fromRow = Math.Max(0, (int)Math.Floor(-top / rowHeight) - 1);
+            var toRow = (int)Math.Ceiling((Scroller.ViewportHeight - top) / rowHeight) + 1;
+            const int columns = OverlayViewModel.TileColumns;
+            vm.ShowArt(fromRow * columns, Math.Min(vm.Tiles.Count - 1, (toRow + 1) * columns - 1));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Overlay tile art", ex);
+        }
     }
 
     void BringSelectedIntoView()
@@ -260,7 +283,7 @@ internal sealed partial class OverlayWindow : Window
         _lastPointer = p;
         if (TileOf(e.OriginalSource as DependencyObject) is { } tile)
         {
-            Raise(() => TileHovered?.Invoke(tile.Index), "tile hover");
+            Raise(() => TileHovered?.Invoke(tile.Game.Id), "tile hover");
             return;
         }
         if (RowOf(e.OriginalSource as DependencyObject) is { } row)
@@ -360,7 +383,7 @@ internal sealed partial class OverlayWindow : Window
         if ((sender as FrameworkElement)?.DataContext is not TileVm tile) return;
         e.Handled = true;
         if (e.ClickCount > 1) return; // a double-click must not start the game twice
-        Raise(() => TileClicked?.Invoke(tile.Index), "tile click");
+        Raise(() => TileClicked?.Invoke(tile.Game.Id), "tile click");
     }
 
     /// <summary>The filter pill of the Games grid: same as Y / Delete.</summary>

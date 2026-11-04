@@ -48,8 +48,9 @@ public static class EmulatorLibrary
                 if (string.IsNullOrEmpty(name)) continue;
                 var known = Known.FirstOrDefault(k => ContainsWord(name, k.Name));
                 if (known.Name is null) continue;
-                var exe = FromIcon(registry.GetString(hive, key, "DisplayIcon"))
-                          ?? FromFolder(registry.GetString(hive, key, "InstallLocation"), known.Exes);
+                // The known exe in the install folder first: DisplayIcon is often the uninstaller.
+                var exe = FromFolder(registry.GetString(hive, key, "InstallLocation"), known.Exes)
+                          ?? FromIcon(registry.GetString(hive, key, "DisplayIcon"), known.Exes);
                 if (exe is null) continue;
                 var id = "emulator:" + exe.ToLowerInvariant();
                 found.TryAdd(id, new GameEntry(id, GameSource.Emulator, name, exe, 0, null, exe, Path.GetDirectoryName(exe)));
@@ -62,15 +63,16 @@ public static class EmulatorLibrary
         displayName.Split([' ', '-', '_', '(', ')', '.'], StringSplitOptions.RemoveEmptyEntries)
             .Any(part => string.Equals(part, word, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>DisplayIcon is often `"C:\path\app.exe",0`; keep it only if it is an existing exe.</summary>
-    static string? FromIcon(string? icon)
+    /// <summary>DisplayIcon is often `"C:\path\app.exe",0`; kept only if it is an existing exe of the emulator.</summary>
+    static string? FromIcon(string? icon, string[] exes)
     {
         if (string.IsNullOrWhiteSpace(icon)) return null;
         var path = icon.Trim();
         var comma = path.LastIndexOf(',');
         if (comma > 0 && int.TryParse(path[(comma + 1)..].Trim(), out _)) path = path[..comma];
         path = path.Trim().Trim('"');
-        return path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && File.Exists(path) ? path : null;
+        var name = Path.GetFileName(path);
+        return exes.Any(e => string.Equals(e, name, StringComparison.OrdinalIgnoreCase)) && File.Exists(path) ? path : null;
     }
 
     static string? FromFolder(string? folder, string[] exes)

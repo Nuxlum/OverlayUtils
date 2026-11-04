@@ -179,6 +179,11 @@ Launching starts real games, so pick ones you don't mind opening.
    Manage apps removes it.
 8. With every source off: "No games found" and the hint to add apps.
 9. A game title with accents or symbols shows correctly on its tile.
+10. Scroll the whole grid quickly with the pad and the wheel: covers fill in
+    as rows come into view and the overlay stays responsive.
+11. Right after starting OverlayUtils the Games tab may say "Looking for
+    games…" for a moment, never "No games found" when there are games.
+12. A GOG classic that runs in DOSBox starts the game, not an empty DOSBox.
 
 ## Testing on Windows (stage 4b)
 

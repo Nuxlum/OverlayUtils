@@ -38,6 +38,8 @@ public sealed class OverlayNavigator
     int _subSegment;
     int _tile;          // Grid row: the selected tile
     string? _tileId;    // its id, so a refresh keeps the same game selected
+    // Grid key -> selected game id, so coming back from Settings or another tab finds the same tile (cleared on open).
+    readonly Dictionary<string, string> _gridTiles = [];
 
     public OverlayNavigator(IReadOnlyList<OverlayTab> tabs, Func<IReadOnlyList<OverlayItem>> settings,
         Func<IReadOnlyList<OverlayItem>> info, TimeProvider? time = null, IMediaControl? media = null)
@@ -121,6 +123,7 @@ public sealed class OverlayNavigator
         _subItem = null;
         _tile = 0;
         _tileId = null;
+        _gridTiles.Clear();
         SelectFirst();
         return cancel;
     }
@@ -226,7 +229,15 @@ public sealed class OverlayNavigator
     /// <summary>Runs the row's RemoveEntry; a <see cref="OverlayItem.ConfirmRemove"/> row needs a second press within 3 s.</summary>
     NavResult Remove()
     {
-        if (Selected?.AltAction is { } alt) return new NavResult(NavEffect.RunHere, alt);
+        if (Selected?.AltAction is { } alt) return new NavResult(NavEffect.RunHere, () =>
+        {
+            alt();
+            // The grid's filter changed: keep the game if it is still shown, else start on the first tile.
+            var tiles = Tiles();
+            if (tiles.Count == 0) return;
+            var index = IndexOfTile(_tileId);
+            SetTile(index >= 0 ? index : 0, tiles);
+        });
         if (Selected is not { RemoveEntry: { } remove } item) return None;
         if (item.ConfirmRemove)
         {
@@ -362,20 +373,28 @@ public sealed class OverlayNavigator
         _tileId = tiles[index].Id;
     }
 
+    /// <summary>Index of the game with this id in the selected grid's tiles, -1 if it is not there.</summary>
+    public int IndexOfTile(string? id)
+    {
+        if (id is null) return -1;
+        var tiles = Tiles();
+        for (var i = 0; i < tiles.Count; i++)
+            if (tiles[i].Id == id) return i;
+        return -1;
+    }
+
     /// <summary>After the tiles changed: the same game stays selected; if it is gone, the tile now at its place.</summary>
     void SyncTile()
     {
         var tiles = Tiles();
         if (tiles.Count == 0) return; // keep the id: the game comes back selected if the list refills
-        var index = -1;
-        if (_tileId != null)
-            for (var i = 0; i < tiles.Count; i++)
-                if (tiles[i].Id == _tileId) { index = i; break; }
+        var index = IndexOfTile(_tileId);
         SetTile(index >= 0 ? index : Math.Clamp(_tile, 0, tiles.Count - 1), tiles);
     }
 
     NavResult LaunchTile()
     {
+        SyncTile(); // the list may have changed since the last redraw: launch the game that was shown, by id
         if (Selected?.Launch is not { } launch || SelectedTile is not { } tile) return None;
         return new NavResult(NavEffect.HideAndRun, () => launch(tile));
     }
@@ -558,14 +577,16 @@ public sealed class OverlayNavigator
         var key = index >= 0 && index < items.Count ? items[index].Key : null;
         if (key == null || key != _selectedKey)
         {
-            _tile = 0; // another row: a grid starts on its first tile
-            _tileId = null;
+            if (_selectedKey != null && _tileId != null) _gridTiles[_selectedKey] = _tileId; // leaving a grid
+            _tile = 0; // another row: a grid starts on its first tile, or on the one it had before
+            _tileId = key != null && _gridTiles.TryGetValue(key, out var remembered) ? remembered : null;
         }
         Index = index;
         _pending = null;
         _removePending = null;
         Segment = 0;
         _selectedKey = index >= 0 && index < items.Count ? items[index].Key : null;
+        if (index >= 0 && index < items.Count && items[index].Kind == ItemKind.Grid) SyncTile();
         if (index < 0 || index >= items.Count || items[index].Kind != ItemKind.Segmented) return;
         var options = items[index].Options();
         for (var i = 0; i < options.Count; i++)

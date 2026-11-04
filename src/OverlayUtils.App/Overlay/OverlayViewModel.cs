@@ -97,7 +97,14 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     string _tilesCulture = "";
     bool _showTiles;
     int _selectedTile = -1;
-    CancellationTokenSource? _artLoad;
+    CancellationTokenSource? _artLoad;              // cancelled when the tiles are rebuilt
+    readonly HashSet<TileVm> _withArt = [];         // tiles that hold their art now
+    readonly HashSet<TileVm> _requested = [];       // tiles whose art a worker is decoding
+
+    /// <summary>Columns of the Games grid (the window's UniformGrid).</summary>
+    public const int TileColumns = 3;
+    /// <summary>Tiles kept with their art beyond the requested range (four rows on each side).</summary>
+    const int ArtKeep = 4 * TileColumns;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -189,37 +196,54 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         var grid = items.FirstOrDefault(i => i.Kind == ItemKind.Grid && i.Visible());
         ShowTiles = grid is not null;
         if (grid?.Tiles?.Invoke() is not { } games) return; // kept while hidden: coming back to the tab is instant
+        // Whole records: a re-read that only found new art or a new title must show it.
         if (_tilesCulture != Loc.Culture.Name || games.Count != _tiles.Count
-            || !games.Select(g => g.Id).SequenceEqual(_tiles.Select(t => t.Game.Id)))
+            || !games.SequenceEqual(_tiles.Select(t => t.Game)))
         {
             _tilesCulture = Loc.Culture.Name;
+            _artLoad?.Cancel();
+            _artLoad = null;
+            _withArt.Clear();
+            _requested.Clear();
             Tiles = games.Select((g, i) => new TileVm(i, g, Loc.T("Games.Source." + g.Source))).ToList();
-            LoadArt(_tiles);
         }
         var selected = nav.Selected?.Kind == ItemKind.Grid && _tiles.Count > 0 ? nav.SelectedTileIndex : -1;
         foreach (var tile in _tiles) tile.IsSelected = tile.Index == selected;
         SelectedTile = selected;
     }
 
-    /// <summary>Art already decoded is set at once; the rest is decoded on a worker, in grid order.</summary>
-    void LoadArt(IReadOnlyList<TileVm> tiles)
+    /// <summary>
+    /// The tiles from <paramref name="first"/> to <paramref name="last"/> are on screen or next to it (window, UI
+    /// thread). Their art is set at once when decoded already, else decoded on a worker; tiles further than
+    /// <see cref="ArtKeep"/> away drop theirs, so a big library holds only a few rows of images.
+    /// </summary>
+    public void ShowArt(int first, int last)
     {
-        _artLoad?.Cancel();
-        var pending = new List<TileVm>();
-        foreach (var tile in tiles)
+        foreach (var tile in _withArt.Where(t => t.Index < first - ArtKeep || t.Index > last + ArtKeep).ToList())
         {
+            tile.Cover = null;
+            tile.Icon = null;
+            _withArt.Remove(tile);
+        }
+        var pending = new List<TileVm>();
+        for (var i = Math.Max(0, first); i <= last && i < _tiles.Count; i++)
+        {
+            var tile = _tiles[i];
+            if (_withArt.Contains(tile) || _requested.Contains(tile)) continue;
             if (GameArt.TryCached(tile.Game.ArtPath, tile.Game.IconPath, out var cover, out var icon))
             {
                 tile.Cover = cover;
                 tile.Icon = icon;
+                _withArt.Add(tile);
             }
             else
             {
                 pending.Add(tile);
+                _requested.Add(tile);
             }
         }
         if (pending.Count == 0) return;
-        var cancel = _artLoad = new CancellationTokenSource();
+        var cancel = _artLoad ??= new CancellationTokenSource();
         var token = cancel.Token;
         var dispatcher = Dispatcher.CurrentDispatcher;
         _ = Task.Run(() =>
@@ -229,11 +253,13 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
                 if (token.IsCancellationRequested) return;
                 var cover = tile.Game.ArtPath is { } art ? GameArt.Cover(art) : null;
                 var icon = cover is null && tile.Game.IconPath is { } path ? GameArt.Icon(path) : null;
-                if (cover is null && icon is null) continue;
                 dispatcher.BeginInvoke(() =>
                 {
+                    if (token.IsCancellationRequested) return; // the grid was rebuilt meanwhile
+                    _requested.Remove(tile);
                     tile.Cover = cover;
                     tile.Icon = icon;
+                    _withArt.Add(tile);
                 });
             }
         }, token);

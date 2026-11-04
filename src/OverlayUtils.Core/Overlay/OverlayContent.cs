@@ -100,7 +100,9 @@ public sealed class OverlayContent
     {
         var games = _games?.Games ?? [];
         var filter = GameLibrary.Valid(_gamesFilter, games);
+        if (games.Count > 0) _gamesFilter = filter; // a filter that fell back to All stays All
         var tiles = GameLibrary.Filter(games, filter);
+        var loading = _games?.Loading == true;
         return
         [
             new OverlayItem
@@ -122,13 +124,13 @@ public sealed class OverlayContent
             {
                 Kind = ItemKind.Info, Icon = Glyphs.Game,
                 Visible = () => games.Count == 0,
-                Label = () => Loc.T("Overlay.Games.Empty"),
+                Label = () => Loc.T(loading ? "Overlay.Games.Loading" : "Overlay.Games.Empty"),
                 Value = () => "",
             },
             new OverlayItem
             {
                 Kind = ItemKind.Info, Icon = Glyphs.Info,
-                Visible = () => games.Count == 0,
+                Visible = () => games.Count == 0 && !loading,
                 Label = () => Loc.T("Overlay.Games.EmptyHint"),
                 Value = () => "",
             },
@@ -181,11 +183,9 @@ public sealed class OverlayContent
             Kind = ItemKind.Action, Icon = Glyphs.Game, Key = "games.app." + path, Stay = true,
             Label = () => AppTitle(path),
             Description = () => Loc.T("Settings.Games.App.Desc", path),
-            RemoveEntry = () =>
-            {
-                _config.Update(c => c.GamesManualApps.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)));
-                _games?.Refresh();
-            },
+            ActionLabel = () => Loc.T("Settings.Games.RemoveApp"),
+            Action = () => RemoveApp(path),
+            RemoveEntry = () => RemoveApp(path),
         }).ToList();
         if (rows.Count == 0)
             rows.Add(new OverlayItem { Kind = ItemKind.Info, Label = () => Loc.T("Settings.Games.NoApps"), Value = () => "" });
@@ -204,6 +204,12 @@ public sealed class OverlayContent
             }),
         });
         return rows;
+    }
+
+    void RemoveApp(string path)
+    {
+        _config.Update(c => c.GamesManualApps.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)));
+        _games?.Refresh();
     }
 
     string AppTitle(string path)

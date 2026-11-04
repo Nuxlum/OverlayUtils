@@ -93,6 +93,7 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Menu.Notifications" xml:space="preserve"><value>Notifiche</value></data>
   <data name="Menu.OpenSettingsFolder" xml:space="preserve"><value>Apri la cartella delle impostazioni</value></data>
   <data name="Menu.Startup" xml:space="preserve"><value>Avvia con Windows</value></data>
+  <data name="Notify.GameLaunchFailed" xml:space="preserve"><value>Impossibile avviare {0}. I dettagli sono in errors.log.</value></data>
   <data name="Notify.HomeKeyBusy" xml:space="preserve"><value>Il tasto Home è già usato da un altro programma (spesso il software della tastiera).</value></data>
   <data name="Notify.HotkeyBusy" xml:space="preserve"><value>{0} è già usato da un altro programma.</value></data>
   <data name="Notify.LegacyRunning" xml:space="preserve"><value>La vecchia AppUtili è ancora in esecuzione e può entrare in conflitto con OverlayUtils. Rimuovila dal menu dell'icona.</value></data>
@@ -161,6 +162,7 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.Games.Desc" xml:space="preserve"><value>A avvia il gioco selezionato; Y o Canc cambia il launcher mostrato.</value></data>
   <data name="Overlay.Games.Empty" xml:space="preserve"><value>Nessun gioco trovato</value></data>
   <data name="Overlay.Games.EmptyHint" xml:space="preserve"><value>Aggiungi programmi in Impostazioni → Giochi → Gestisci app</value></data>
+  <data name="Overlay.Games.Loading" xml:space="preserve"><value>Ricerca dei giochi…</value></data>
   <data name="Overlay.Info.Config" xml:space="preserve"><value>Configurazione</value></data>
   <data name="Overlay.Info.Download" xml:space="preserve"><value>Scarica</value></data>
   <data name="Overlay.Info.Folder" xml:space="preserve"><value>Cartella</value></data>
@@ -262,7 +264,8 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Settings.Games.Apps" xml:space="preserve"><value>Gestisci app</value></data>
   <data name="Settings.Games.Apps.Desc" xml:space="preserve"><value>Programmi aggiunti a mano alla scheda Giochi: launcher non letti, emulatori portatili, qualsiasi altra cosa.</value></data>
   <data name="Settings.Games.NoApps" xml:space="preserve"><value>Nessuna app aggiunta</value></data>
-  <data name="Settings.Games.Source.Desc" xml:space="preserve"><value>Mostra i giochi di {0} nella scheda Giochi.</value></data>
+  <data name="Settings.Games.RemoveApp" xml:space="preserve"><value>Rimuovi</value></data>
+  <data name="Settings.Games.Source.Desc" xml:space="preserve"><value>Mostra nella scheda Giochi: {0}.</value></data>
   <data name="Settings.HomeKey.Desc" xml:space="preserve"><value>Cosa fa il tasto multimediale Home della tastiera (Nessuno = apre il browser).</value></data>
   <data name="Settings.HomeKey.None" xml:space="preserve"><value>Nessuno</value></data>
   <data name="Settings.HomeKey.Windows" xml:space="preserve"><value>Windows</value></data>

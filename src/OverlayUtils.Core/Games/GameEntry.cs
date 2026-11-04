@@ -14,4 +14,5 @@ public sealed record GameEntry(
     long LastPlayed,
     string? ArtPath,
     string? IconPath,
-    string? WorkingDir = null);
+    string? WorkingDir = null,
+    string? Arguments = null); // for an exe target (GOG launchParam)

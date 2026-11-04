@@ -93,6 +93,7 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Menu.Notifications" xml:space="preserve"><value>Notifications</value></data>
   <data name="Menu.OpenSettingsFolder" xml:space="preserve"><value>Open settings folder</value></data>
   <data name="Menu.Startup" xml:space="preserve"><value>Start with Windows</value></data>
+  <data name="Notify.GameLaunchFailed" xml:space="preserve"><value>Could not start {0}. Details are in errors.log.</value></data>
   <data name="Notify.HomeKeyBusy" xml:space="preserve"><value>The Home key is already used by another program (often the keyboard's own software).</value></data>
   <data name="Notify.HotkeyBusy" xml:space="preserve"><value>{0} is already used by another program.</value></data>
   <data name="Notify.LegacyRunning" xml:space="preserve"><value>The old AppUtili is still running and may clash with OverlayUtils. Remove it from the tray menu.</value></data>
@@ -161,6 +162,7 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Overlay.Games.Desc" xml:space="preserve"><value>A plays the selected game; Y or Delete changes which launcher is shown.</value></data>
   <data name="Overlay.Games.Empty" xml:space="preserve"><value>No games found</value></data>
   <data name="Overlay.Games.EmptyHint" xml:space="preserve"><value>Add programs in Settings → Games → Manage apps</value></data>
+  <data name="Overlay.Games.Loading" xml:space="preserve"><value>Looking for games…</value></data>
   <data name="Overlay.Info.Config" xml:space="preserve"><value>Configuration</value></data>
   <data name="Overlay.Info.Download" xml:space="preserve"><value>Download</value></data>
   <data name="Overlay.Info.Folder" xml:space="preserve"><value>Folder</value></data>
@@ -262,7 +264,8 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Settings.Games.Apps" xml:space="preserve"><value>Manage apps</value></data>
   <data name="Settings.Games.Apps.Desc" xml:space="preserve"><value>Programs added by hand to the Games tab: launchers we can't read, portable emulators, anything else.</value></data>
   <data name="Settings.Games.NoApps" xml:space="preserve"><value>No apps added</value></data>
-  <data name="Settings.Games.Source.Desc" xml:space="preserve"><value>Show the {0} games in the Games tab.</value></data>
+  <data name="Settings.Games.RemoveApp" xml:space="preserve"><value>Remove</value></data>
+  <data name="Settings.Games.Source.Desc" xml:space="preserve"><value>Show games from {0} in the Games tab.</value></data>
   <data name="Settings.HomeKey.Desc" xml:space="preserve"><value>What the keyboard's Home media key does (None = opens the browser).</value></data>
   <data name="Settings.HomeKey.None" xml:space="preserve"><value>None</value></data>
   <data name="Settings.HomeKey.Windows" xml:space="preserve"><value>Windows</value></data>

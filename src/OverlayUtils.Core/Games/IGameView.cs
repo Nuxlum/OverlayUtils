@@ -6,6 +6,9 @@ public interface IGameView
     /// <summary>Merged, sorted games of the visible sources (the last list read).</summary>
     IReadOnlyList<GameEntry> Games { get; }
 
+    /// <summary>The first read has not finished yet (the tab says Loading, not "No games found").</summary>
+    bool Loading { get; }
+
     /// <summary>The list changed (any thread).</summary>
     event Action? Changed;
 

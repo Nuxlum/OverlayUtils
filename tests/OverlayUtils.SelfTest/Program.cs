@@ -2047,10 +2047,12 @@ string RepoRoot()
     reg.Set(hk, gogKey + @"\1207664643", "gameID", "1207664643");
     reg.Set(hk, gogKey + @"\1207664643", "exe", gogExe);
     reg.Set(hk, gogKey + @"\1207664643", "workingDir", gogDir);
+    reg.Set(hk, gogKey + @"\1207664643", "launchParam", "-conf \"witcher.conf\"");
     reg.Set(hk, gogKey + @"\555", "gameName", "A DLC");
     var gog = GogLibrary.Read(reg);
     Check(gog.Count == 1 && gog[0].Id == "gog:1207664643" && gog[0].LaunchTarget == gogExe && gog[0].WorkingDir == gogDir,
         "GOG game read with its working directory; entry without exe skipped");
+    Check(gog[0].Arguments == "-conf \"witcher.conf\"", "GOG launchParam kept as the arguments (DOSBox / ScummVM games)");
 
     // Emulators: uninstall entries matched by name, exe must exist.
     var uninstall = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
@@ -2064,6 +2066,13 @@ string RepoRoot()
     File.WriteAllText(dolphinExe, "x");
     reg.Set(Microsoft.Win32.RegistryHive.CurrentUser, uninstall + @"\Dolphin", "DisplayName", "Dolphin");
     reg.Set(Microsoft.Win32.RegistryHive.CurrentUser, uninstall + @"\Dolphin", "DisplayIcon", "\"" + dolphinExe + "\",0");
+    var meloDir = Path.Combine(temp, "emu", "melonDS");
+    Directory.CreateDirectory(meloDir);
+    File.WriteAllText(Path.Combine(meloDir, "uninst.exe"), "x");
+    File.WriteAllText(Path.Combine(meloDir, "melonDS.exe"), "x");
+    reg.Set(hk, uninstall + @"\melonDS", "DisplayName", "melonDS");
+    reg.Set(hk, uninstall + @"\melonDS", "DisplayIcon", Path.Combine(meloDir, "uninst.exe"));
+    reg.Set(hk, uninstall + @"\melonDS", "InstallLocation", meloDir);
     reg.Set(hk, uninstall + @"\Notepad++", "DisplayName", "Notepad++");
     reg.Set(hk, uninstall + @"\PCSX2", "DisplayName", "PCSX2");
     reg.Set(hk, uninstall + @"\PCSX2", "InstallLocation", Path.Combine(temp, "emu", "missing"));
@@ -2071,6 +2080,7 @@ string RepoRoot()
     Check(emulators.ContainsKey("RetroArch 1.19") && emulators.ContainsKey("Dolphin"), "installed emulators detected");
     Check(!emulators.ContainsKey("Notepad++") && !emulators.ContainsKey("PCSX2"), "unrelated apps and missing exes skipped");
     Check(emulators["Dolphin"].LaunchTarget == dolphinExe && emulators["Dolphin"].Source == GameSource.Emulator, "emulator exe from DisplayIcon");
+    Check(emulators["melonDS"].LaunchTarget == Path.Combine(meloDir, "melonDS.exe"), "a DisplayIcon pointing at the uninstaller is not used");
 
     // Hand-added apps.
     var appExe = Path.Combine(temp, "apps", "Quiver Launcher & Co", "quiver.exe");
@@ -2173,6 +2183,50 @@ string RepoRoot()
     click.Action?.Invoke();
     Check(click.Effect == NavEffect.HideAndRun && view.Launched.Last() == "steam:1", "click launches that tile");
 
+    // The grid keeps its tile across a visit to Settings and another tab.
+    view.Set([G("steam:1", GameSource.Steam, "A"), G("steam:2", GameSource.Steam, "B"), G("epic:3", GameSource.Epic, "C")]);
+    nav.Refresh();
+    nav.HoverTile(2);
+    nav.Handle(OverlayCommand.Settings);
+    nav.Handle(OverlayCommand.B);
+    nav.Refresh();
+    Check(nav.SelectedTile?.Id == "epic:3", "back from Settings: same tile selected");
+    nav.Handle(OverlayCommand.PrevTab);
+    nav.Handle(OverlayCommand.NextTab);
+    nav.Refresh();
+    Check(nav.SelectedTile?.Id == "epic:3", "back from another tab: same tile selected");
+
+    // Launch uses the game shown, even if the list changed before the next redraw.
+    view.Set([G("steam:0", GameSource.Steam, "Z"), .. view.Games]);
+    nav.Handle(OverlayCommand.A).Action?.Invoke();
+    Check(view.Launched.Last() == "epic:3", "A launches the selected game by id, not by position");
+    nav.Refresh();
+
+    // A filter that drops the selected game starts on its first tile; one that keeps it keeps it.
+    nav.Handle(OverlayCommand.Remove).Action?.Invoke(); // All -> Steam
+    nav.Refresh();
+    Check(nav.SelectedTile?.Id == "steam:0", "filter without the selected game: first tile");
+    nav.Handle(OverlayCommand.Remove).Action?.Invoke(); // Steam -> Epic: its first tile
+    nav.Handle(OverlayCommand.Remove).Action?.Invoke(); // Epic -> All
+    nav.Refresh();
+    Check(nav.SelectedTile?.Id == "epic:3", "filter that has the selected game keeps it");
+
+    // A filter that fell back to All stays on All when its source comes back.
+    nav.Handle(OverlayCommand.Remove).Action?.Invoke();
+    nav.Handle(OverlayCommand.Remove).Action?.Invoke(); // Epic
+    var withEpic = view.Games;
+    view.Set(withEpic.Where(g => g.Source != GameSource.Epic).ToList());
+    nav.Refresh();
+    view.Set(withEpic);
+    nav.Refresh();
+    Check(nav.Selected?.Label() == Loc.T("Overlay.Games.All"), "a fallen-back filter does not come back by itself");
+
+    // Before the first read: Loading, not "No games found".
+    var loading = new FakeGames { Loading = true };
+    var loadingContent = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), host, new FakeAudio(), null, null, loading);
+    Check(loadingContent.Games().Any(i => i.Visible() && i.Label() == Loc.T("Overlay.Games.Loading"))
+        && !loadingContent.Games().Any(i => i.Visible() && i.Label() == Loc.T("Overlay.Games.Empty")), "loading state before the first read");
+
     // Settings -> Games.
     var settings = content.Settings();
     var epicToggle = settings.First(i => i.Label() == Loc.T("Games.Source.Epic"));
@@ -2183,6 +2237,7 @@ string RepoRoot()
     appsPage.First(i => i.Label() == Loc.T("Settings.Games.AddApp")).Action!();
     Check(store.Current.GamesManualApps.SequenceEqual([@"C:\Tools\quiver.exe"]), "Add app stores the exe");
     var entry = content.Settings().First(i => i.Label() == Loc.T("Settings.Games.Apps")).SubPage!().First(i => i.RemoveEntry != null);
+    Check(entry.Action != null && entry.ActionLabel?.Invoke() == Loc.T("Settings.Games.RemoveApp"), "A on an app row removes it too, and says so");
     entry.RemoveEntry!();
     Check(store.Current.GamesManualApps.Count == 0, "Remove deletes the app");
 }
@@ -2286,6 +2341,7 @@ sealed class FakeRegistry : IRegistryView
 sealed class FakeGames : IGameView
 {
     public IReadOnlyList<GameEntry> Games { get; private set; } = [];
+    public bool Loading { get; init; }
     public List<string> Launched { get; } = [];
     public int Refreshes { get; private set; }
     public event Action? Changed;

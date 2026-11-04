@@ -126,9 +126,17 @@ public static class SteamLibrary
             int.TryParse(entry.Value("lastplaytime"), out var lastPlayed);
             var name = entry.Value("appname") is { Length: > 0 } n ? n : $"Shortcut {appid}";
             games.Add(new GameEntry($"steam:{gameId}", GameSource.Steam, name, $"steam://rungameid/{gameId}",
-                Math.Max(0, lastPlayed), ShortcutArt(grid, appid, entry.Value("icon")), null));
+                Math.Max(0, lastPlayed), ShortcutArt(grid, appid, entry.Value("icon")), ShortcutExe(entry.Value("exe"))));
         }
         return games;
+    }
+
+    /// <summary>The shortcut's target exe (stored quoted), for its icon when there is no grid art.</summary>
+    static string? ShortcutExe(string? exe)
+    {
+        if (string.IsNullOrWhiteSpace(exe)) return null;
+        var path = exe.Trim().Trim('"');
+        return path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && File.Exists(path) ? path : null;
     }
 
     static string? ShortcutArt(string grid, uint appid, string? icon)

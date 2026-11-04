@@ -155,6 +155,18 @@ The stage checklist lives in `PORTING.md`.
   command cycles All → each launcher that has games (`OverlayItem.AltAction`);
   a filter whose launcher empties falls back to All. The grid keeps the
   selected game by id across refreshes.
+- 2026-11-04 - **Art only near the view** (review fix): the grid asks for the
+  covers of the rows on screen plus one on each side, tiles four rows away
+  drop theirs, and decoded covers sit in a 120-entry most-recently-used cache
+  (about 30 MB), so a 1,000-game library does not hold 300 MB of images.
+- 2026-11-04 - **Grid remembers its tile** across Settings and other tabs
+  (Python resets it only on show; so do we, in `Reset`). A filter change keeps
+  the selected game when the new filter has it, else starts on the first
+  tile; a filter that fell back to All stays All.
+- 2026-11-04 - **Launcher re-read throttled:** opening the overlay reads the
+  launchers again only if the last read is over 30 s old; Settings → Games
+  changes read at once. A launch that fails is logged and notified (shown
+  even with notifications off).
 - 2026-11-04 - **Tiles are drawn outside the row list:** the view model keeps
   the tile objects while the list of games is unchanged, so moving the
   selection only flips `IsSelected` and art decoded on a worker arrives
@@ -194,6 +206,13 @@ The stage checklist lives in `PORTING.md`.
 
 ## Session log
 
+- 2026-11-04 - Stage 5 final review fixes: GOG `launchParam` passed as
+  arguments, emulator `DisplayIcon` used only when it names the emulator's
+  exe (not an uninstaller), launch and click by game id, grid tile kept
+  across pages, filter fixes, "Looking for games…" before the first read,
+  bounded art loading, stale-tile rebuild on any game change, Xbox via
+  `InstalledPath` (473 → 81 ms) with the store logo as fallback, shortcut exe
+  icons, Manage apps rows remove on A too. Self-test 1263/1263.
 - 2026-11-04 - Stage 5 (games library) written in 5 tasks: Steam reader with
   text / binary VDF and shortcuts, Epic / GOG / emulator / manual-app
   readers, merge / sort / filter, Grid row kind and Games tab, Settings →

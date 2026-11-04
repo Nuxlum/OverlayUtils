@@ -309,7 +309,15 @@ Stage 5. Readers and rules in Core (`Games/`), Xbox and the service in App.
 - **Drawing.** The grid row draws only its header (filter pill, count); the
   tiles are a separate `ItemsControl` under the rows, bound to tile objects
   that survive redraws while the game list is the same.
-- **Launch.** Through the shell: `steam://rungameid/`, the Epic launcher URI,
+- **Art.** `OverlayWindow.UpdateArtRange` (on scroll and when the tiles
+  change) asks `OverlayViewModel.ShowArt` for the rows in view ± one; covers
+  are decoded on a worker at 200 px and kept in `GameArt`'s 120-entry
+  most-recently-used cache; tiles four rows away release theirs.
+- **Reads.** At start, on overlay open when the last read is older than 30 s
+  (`GameService.RefreshIfStale`), at once on a Settings → Games change.
+  `Loading` is true until the first read ends. Xbox ids are the package
+  family name; the launch target is the AUMID.
+- **Launch.** Through the shell (GOG `launchParam` as arguments): `steam://rungameid/`, the Epic launcher URI,
   `shell:AppsFolder\<AUMID>`, or the exe with its working folder.
 - **Config keys.** `games_sources_hidden` (lowercase source names, not
   read at all when hidden), `games_manual_apps` (exe paths).

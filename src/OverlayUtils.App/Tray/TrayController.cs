@@ -95,7 +95,7 @@ internal sealed class TrayController : IOverlayHost, IDisposable
         _locator.StartSearch();
         StartAudio();
         // Read once in the background now, so the first open of the Games tab is not empty; again on every open.
-        _games = new GameService(_config);
+        _games = new GameService(_config, message => Notify(message, force: true));
         _games.Changed += () => _overlay?.Invalidate();
         _games.Refresh();
         try
@@ -482,12 +482,12 @@ internal sealed class TrayController : IOverlayHost, IDisposable
     });
 
     /// <summary>
-    /// The overlay opened: the game library is read again (new installs show up). It hid: an open name prompt is
-    /// cancelled (it would float alone over the game).
+    /// The overlay opened: the game library is read again unless it was read in the last 30 s (new installs show up).
+    /// It hid: an open name prompt is cancelled (it would float alone over the game).
     /// </summary>
     private void OnOverlayOpenChanged(bool open)
     {
-        if (open) _games?.Refresh();
+        if (open) _games?.RefreshIfStale();
         else _nameDialog?.Dismiss();
     }
 

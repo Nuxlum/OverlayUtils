@@ -15,6 +15,9 @@ internal static class XboxLibrary
 {
     const string GameConfig = "MicrosoftGame.config";
 
+    // Packages whose failure was logged already: a broken or staged package fails on every read.
+    static readonly HashSet<string> Logged = new(StringComparer.OrdinalIgnoreCase);
+
     public static IReadOnlyList<GameEntry> Read()
     {
         var games = new List<GameEntry>();
@@ -23,15 +26,17 @@ internal static class XboxLibrary
             try
             {
                 if (package.IsFramework || package.IsResourcePackage) continue;
-                string folder;
-                try { folder = package.InstalledLocation.Path; }
-                catch (Exception e) when (e is IOException or UnauthorizedAccessException or FileNotFoundException) { continue; }
+                // A plain path (no StorageFolder): this runs for every package on every read.
+                var folder = package.InstalledPath;
+                if (string.IsNullOrEmpty(folder)) continue;
                 var config = Path.Combine(folder, GameConfig);
                 if (!File.Exists(config)) continue;
 
                 var entry = package.GetAppListEntriesAsync().AsTask().GetAwaiter().GetResult().FirstOrDefault();
                 if (entry is null) continue; // no Start menu entry: nothing to launch
                 var (configTitle, logo) = ReadConfig(config, folder);
+                if (logo is null && package.Logo is { IsFile: true } storeLogo && File.Exists(storeLogo.LocalPath))
+                    logo = storeLogo.LocalPath; // the package's store logo when the config names none that exists
                 var title = entry.DisplayInfo.DisplayName is { Length: > 0 } name ? name
                     : configTitle ?? package.DisplayName;
                 games.Add(new GameEntry("xbox:" + package.Id.FamilyName.ToLowerInvariant(), GameSource.Xbox, title,
@@ -39,7 +44,13 @@ internal static class XboxLibrary
             }
             catch (Exception e)
             {
-                Log.Error("Xbox library package", e); // one broken package must not hide the others
+                // One broken package must not hide the others; logged once per session.
+                string name;
+                try { name = package.Id.FullName; }
+                catch (Exception) { name = "?"; }
+                bool first;
+                lock (Logged) first = Logged.Add(name);
+                if (first) Log.Error($"Xbox library package {name}", e);
             }
         }
         return games;
