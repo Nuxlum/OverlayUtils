@@ -347,6 +347,15 @@ public sealed class OverlayContent
             ? Loc.T("Channel." + channel.Id)
             : channel.Name;
 
+    /// <summary>
+    /// The name to store for a rename: the localized default name of a default channel (the suggestion accepted
+    /// unchanged) is stored as the English default, so it keeps following the language.
+    /// </summary>
+    static string StoredName(string id, string typed) =>
+        MixRules.DefaultChannels.FirstOrDefault(d => d.Id == id) is { } standard && typed.Trim() == Loc.T("Channel." + id)
+            ? standard.Name
+            : typed;
+
     /// <summary>The preset Left/Right picked, else the first.</summary>
     string PresetPick()
     {
@@ -419,7 +428,7 @@ public sealed class OverlayContent
             Toggle = () =>
             {
                 if (RenamePick() is not { } channel) return;
-                _host.AskName(ChannelName(channel), name => Mix.RenameChannel(channel.Id, name));
+                _host.AskName(ChannelName(channel), name => Mix.RenameChannel(channel.Id, StoredName(channel.Id, name)));
             },
         });
         return rows;
