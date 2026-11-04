@@ -1429,6 +1429,20 @@ string RepoRoot()
     Check(applied.Channels["game"].Volume == 0.2 && applied.Channels["game"].Muted && applied.Channels["chat"].Volume == 1 && !applied.Channels.ContainsKey("gone") && applied.Apps["a.exe"].Volume == 0.5, "preset ignores unknown channels and keeps the rest");
     Check(baseMix.Channels["game"].Volume == 1, "preset does not mutate the original mix");
 
+    var plainPrograms = new Dictionary<string, string> { [@"C:\x\chrome.exe"] = "chat" };
+    Check(MixRules.ChannelOf(@"c:\X\CHROME.exe", plainPrograms, false) == "chat", "stored choice wins with a case-sensitive dictionary");
+    Check(MixRules.Classify(@"C:\steamapps\commonX\a.exe", false) == "other", "steamapps commonX is not a game folder");
+    var before = progs.ToDictionary(p => p.Key, p => p.Value);
+    MixRules.DeleteChannel(chans, progs, "c1");
+    Check(progs.Count == before.Count && before.All(p => progs[p.Key] == p.Value), "DeleteChannel leaves its input unmodified");
+    var loadedMix = System.Text.Json.JsonSerializer.Deserialize<DeviceMix>("""{"channels":{"game":{"volume":0.5,"muted":false}},"apps":{"C:\\x\\A.exe":{"volume":0.25,"muted":true}}}""", ConfigStore.JsonOptions)!;
+    Check(MixRules.AppLevel(loadedMix, @"c:\x\a.EXE") == new MixLevel(0.25, true), "AppLevel finds a differently cased exe in a JSON-loaded mix");
+    Check(MixRules.AppLevel(loadedMix, @"C:\none.exe") == new MixLevel(1.0, false), "AppLevel defaults to 1.0 unmuted");
+    var copiedLoaded = MixRules.MixFor(new Dictionary<string, DeviceMix> { ["A"] = loadedMix }, "B", "A");
+    Check(copiedLoaded.Apps.TryGetValue(@"c:\x\a.exe", out var cl) && cl.Muted, "copied mix keeps app lookups case-insensitive");
+    var presetApplied = MixRules.ApplyPreset(loadedMix, new MixPreset("Q", []), MixRules.DefaultChannels);
+    Check(presetApplied.Apps.ContainsKey(@"c:\x\a.exe"), "preset copy keeps app lookups case-insensitive");
+
     var groups = MixRules.GroupByProgram(new[] { "CHROME.EXE", "chrome.exe", "Chrome.exe", "vlc.exe" }, s => s);
     Check(groups.Count == 2 && groups[0].Sessions.Count == 3 && groups[1].Sessions.Count == 1, "sessions group by exe case-insensitively");
 
