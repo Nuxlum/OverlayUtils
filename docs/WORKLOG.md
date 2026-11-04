@@ -139,6 +139,26 @@ The stage checklist lives in `PORTING.md`.
   channel's assignments and levels. The row shows "Delete? Press again" and
   the footer "Confirm delete". Removing a disconnected device from a priority
   list stays one press.
+- 2026-11-04 - **Games library without hard-coded paths:** every launcher is
+  found from the registry (Steam path, Epic AppDataPath, GOG game keys,
+  uninstall entries for emulators) and its own files; nothing assumes a drive
+  or folder. Xbox / Game Pass games are the user's packages that carry a
+  MicrosoftGame.config, launched by AUMID.
+- 2026-11-04 - **Emulators open by themselves:** one tile per installed
+  emulator, no ROM scanning (there are too many formats and front ends to
+  support well). Portable emulators, Quiver Launcher, recomp launchers and
+  anything else go in through Settings → Games → Manage apps → Add app….
+- 2026-11-04 - **Duplicates across stores are kept:** a game owned on Steam
+  and Epic shows twice (each tile launches its own store's copy); only the
+  same id is merged.
+- 2026-11-04 - **Y / Delete is the Games filter:** on the Games tab the Remove
+  command cycles All → each launcher that has games (`OverlayItem.AltAction`);
+  a filter whose launcher empties falls back to All. The grid keeps the
+  selected game by id across refreshes.
+- 2026-11-04 - **Tiles are drawn outside the row list:** the view model keeps
+  the tile objects while the list of games is unchanged, so moving the
+  selection only flips `IsSelected` and art decoded on a worker arrives
+  without rebuilding the grid.
 
 ## Open questions
 
@@ -174,6 +194,13 @@ The stage checklist lives in `PORTING.md`.
 
 ## Session log
 
+- 2026-11-04 - Stage 5 (games library) written in 5 tasks: Steam reader with
+  text / binary VDF and shortcuts, Epic / GOG / emulator / manual-app
+  readers, merge / sort / filter, Grid row kind and Games tab, Settings →
+  Games, Xbox reader, GameService, cover grid with art loading. 0 warnings,
+  self-test 1247/1247; a read-only check on the dev PC found Steam 79, Epic
+  1, GOG 7, Xbox 1, emulators 0. Nothing launched yet: stage 5 list in
+  PORTING.
 - 2026-11-04 - Stage 4b review fixes: untouched mix levels no longer
   override Windows' per-app volumes (`ShouldWrite`, empty default mix),
   press-twice delete of custom channels, Enter on Cancel in the name dialog

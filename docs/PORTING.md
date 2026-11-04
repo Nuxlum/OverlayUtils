@@ -76,8 +76,15 @@ Plan: `docs/superpowers/plans/2026-11-04-audio-mixing.md`.
 - [~] Auto-switch circuit breaker (3 switches per direction in 10 s, then paused until a quiet device event)
 - [~] Sonar: no integration planned; its virtual devices are ordinary entries in the priority lists
 
-### Stage 5 - Steam library  `[ ]`
-- [ ] Installed games, non-Steam shortcuts (binary VDF), artwork, launch  *(LIBRERIA GIOCHI)*
+### Stage 5 - games library  `[~]`
+Design: `docs/superpowers/specs/2026-11-04-games-design.md`, plan:
+`docs/superpowers/plans/2026-11-04-games.md`. Builds with 0 warnings, the
+self-test passes, and a read-only check found Steam, Epic, GOG and Xbox games
+on the dev PC. No game has been launched from the overlay yet.
+- [~] Steam: installed games in every library, non-Steam shortcuts (binary VDF), cover art, last played order  *(LIBRERIA GIOCHI)*
+- [~] Epic, GOG, Xbox / PC Game Pass (MicrosoftGame.config packages), installed emulators (one tile each), manually added apps
+- [~] Games tab: 3-column cover grid, Y / Delete (or the filter pill) cycles the source filter, mouse hover / click, empty state
+- [~] Settings → Games: a switch per source, Manage apps page (Add app…, Y removes)
 
 ### Stage 6 - Spotify  `[ ]`
 - [ ] PKCE login, token refresh (reuse migrated `spotify_token.json`), recent / playlists, play, shuffle  *(SPOTIFY)*
@@ -148,6 +155,30 @@ so the first tests change the default devices on purpose.
 9. Open the overlay, change the volume from the Windows flyout: the Volume
    row updates at once. Hide the Audio tab in Settings -> Tabs while the
    overlay is open: it disappears at once.
+
+## Testing on Windows (stage 5)
+
+Launching starts real games, so pick ones you don't mind opening.
+1. Open the overlay, go to Games: tiles of every installed launcher, most
+   recently played Steam games first, then A-Z. Covers appear within a few
+   seconds the first time and at once after that.
+2. Pad / arrows: Right at the end of a row goes to the next row, Up / Down
+   keep the column, Down onto a short last row lands on its last tile. The
+   list scrolls with the selection. The mouse wheel moves by row.
+3. Y (Delete on the keyboard, or click the filter pill) cycles All → Steam →
+   Epic → … and back; only launchers that have games are offered.
+4. A (or a click) on a Steam game, a non-Steam shortcut, an Epic game, a GOG
+   game and an Xbox game: the overlay hides and the game starts.
+5. Install or uninstall a game while the overlay is closed, then open it: the
+   grid follows, and the selected tile stays on the same game if it is still
+   there.
+6. Settings → Games: turn Epic off, the Epic tiles go; when the filter was
+   Epic it goes back to All. Turn it on again.
+7. Settings → Games → Manage apps → Add app…: pick an exe (e.g. a portable
+   emulator); it shows as a tile with its icon under Apps. Y on its row in
+   Manage apps removes it.
+8. With every source off: "No games found" and the hint to add apps.
+9. A game title with accents or symbols shows correctly on its tile.
 
 ## Testing on Windows (stage 4b)
 

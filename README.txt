@@ -71,6 +71,18 @@ you added (its programs go to Other).
 Settings -> Audio -> Programs: Left/Right move a program to another channel;
 "Add program..." picks an .exe before it ever plays.
 
+GAMES
+-----
+The Games tab shows the games installed with Steam (non-Steam shortcuts
+included), Epic, GOG and the Xbox app (PC Game Pass), plus installed
+emulators and any program you add. Covers come from the launchers; the most
+recently played Steam games come first.
+A (or a click) starts the selected game. Y on the pad (Delete on the
+keyboard, or a click on the pill above the grid) shows only one launcher at a
+time: All, Steam, Epic, ...
+Settings -> Games: a switch per launcher, and "Manage apps" to add any .exe
+(portable emulators, other launchers) or remove it again with Y.
+
 OVERLAY OVER FULLSCREEN GAMES (optional)
 ----------------------------------------
 By default the overlay works over the desktop, windows, borderless games and
@@ -179,6 +191,19 @@ Altro).
 Impostazioni -> Audio -> Programmi: Sinistra/Destra spostano un programma in
 un altro canale; "Aggiungi programma..." sceglie un .exe prima ancora che
 suoni.
+
+GIOCHI
+------
+La scheda Giochi mostra i giochi installati con Steam (scorciatoie non Steam
+comprese), Epic, GOG e l'app Xbox (PC Game Pass), più gli emulatori
+installati e qualsiasi programma aggiunto da te. Le copertine arrivano dai
+launcher; i giochi Steam giocati di recente vengono per primi.
+A (o un clic) avvia il gioco selezionato. Y sul pad (Canc sulla tastiera, o
+un clic sulla pillola sopra la griglia) mostra un launcher alla volta: Tutti,
+Steam, Epic, ...
+Impostazioni -> Giochi: un interruttore per ogni launcher, e "Gestisci app"
+per aggiungere qualsiasi .exe (emulatori portatili, altri launcher) o
+toglierlo di nuovo con Y.
 
 OVERLAY SOPRA I GIOCHI A SCHERMO INTERO (facoltativo)
 -----------------------------------------------------

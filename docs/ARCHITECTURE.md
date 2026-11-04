@@ -290,6 +290,30 @@ gets channel volume x app volume.
   `audio_presets` (list of `{name, channels}`). Null collections in the file
   load as empty.
 
+## Games
+
+Stage 5. Readers and rules in Core (`Games/`), Xbox and the service in App.
+
+| Core | App (`Games/`, `Overlay/`) |
+|---|---|
+| `SteamLibrary` (libraryfolders, appmanifests, shortcuts.vdf via `Vdf`), `EpicLibrary`, `GogLibrary`, `EmulatorLibrary`, `ManualApps` | `XboxLibrary`: user packages with a MicrosoftGame.config (WinRT `PackageManager`) |
+| `IRegistryView` (read-only; faked in the self-test) | `GameService : IGameView`: reads on a worker at start and on every overlay open |
+| `GameLibrary`: merge (hidden sources, same id once), sort (last played, title), filter cycle | `GameArt`: covers / icons decoded small, frozen, cached by path |
+| `GameEntry`, `IGameView` | `TileVm`, `TileList` in `OverlayWindow` |
+
+- **Grid row.** `ItemKind.Grid` gives the navigator a tile cursor: Left/Right
+  step through tiles across rows, Up/Down keep the column, A (or a click)
+  returns `HideAndRun` with `Launch(tile)`. `Refresh` keeps the selected tile
+  by game id. The Remove command runs the row's `AltAction` (the source
+  filter) when it has one.
+- **Drawing.** The grid row draws only its header (filter pill, count); the
+  tiles are a separate `ItemsControl` under the rows, bound to tile objects
+  that survive redraws while the game list is the same.
+- **Launch.** Through the shell: `steam://rungameid/`, the Epic launcher URI,
+  `shell:AppsFolder\<AUMID>`, or the exe with its working folder.
+- **Config keys.** `games_sources_hidden` (lowercase source names, not
+  read at all when hidden), `games_manual_apps` (exe paths).
+
 ## Configuration
 
 `ConfigStore` owns `%APPDATA%\OverlayUtils\config.json`:
