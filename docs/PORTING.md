@@ -152,7 +152,9 @@ so the first tests change the default devices on purpose.
 ## Testing on Windows (stage 4b)
 
 Needs the headset and the speakers (two outputs), Discord, a browser and a
-game. Nothing is changed in Windows until an app plays or a row is touched.
+game. Windows' per-app volumes and mutes change only for apps whose own row
+or channel row was set in the overlay on the current output; every other app
+keeps what Windows has for it.
 1. Audio tab with Chrome playing in two tabs and Discord in a call: one row
    for Chrome and one for Discord (indented under Media / Chat), however many
    processes they run. Right on Chrome changes every Chrome tab at once.
@@ -172,8 +174,10 @@ game. Nothing is changed in Windows until an app plays or a row is touched.
 5. Settings -> Audio -> Channels: "Add channel..." (type a name), change its
    icon with Left/Right, move it with A / Up / Down / A; "Rename..." (footer
    says "Rename") on Game; the new name shows in the Audio tab. Move Discord
-   to the new channel in Programs, then delete the channel with Y: Discord is
-   back under Other with its own volume unchanged.
+   to the new channel in Programs, then press Y on the channel: the row says
+   "Delete? Press again" and the footer "Confirm delete"; wait 3 s and it
+   goes back. Press Y twice: Discord is back under Other with its own volume
+   unchanged.
 6. Settings -> Audio -> Programs: move Chrome to Chat by hand; restart the
    app and play in Chrome: it stays in Chat. "Add program..." opens a file
    picker over the overlay; pick an .exe that never played, give it a
@@ -189,7 +193,13 @@ game. Nothing is changed in Windows until an app plays or a row is touched.
    open: the dialog closes and nothing is saved. Open "Add channel..." and,
    with the prompt still open, click "Save preset...": the prompt becomes
    "Save preset" and only the preset is saved. Apps already playing when the app
-   starts keep their level until a row is touched or the output changes.
+   starts keep their level until their row or their channel's row is touched,
+   or the output changes to a device with a level set for them.
+10. Hands off untouched apps: on a fresh config, set Spotify to 40 % and mute
+    VLC in the Windows mixer. Open the overlay, change only Game, switch the
+    output and back: Spotify stays at 40 % and VLC muted. In the name dialog,
+    Tab to Cancel and press Enter: nothing is saved. With one custom channel
+    renamed "Channel 6", "Add channel..." suggests "Channel 7".
 
 ## Testing on Windows (stage 3)
 

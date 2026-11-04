@@ -126,6 +126,8 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Overlay.CloseWindow.Desc" xml:space="preserve"><value>Closes the window that was in front before the overlay.</value></data>
   <data name="Overlay.CloseWindow.Label" xml:space="preserve"><value>Close window</value></data>
   <data name="Overlay.ConfirmPending" xml:space="preserve"><value>Confirm?</value></data>
+  <data name="Overlay.DeletePending" xml:space="preserve"><value>Delete? Press again</value></data>
+  <data name="Overlay.Footer.ConfirmDelete" xml:space="preserve"><value>Confirm delete</value></data>
   <data name="Overlay.Footer.Apply" xml:space="preserve"><value>Apply</value></data>
   <data name="Overlay.Footer.Back" xml:space="preserve"><value>Back</value></data>
   <data name="Overlay.Footer.Change" xml:space="preserve"><value>Change</value></data>
@@ -208,7 +210,7 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Settings.Audio.AutoInput.Desc" xml:space="preserve"><value>Follow the Input order when a microphone is connected or disconnected. Off: manual only.</value></data>
   <data name="Settings.Audio.AutoOutput" xml:space="preserve"><value>Auto-switch output</value></data>
   <data name="Settings.Audio.AutoOutput.Desc" xml:space="preserve"><value>Follow the Output order when an output is connected or disconnected. Off: manual only.</value></data>
-  <data name="Settings.Audio.Channel.CustomDesc" xml:space="preserve"><value>Left / right: icon. A: pick up and move. Y / Delete: delete it (its programs go to Other).</value></data>
+  <data name="Settings.Audio.Channel.CustomDesc" xml:space="preserve"><value>Left / right: icon. A: pick up and move. Y / Delete twice: delete it (its programs go to Other).</value></data>
   <data name="Settings.Audio.Channel.Desc" xml:space="preserve"><value>Left / right: icon. A: pick up, Up / Down: move, A: drop (B cancels).</value></data>
   <data name="Settings.Audio.ChannelName" xml:space="preserve"><value>Channel {0}</value></data>
   <data name="Settings.Audio.Channels" xml:space="preserve"><value>Channels</value></data>

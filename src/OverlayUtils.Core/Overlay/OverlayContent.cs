@@ -374,12 +374,25 @@ public sealed class OverlayContent
         _presetPick = names[(((index + Math.Sign(direction)) % names.Count) + names.Count) % names.Count];
     }
 
+    /// <summary>
+    /// "Channel N" with N one past the number of channels, skipping names in use (stored or shown, any casing).
+    /// </summary>
+    public static string SuggestedChannelName(IReadOnlyList<AudioChannel> channels) =>
+        FreeName("Settings.Audio.ChannelName", channels.Count + 1, channels.Select(c => c.Name).Concat(channels.Select(ChannelName)));
+
     /// <summary>"Preset N" with N one past the number of presets, skipping names in use.</summary>
     string SuggestedPresetName()
     {
-        var names = _config.Current.AudioPresets.Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        for (var n = names.Count + 1; ; n++)
-            if (Loc.T("Overlay.Audio.PresetName", n) is var name && !names.Contains(name)) return name;
+        var presets = _config.Current.AudioPresets;
+        return FreeName("Overlay.Audio.PresetName", presets.Count + 1, presets.Select(p => p.Name));
+    }
+
+    /// <summary>The localized "{key} N" for the first N from <paramref name="start"/> that is not in use (any casing).</summary>
+    static string FreeName(string key, int start, IEnumerable<string> inUse)
+    {
+        var names = inUse.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        for (var n = start; ; n++)
+            if (Loc.T(key, n) is var name && !names.Contains(name)) return name;
     }
 
     /// <summary>Rows of the Channels page: the channels (reorderable, Left/Right = icon), Add channel, Rename.</summary>
@@ -404,6 +417,7 @@ public sealed class OverlayContent
                 Commit = CommitChannels,
                 Cancel = () => _channelDraft = null,
                 RemoveEntry = custom ? () => Mix.DeleteChannel(id) : null,
+                ConfirmRemove = true, // deleting loses its program assignments and levels: press twice
             };
         }).ToList();
 
@@ -412,7 +426,7 @@ public sealed class OverlayContent
             Kind = ItemKind.Action, Icon = Glyphs.Add, Key = "channels.add", Stay = true,
             Label = () => Loc.T("Settings.Audio.AddChannel"),
             Description = () => Loc.T("Settings.Audio.AddChannel.Desc"),
-            Action = () => _host.AskName(Loc.T("Dialog.Name.NewChannel"), Loc.T("Settings.Audio.ChannelName", Mix.Channels.Count + 1),
+            Action = () => _host.AskName(Loc.T("Dialog.Name.NewChannel"), SuggestedChannelName(Mix.Channels),
                 Mix.AddChannel),
         });
         rows.Add(new OverlayItem

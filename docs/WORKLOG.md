@@ -125,6 +125,20 @@ The stage checklist lives in `PORTING.md`.
   open prompt (the old one is cancelled). Hiding the overlay cancels it.
 - 2026-11-04 - **A row can name its A action** (`OverlayItem.ActionLabel`):
   "Apply" on Presets, "Rename" on Rename, instead of the kind's "Turn on/off".
+- 2026-11-04 - **No stored level means hands off** (review fix): a session is
+  written only when its app or its channel has an entry in the device's mix
+  (`MixRules.ShouldWrite`); a new device's mix has no channel entries. So
+  untouched programs keep the per-app volume and mute Windows has for them
+  instead of being reset to 100 % unmuted. Edits, presets and copies to a new
+  device create entries, so anything the user set (even back to 100 %) is
+  written; not "skip if equal to the default", which would lose an unmute.
+  A session written once stays written while it lives (a program moved to an
+  untouched channel follows it).
+- 2026-11-04 - **Deleting a custom channel takes two presses** (Y / Delete
+  within 3 s, `OverlayItem.ConfirmRemove`), like Power: it loses the
+  channel's assignments and levels. The row shows "Delete? Press again" and
+  the footer "Confirm delete". Removing a disconnected device from a priority
+  list stays one press.
 
 ## Open questions
 
@@ -160,6 +174,11 @@ The stage checklist lives in `PORTING.md`.
 
 ## Session log
 
+- 2026-11-04 - Stage 4b review fixes: untouched mix levels no longer
+  override Windows' per-app volumes (`ShouldWrite`, empty default mix),
+  press-twice delete of custom channels, Enter on Cancel in the name dialog
+  cancels, "Add channel..." skips names in use. Self-test green, 0 warnings;
+  still not tested with real devices.
 - 2026-11-04 - Stage 4b (mixing) written in 4 tasks: mixing rules
   (self-tested), audio sessions with per-app mix and the auto-switch circuit
   breaker, channels / presets / Channels and Programs pages in the overlay,

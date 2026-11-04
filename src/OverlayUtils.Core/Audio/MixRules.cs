@@ -97,29 +97,44 @@ public static class MixRules
     public static double Effective(MixLevel channel, MixLevel app) =>
         channel.Muted || app.Muted ? 0.0 : channel.Volume * app.Volume;
 
-    private static Dictionary<string, MixLevel> CopyApps(Dictionary<string, MixLevel> apps)
+    private static Dictionary<string, MixLevel> CopyApps(Dictionary<string, MixLevel>? apps)
     {
         var copy = new Dictionary<string, MixLevel>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (exe, level) in apps) copy[exe] = level;
+        foreach (var (exe, level) in apps ?? []) copy[exe] = level;
         return copy;
     }
 
     /// <summary>App level by exe path, case-insensitive; 1.0 unmuted when the app has none.</summary>
-    public static MixLevel AppLevel(DeviceMix mix, string exe)
+    public static MixLevel AppLevel(DeviceMix mix, string exe) => FindApp(mix, exe) ?? new MixLevel(1.0, false);
+
+    private static MixLevel? FindApp(DeviceMix mix, string exe)
     {
-        if (mix.Apps.TryGetValue(exe, out var level)) return level;
-        foreach (var (key, value) in mix.Apps)
+        if (mix.Apps is not { } apps) return null;
+        if (apps.TryGetValue(exe, out var level)) return level;
+        foreach (var (key, value) in apps)
             if (string.Equals(key, exe, StringComparison.OrdinalIgnoreCase)) return value;
-        return new MixLevel(1.0, false);
+        return null;
     }
 
-    /// <summary>The device's own mix; a device seen for the first time starts from a copy of the current device's.</summary>
+    /// <summary>
+    /// Whether a session of <paramref name="exe"/> on channel <paramref name="channelId"/> is written at all: only
+    /// when the user stored a level for the app or for its channel on this device. Nothing stored means hands off,
+    /// so the per-app volumes and mutes set in Windows stay until the user changes the mix in the overlay. A level
+    /// set back to 100 % unmuted is still an entry, so undoing a mute is written.
+    /// </summary>
+    public static bool ShouldWrite(DeviceMix mix, string channelId, string exe) =>
+        mix.Channels?.ContainsKey(channelId) == true || FindApp(mix, exe) is not null;
+
+    /// <summary>
+    /// The device's own mix; a device seen for the first time starts from a copy of the current device's (only the
+    /// entries it has), else empty: no entries, so nothing is written until the user sets a level.
+    /// </summary>
     public static DeviceMix MixFor(IReadOnlyDictionary<string, DeviceMix> mixes, string deviceId, string? currentDeviceId)
     {
         if (mixes.TryGetValue(deviceId, out var own)) return own;
         if (currentDeviceId is not null && mixes.TryGetValue(currentDeviceId, out var current))
-            return new DeviceMix(new(current.Channels), CopyApps(current.Apps));
-        return new DeviceMix(DefaultChannels.ToDictionary(c => c.Id, _ => new MixLevel(1.0, false)), []);
+            return new DeviceMix(new(current.Channels ?? []), CopyApps(current.Apps));
+        return new DeviceMix([], []);
     }
 
     /// <summary>Removes a custom channel and moves its programs to "other". Default channels stay.</summary>
@@ -147,7 +162,7 @@ public static class MixRules
     /// <summary>A copy of the mix with the preset's channel levels applied; unknown channel ids are ignored.</summary>
     public static DeviceMix ApplyPreset(DeviceMix mix, MixPreset preset, IReadOnlyList<AudioChannel> channels)
     {
-        var result = new DeviceMix(new(mix.Channels), CopyApps(mix.Apps));
+        var result = new DeviceMix(new(mix.Channels ?? []), CopyApps(mix.Apps));
         foreach (var (id, level) in preset.Channels)
             if (channels.Any(c => c.Id == id)) result.Channels[id] = level;
         return result;

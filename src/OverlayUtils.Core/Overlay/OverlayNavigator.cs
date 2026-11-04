@@ -27,6 +27,7 @@ public sealed class OverlayNavigator
     int _savedIndex;
     int _savedSegment;
     (int Index, int Segment, DateTimeOffset Deadline)? _pending;
+    (int Index, DateTimeOffset Deadline)? _removePending;
     string? _selectedKey;
     bool _holding;
     Action? _holdCancel;
@@ -85,6 +86,9 @@ public sealed class OverlayNavigator
     }
 
     public bool IsPending(int index, int segment) => _pending is { } p && p.Index == index && p.Segment == segment;
+
+    /// <summary>A Remove on a <see cref="OverlayItem.ConfirmRemove"/> row is armed: the next one within 3 s deletes.</summary>
+    public bool IsRemovePending(int index) => _removePending is { } p && p.Index == index;
 
     /// <summary>
     /// Back to the first tab. Returns the Cancel of a picked-up Reorder row (or null); the caller runs it
@@ -163,6 +167,7 @@ public sealed class OverlayNavigator
 
     public NavResult Handle(OverlayCommand command)
     {
+        if (command != OverlayCommand.Remove) _removePending = null; // any other command disarms a pending delete
         if (_holding) return HandleHolding(command);
         switch (command)
         {
@@ -187,10 +192,26 @@ public sealed class OverlayNavigator
             case OverlayCommand.PrevTrack: return Media(_media is { } prev ? prev.Previous : null);
             case OverlayCommand.NextTrack: return Media(_media is { } next ? next.Next : null);
             case OverlayCommand.PlayPause: return Media(_media is { } play ? play.PlayPause : null);
-            case OverlayCommand.Remove:
-                return Selected?.RemoveEntry is { } remove ? new NavResult(NavEffect.RunHere, remove) : None;
+            case OverlayCommand.Remove: return Remove();
             default: return None;
         }
+    }
+
+    /// <summary>Runs the row's RemoveEntry; a <see cref="OverlayItem.ConfirmRemove"/> row needs a second press within 3 s.</summary>
+    NavResult Remove()
+    {
+        if (Selected is not { RemoveEntry: { } remove } item) return None;
+        if (item.ConfirmRemove)
+        {
+            var now = _time.GetUtcNow();
+            if (!(_removePending is { } p && p.Index == Index && now <= p.Deadline))
+            {
+                _removePending = (Index, now + ConfirmTimeout);
+                return Redraw;
+            }
+            _removePending = null;
+        }
+        return new NavResult(NavEffect.RunHere, remove);
     }
 
     static NavResult Media(Action? action) => action == null ? None : new NavResult(NavEffect.RunHere, action);
@@ -254,6 +275,7 @@ public sealed class OverlayNavigator
     public NavResult Click(int index, int? segment = null)
     {
         if (_holding) return None;
+        _removePending = null;
         var items = Items;
         if (index < 0 || index >= items.Count || !IsSelectable(items[index])) return None;
         // Re-selecting the current row would clear a pending confirm, so a second click could never fire it.
@@ -313,16 +335,31 @@ public sealed class OverlayNavigator
     {
         var items = Items;
         if (_holding || index < 0 || index >= items.Count || !IsSelectable(items[index])) return false;
+        _removePending = null;
         if (index != Index) Select(index);
         return true;
     }
 
+    /// <summary>Drops a segment confirm or a pending delete whose 3 s are over (true if one was dropped).</summary>
     public bool ExpirePending()
     {
-        if (_pending is not { } p || _time.GetUtcNow() <= p.Deadline) return false;
-        _pending = null;
-        return true;
+        var now = _time.GetUtcNow();
+        var expired = false;
+        if (_pending is { } p && now > p.Deadline)
+        {
+            _pending = null;
+            expired = true;
+        }
+        if (_removePending is { } r && now > r.Deadline)
+        {
+            _removePending = null;
+            expired = true;
+        }
+        return expired;
     }
+
+    /// <summary>A segment confirm or a delete is waiting for its second press.</summary>
+    public bool HasPending => _pending is not null || _removePending is not null;
 
     public string Description() => Selected?.Description() ?? "";
 
@@ -362,6 +399,8 @@ public sealed class OverlayNavigator
                 hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.Icon")));
             else if (item.Kind == ItemKind.Expander)
                 hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.OpenClose")));
+            if (IsRemovePending(Index))
+                hints.Add(new FooterHint(pad ? "Y" : "Del", Loc.T("Overlay.Footer.ConfirmDelete"), OverlayCommand.Remove));
         }
         if (Page == OverlayPage.Tabs)
         {
@@ -388,6 +427,7 @@ public sealed class OverlayNavigator
     {
         Index = index;
         _pending = null;
+        _removePending = null;
         Segment = 0;
         var items = Items;
         _selectedKey = index >= 0 && index < items.Count ? items[index].Key : null;

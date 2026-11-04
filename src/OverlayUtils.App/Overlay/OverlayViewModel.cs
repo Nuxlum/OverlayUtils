@@ -123,6 +123,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
             var isOn = item.Kind is ItemKind.Toggle or ItemKind.Expander or ItemKind.Slider or ItemKind.Media && item.IsOn();
             var sliderLevel = item.Kind == ItemKind.Slider ? SliderLevel(value) : 0;
             if (item.Kind == ItemKind.Slider && isOn) value = Loc.T("Overlay.Audio.Muted");
+            if (nav.IsRemovePending(i)) value = Loc.T("Overlay.DeletePending");
             rows.Add(new RowVm(i, string.IsNullOrEmpty(section) ? null : section.ToUpper(Loc.Culture), item.Icon,
                 item.Label(), item.Kind, value, isOn, hint,
                 item.Kind == ItemKind.Action && hint.Length == 0 && (item.Stay || item.OpensInfo || item.SubPage != null),

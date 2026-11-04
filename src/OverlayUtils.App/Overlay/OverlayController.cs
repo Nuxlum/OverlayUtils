@@ -272,18 +272,7 @@ internal sealed class OverlayController : IDisposable
         if (!HasPending()) _pendingTimer.Stop();
     }
 
-    bool HasPending()
-    {
-        var items = _navigator.Items;
-        for (var i = 0; i < items.Count; i++)
-        {
-            if (items[i].Kind != ItemKind.Segmented) continue;
-            var count = items[i].Options().Count;
-            for (var j = 0; j < count; j++)
-                if (_navigator.IsPending(i, j)) return true;
-        }
-        return false;
-    }
+    bool HasPending() => _navigator.HasPending;
 
     // --- commands -------------------------------------------------------------
 

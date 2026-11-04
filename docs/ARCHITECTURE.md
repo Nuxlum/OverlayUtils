@@ -243,15 +243,24 @@ gets channel volume x app volume.
   exists counts as `other` (`ChannelFor`).
 - **Apply rules.** The service writes a session's volume (`Effective`,
   clamped) and its mute flag (channel or app muted); muting never changes
-  the stored or the session volume. It writes: to every session of a program
-  when that program gets a new session; to all live sessions when the default
-  output changes (that device's mix) and on `ApplyMix()` (after every overlay
-  edit). Never at startup: apps already playing keep their level until a row
-  is touched or the output changes. Changes made in the Windows mixer stay
-  until then too.
+  the stored or the session volume. Only sessions whose app or channel has a
+  stored level on the current device are written (`MixRules.ShouldWrite`):
+  no entry means hands off, so a program the user never set in the overlay
+  keeps the volume and mute Windows has for it, on every device and after
+  every edit of other rows. Any level the user sets is an entry (even back
+  to 100 % unmuted), so undoing a mute is written. A session written once
+  keeps being written while it lives (moving its program to an untouched
+  channel resets it to that channel's 100 %). When it writes: to every
+  session of a program when that program gets a new session; to all live
+  sessions when the default output changes (that device's mix) and on
+  `ApplyMix()` (after every overlay edit). Never at startup: apps already
+  playing keep their level until their row or their channel's row is
+  touched, or the output changes to a device with an entry for them.
+  Changes made in the Windows mixer stay until then too.
 - **Per device.** `audio_mix` is keyed by output device id. A device seen for
-  the first time gets a copy of the previous device's mix (`MixFor`, stored by
-  `EnsureMix`). Presets store channel levels only and apply to the current
+  the first time gets a copy of the previous device's entries (`MixFor`,
+  stored by `EnsureMix`), or an empty mix when there is none: untouched
+  channels and apps stay without entries (shown as 100 %, not written). Presets store channel levels only and apply to the current
   device; ids missing from the channel list are ignored.
 - **Channels.** `game`, `chat`, `media`, `other` are fixed ids (renamable,
   re-iconable, not deletable); custom ones are `c1`, `c2`, ... Deleting one

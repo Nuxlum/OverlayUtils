@@ -1503,6 +1503,10 @@ string RepoRoot()
     while (nav.Selected?.Key != "c1") nav.Handle(OverlayCommand.Down);
     Check(nav.Selected?.RemoveEntry != null, "a custom channel can be deleted");
     audio.Calls.Clear();
+    Check(nav.Selected?.ConfirmRemove == true, "deleting a custom channel asks for a second press");
+    Run(nav.Handle(OverlayCommand.Remove));
+    Check(store.Current.AudioChannels.Count == 5 && store.Current.AudioPrograms[spotify] == "c1" && nav.IsRemovePending(nav.Index),
+        "the first Y only arms the delete");
     Run(nav.Handle(OverlayCommand.Remove));
     nav.Refresh();
     Check(store.Current.AudioChannels.Count == 4 && store.Current.AudioPrograms[spotify] == "other" && audio.Calls.Contains("ApplyMix"),
@@ -1744,9 +1748,9 @@ string RepoRoot()
     Check(copied.Channels["game"].Volume == 0.3 && copied.Apps["a.exe"].Muted && !ReferenceEquals(copied.Channels, mixA.Channels), "unknown device copies the current mix");
     Check(ReferenceEquals(MixRules.MixFor(mixes, "A", "B"), mixA), "known device returns its own mix");
     var empty = MixRules.MixFor(mixes, "C", null);
-    Check(empty.Channels.Count == MixRules.DefaultChannels.Count && empty.Channels.Values.All(l => l.Volume == 1.0 && !l.Muted) && empty.Apps.Count == 0, "no current device gives defaults");
+    Check(empty.Channels.Count == 0 && empty.Apps.Count == 0, "no current device gives an empty mix (nothing stored = nothing written)");
     var empty2 = MixRules.MixFor(mixes, "C", "missing");
-    Check(empty2.Channels.Count == MixRules.DefaultChannels.Count, "current device without a mix gives defaults");
+    Check(empty2.Channels.Count == 0 && empty2.Apps.Count == 0, "current device without a mix gives an empty mix");
 
     var chans = new List<AudioChannel>(MixRules.DefaultChannels) { new("c1", "One", "star") };
     var progs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["a.exe"] = "c1", ["b.exe"] = "c1", ["c.exe"] = "chat" };
@@ -1827,6 +1831,92 @@ string RepoRoot()
     Check(Math.Abs(sl.Volume - 0.4) < 1e-9 && !sl.Muted, "unmuted: product, not muted");
     Check(MixRules.SessionLevel(new MixLevel(1.5, false), new MixLevel(1.2, false)).Volume == 1.0, "session volume clamped above 1");
     Check(MixRules.SessionLevel(new MixLevel(-0.5, false), new MixLevel(0.8, false)).Volume == 0.0, "session volume clamped below 0");
+}
+
+// --- Mixing rules: only what the user set is written ---
+{
+    var none = new DeviceMix([], []);
+    Check(!MixRules.ShouldWrite(none, "game", @"C:\x\a.exe"), "untouched channel and app: the session is not written");
+    var set = new DeviceMix(new() { ["game"] = new MixLevel(1.0, false) }, new() { [@"C:\x\A.exe"] = new MixLevel(1.0, false) });
+    Check(MixRules.ShouldWrite(set, "game", @"C:\x\b.exe"), "a stored channel level (even 100 % unmuted) is written");
+    Check(MixRules.ShouldWrite(set, "chat", @"c:\X\a.EXE"), "a stored app level is written (any casing)");
+    Check(!MixRules.ShouldWrite(set, "chat", @"C:\x\b.exe"), "neither stored: not written");
+    var loaded = System.Text.Json.JsonSerializer.Deserialize<DeviceMix>("""{"channels":null,"apps":null}""", ConfigStore.JsonOptions)!;
+    Check(!MixRules.ShouldWrite(loaded, "game", @"C:\x\a.exe"), "a mix loaded with null collections writes nothing and does not throw");
+    var copiedEmpty = MixRules.MixFor(new Dictionary<string, DeviceMix> { ["A"] = new([], []) }, "B", "A");
+    Check(copiedEmpty.Channels.Count == 0 && copiedEmpty.Apps.Count == 0, "a new device copying an untouched mix stays untouched");
+
+    var path = Path.Combine(temp, "shouldwrite", "config.json");
+    var store = new ConfigStore(path);
+    var audio = new FakeAudio();
+    audio.Outputs.Add(new AudioDeviceRef("spk", "Speakers"));
+    audio.DefaultOutput = "spk";
+    var mix = new MixController(store, audio);
+    Check(mix.CurrentMix().Channels.Count == 0 && mix.ChannelLevel("game") == new MixLevel(1.0, false), "untouched: UI shows 100 % unmuted, nothing stored");
+    mix.ToggleChannelMute("game");
+    mix.ToggleChannelMute("game");
+    var stored = store.Current.AudioMix["spk"];
+    Check(stored.Channels["game"] == new MixLevel(1.0, false) && MixRules.ShouldWrite(stored, "game", @"C:\x\a.exe"),
+        "unmute after mute stays stored, so the unmute is written");
+    Check(!MixRules.ShouldWrite(stored, "chat", @"C:\x\a.exe"), "editing one channel does not make the others written");
+    mix.ToggleAppMute(@"C:\x\a.exe");
+    mix.ToggleAppMute(@"C:\x\a.exe");
+    Check(MixRules.ShouldWrite(store.Current.AudioMix["spk"], "chat", @"C:\x\a.exe"), "an app set back to 100 % is still written");
+}
+
+// --- Overlay: Remove that asks for confirmation ---
+{
+    var clock = new TestClock { Now = DateTimeOffset.UnixEpoch };
+    var log = new List<string>();
+    OverlayItem Row(string key, bool confirm) => new()
+    {
+        Kind = ItemKind.Reorder, Key = key, Label = () => key, RemoveEntry = () => log.Add("remove " + key), ConfirmRemove = confirm,
+    };
+    var rows = new[] { Row("a", true), Row("b", true), Row("c", false) };
+    var nav = new OverlayNavigator([new OverlayTab("Controlli", () => "C", () => rows)], () => [], () => [], clock);
+    void Run(NavResult r) => r.Action?.Invoke();
+    nav.Reset([]);
+    var first = nav.Handle(OverlayCommand.Remove);
+    Check(first.Effect == NavEffect.Redraw && log.Count == 0 && nav.IsRemovePending(0), "first Remove arms the delete");
+    Check(nav.Footer(pad: true).Any(h => h.Keys == "Y" && h.Command == OverlayCommand.Remove && h.Label == Loc.T("Overlay.Footer.ConfirmDelete")),
+        "footer asks for the second press");
+    Check(!nav.IsPending(0, 0), "a pending delete is not a pending segment confirm");
+    clock.Now += TimeSpan.FromSeconds(2.9);
+    var second = nav.Handle(OverlayCommand.Remove);
+    Check(second.Effect == NavEffect.RunHere && !nav.IsRemovePending(0), "second Remove within 3 s deletes");
+    Run(second);
+    Check(log.SequenceEqual(["remove a"]), "the row was deleted once");
+    log.Clear();
+    Run(nav.Handle(OverlayCommand.Remove));
+    clock.Now += TimeSpan.FromSeconds(3.1);
+    var late = nav.Handle(OverlayCommand.Remove);
+    Check(late.Effect == NavEffect.Redraw && log.Count == 0 && nav.IsRemovePending(0), "a late second press re-arms instead of deleting");
+    nav.Handle(OverlayCommand.Down);
+    Check(!nav.IsRemovePending(0) && !nav.IsRemovePending(1), "moving to another row disarms");
+    Run(nav.Handle(OverlayCommand.Remove));
+    Run(nav.Handle(OverlayCommand.Right));
+    Check(!nav.IsRemovePending(1), "another command disarms");
+    Run(nav.Handle(OverlayCommand.Remove));
+    Run(nav.Handle(OverlayCommand.A));
+    Check(!nav.IsRemovePending(1) && log.Count == 0, "picking the row up disarms");
+    Run(nav.Handle(OverlayCommand.B));
+    Run(nav.Handle(OverlayCommand.Remove));
+    Check(!nav.ExpirePending(), "ExpirePending false before the deadline");
+    clock.Now += TimeSpan.FromSeconds(3.1);
+    Check(nav.ExpirePending() && !nav.IsRemovePending(1), "ExpirePending clears a pending delete");
+    nav.Handle(OverlayCommand.Down);
+    Run(nav.Handle(OverlayCommand.Remove));
+    Check(log.SequenceEqual(["remove c"]), "a row without ConfirmRemove still deletes at once");
+}
+
+// --- Overlay: suggested channel name skips names in use ---
+{
+    var defaults = MixRules.DefaultChannels.ToList();
+    Check(OverlayContent.SuggestedChannelName(defaults) == Loc.T("Settings.Audio.ChannelName", 5), "four channels: Channel 5");
+    var taken = new List<AudioChannel>(defaults) { new("c1", Loc.T("Settings.Audio.ChannelName", 6), "star") };
+    Check(OverlayContent.SuggestedChannelName(taken) == Loc.T("Settings.Audio.ChannelName", 7), "Channel 6 in use: Channel 7");
+    var upper = new List<AudioChannel>(defaults) { new("c1", Loc.T("Settings.Audio.ChannelName", 6).ToUpperInvariant(), "star") };
+    Check(OverlayContent.SuggestedChannelName(upper) == Loc.T("Settings.Audio.ChannelName", 7), "names in use compare case-insensitively");
 }
 
 // --- Switch breaker ---

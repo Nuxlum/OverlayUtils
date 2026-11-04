@@ -13,7 +13,10 @@ namespace OverlayUtils.Core.Audio;
 // rescan (session created/expired/disconnected, process exited) diffs the
 // enumerator against what is tracked. The mix is written when a program gets
 // a new session, when the default output changes and on ApplyMix; never at
-// start, so changes made elsewhere stay until the next overlay change.
+// start, so changes made elsewhere stay until the next overlay change. Only
+// sessions whose app or channel has a stored level on the device are written
+// (MixRules.ShouldWrite): untouched defaults never override the per-app
+// volumes and mutes set in Windows.
 public sealed partial class AudioService
 {
     private enum ApplyMode { None, NewPrograms, All }
@@ -25,6 +28,11 @@ public sealed partial class AudioService
         public uint ProcessId { get; } = processId;
         /// <summary>Null for sessions that are never listed or mixed (system sounds, our own, unreadable).</summary>
         public string? Exe { get; } = exe;
+        /// <summary>
+        /// Set once the mix wrote this session; from then on it is always written, so moving the program to an
+        /// untouched channel (or deleting its channel) replaces the level written before instead of keeping it.
+        /// </summary>
+        public bool Written { get; set; }
     }
 
     /// <summary>A process with sessions: its exe and, when Windows allows it, a handle that reports its exit.</summary>
@@ -66,7 +74,10 @@ public sealed partial class AudioService
         }
     }
 
-    /// <summary>Stores a mix for a device seen for the first time: a copy of the previous device's, else defaults.</summary>
+    /// <summary>
+    /// Stores a mix for a device seen for the first time: a copy of the previous device's entries, else an empty mix
+    /// (nothing stored, so nothing is written until the user sets a level).
+    /// </summary>
     private void EnsureMix(string deviceId, string? previousDeviceId)
     {
         var mixes = _config.Current.AudioMix;
@@ -322,7 +333,9 @@ public sealed partial class AudioService
 
     /// <summary>
     /// Writes channel x app to each session via <see cref="MixRules.SessionLevel"/>: the volume product and the
-    /// session mute flag (so the Windows mixer shows it muted, and unmuting there restores the level).
+    /// session mute flag (so the Windows mixer shows it muted, and unmuting there restores the level). A session is
+    /// skipped while neither its app nor its channel has a stored level (<see cref="MixRules.ShouldWrite"/>) and the
+    /// mix never wrote it; a missing level in a written session counts as 100 % unmuted.
     /// </summary>
     private void ApplyLevels(List<TrackedSession> sessions)
     {
@@ -335,12 +348,14 @@ public sealed partial class AudioService
             try
             {
                 var channelId = MixRules.ChannelFor(exe, config.AudioPrograms, config.AudioChannels);
-                var channel = mix.Channels.TryGetValue(channelId, out var level) ? level : new MixLevel(1.0, false);
+                if (!session.Written && !MixRules.ShouldWrite(mix, channelId, exe)) continue;
+                var channel = mix.Channels?.TryGetValue(channelId, out var level) == true ? level : new MixLevel(1.0, false);
                 var app = MixRules.AppLevel(mix, exe);
                 var (sessionVolume, muted) = MixRules.SessionLevel(channel, app);
                 var volume = (ISimpleAudioVolume)session.Control;
                 volume.SetMasterVolume((float)sessionVolume, EventContext);
                 volume.SetMute(muted ? 1 : 0, EventContext);
+                session.Written = true;
             }
             catch (Exception e)
             {

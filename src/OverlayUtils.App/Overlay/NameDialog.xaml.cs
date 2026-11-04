@@ -55,8 +55,18 @@ internal sealed partial class NameDialog : Window
     {
         if (e.Key == Key.Enter)
         {
-            e.Handled = true;
-            Accept();
+            // Enter acts on what has focus: the text box or OK saves, Cancel cancels (Tab can reach either button).
+            var focused = Keyboard.FocusedElement;
+            if (ReferenceEquals(focused, CancelButton))
+            {
+                e.Handled = true;
+                Dismiss();
+            }
+            else if (ReferenceEquals(focused, NameBox) || ReferenceEquals(focused, OkButton))
+            {
+                e.Handled = true;
+                Accept();
+            }
         }
         else if (e.Key == Key.Escape)
         {
