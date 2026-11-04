@@ -10,8 +10,9 @@ namespace OverlayUtils.Core.Audio;
 public enum AudioFlow { Output, Input }
 
 /// <summary>
-/// Windows audio devices, master volume and microphone mute, on its own MTA
-/// thread: every COM call happens there. Windows notifications (any thread)
+/// Windows audio devices, master volume, microphone mute and the per-app mix
+/// (audio sessions, see AudioService.Sessions.cs), on its own MTA thread:
+/// every COM call happens there. Windows notifications (any thread)
 /// only queue work to it. Public members read a cached snapshot or queue a
 /// command, so they are safe and non-blocking from any thread. Errors are
 /// logged, never thrown.
@@ -50,10 +51,22 @@ public sealed partial class AudioService : IDisposable
     private string? _boundInput;
     private DateTime? _refreshDue;
     private bool _disposed;
+    private readonly SwitchBreaker _outputBreaker = new();
+    private readonly SwitchBreaker _inputBreaker = new();
+    private readonly bool _readOnly;
 
-    public AudioService(ConfigStore config) => _config = config;
+    /// <param name="config">Settings store (device lists, caps, mix).</param>
+    /// <param name="readOnly">
+    /// For read-only checks (smoke tests): the service never changes Windows audio on its own - no
+    /// session volumes/mutes from the mix, no volume cap, no auto-switch. Explicit commands still act.
+    /// </param>
+    public AudioService(ConfigStore config, bool readOnly = false)
+    {
+        _config = config;
+        _readOnly = readOnly;
+    }
 
-    /// <summary>Devices, defaults, volume or mute changed. Raised on the audio thread.</summary>
+    /// <summary>Devices, defaults, volume, mute or the app list changed. Raised on the audio thread.</summary>
     public event Action? Changed;
 
     public void Start()
@@ -160,6 +173,7 @@ public sealed partial class AudioService : IDisposable
             _enumerator = CoreAudio.Create<IMMDeviceEnumerator>(CoreAudio.CLSID_MMDeviceEnumerator);
             _client = new NotificationClient(this);
             _enumerator.RegisterEndpointNotificationCallback(_client);
+            SeedChannels();
             Refresh(starting: true);
         }
         catch (Exception e)
@@ -243,7 +257,7 @@ public sealed partial class AudioService : IDisposable
             _defaultInput = defaultInput;
         }
 
-        if (defaultOutput != _boundOutput) BindOutput(defaultOutput, applyCap: !starting);
+        if (defaultOutput != _boundOutput) BindOutput(defaultOutput, changed: !starting);
         if (defaultInput != _boundInput) BindInput(defaultInput);
         ReadVolumes(raise: false);
         RaiseChanged();
@@ -280,9 +294,22 @@ public sealed partial class AudioService : IDisposable
                 || inputs.Any(d => _inputs.Find(i => i.Id == d.Id) is { } i && i.Name != d.Name);
     }
 
+    /// <summary>The priority rule behind the circuit breaker (Global Constraints: at most 3 switches in 10 s).</summary>
     private string? AutoSwitch(AudioFlow flow, List<AudioDeviceRef> ranked, List<AudioDeviceRef> available, string? current)
     {
+        if (_readOnly) return current;
         var target = AudioRules.Target(ranked, available.Select(d => d.Id).ToHashSet(), current);
+        var breaker = flow == AudioFlow.Output ? _outputBreaker : _inputBreaker;
+        switch (breaker.Check(DateTime.UtcNow, switchNeeded: target is not null))
+        {
+            case BreakerDecision.Tripped:
+                Log.Info($"Audio auto-switch ({flow}) paused: more than {SwitchBreaker.MaxSwitches} switches within "
+                    + $"{SwitchBreaker.Window.TotalSeconds:0} s; it resumes at the first device change after "
+                    + $"{SwitchBreaker.Window.TotalSeconds:0} s without changes");
+                return current;
+            case BreakerDecision.Paused:
+                return current;
+        }
         if (target is null) return current;
         Log.Info($"Audio auto-switch ({flow}): {available.Find(d => d.Id == target)?.Name ?? target}");
         return ApplyDefault(flow, target, refresh: false) ? target : current;
@@ -324,14 +351,20 @@ public sealed partial class AudioService : IDisposable
         return ok;
     }
 
-    /// <summary>Binds the default output volume; the cap applies only when the default changes, never at start.</summary>
-    private void BindOutput(string? id, bool applyCap)
+    /// <summary>
+    /// Binds the default output volume and its sessions. A device seen for the first time gets a copy of the
+    /// previous device's mix. Only when the default changed (never at start) the cap and the mix are applied.
+    /// </summary>
+    private void BindOutput(string? id, bool changed)
     {
+        var previous = _boundOutput;
         Unbind(ref _outputVolume, ref _outputCallback);
         _boundOutput = id;
+        if (id is not null) EnsureMix(id, previous);
+        BindSessions(id, applyAll: changed);
         if (id is null) return;
         (_outputVolume, _outputCallback) = Bind(id);
-        if (_outputVolume is null || !applyCap) return;
+        if (_outputVolume is null || !changed || _readOnly) return;
         try
         {
             var cap = AudioRules.CapFor(_config.Current.AudioVolumeCaps, id);
@@ -527,6 +560,7 @@ public sealed partial class AudioService : IDisposable
 
     private void Cleanup()
     {
+        UnbindSessions();
         Unbind(ref _outputVolume, ref _outputCallback);
         Unbind(ref _inputVolume, ref _inputCallback);
         if (_enumerator is not null && _client is not null)

@@ -126,6 +126,26 @@ internal static partial class Native
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool CloseHandle(nint handle);
 
+    // --- other processes (audio sessions) -------------------------------------
+    public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    public const uint STILL_ACTIVE = 259;
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    public static partial nint OpenProcess(uint access, [MarshalAs(UnmanagedType.Bool)] bool inheritHandle, uint processId);
+
+    /// <summary>Full Win32 path of the process image; <paramref name="size"/> is in/out, in characters.</summary>
+    [LibraryImport("kernel32.dll", EntryPoint = "QueryFullProcessImageNameW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool QueryFullProcessImageName(nint process, uint flags, ref ushort exeName, ref uint size);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetExitCodeProcess(nint process, out uint exitCode);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetWindowRect(nint hWnd, out RECT rect);
+
     // --- windows / focus ----------------------------------------------------
     public const uint GA_ROOT = 2;
 

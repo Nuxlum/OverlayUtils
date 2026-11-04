@@ -1475,6 +1475,46 @@ string RepoRoot()
     Check(nm.AudioChannels.Count == 0 && nm.AudioPrograms.Count == 0 && nm.AudioMix.Count == 0 && nm.AudioPresets.Count == 0, "null mixing collections load as empty");
 }
 
+// --- Mixing rules: channel of a program, validated ---
+{
+    var channels = new List<AudioChannel>(MixRules.DefaultChannels) { new("c2", "Two", "star") };
+    var programs = new Dictionary<string, string> { [@"C:\x\a.exe"] = "c1", [@"C:\x\b.exe"] = "c2", [@"C:\x\chrome.exe"] = "chat" };
+    Check(MixRules.ChannelFor(@"C:\X\A.EXE", programs, channels) == "other", "a stored channel that no longer exists falls back to other");
+    Check(MixRules.ChannelFor(@"c:\x\B.exe", programs, channels) == "c2", "a stored custom channel is kept (any casing)");
+    Check(MixRules.ChannelFor(@"C:\x\chrome.exe", programs, channels) == "chat", "a stored default channel is kept");
+    Check(MixRules.ChannelFor(@"C:\x\vlc.exe", programs, channels) == "media", "an unknown program uses the rule");
+    Check(MixRules.ChannelFor(@"C:\x\vlc.exe", programs, []) == "media", "no channel list means the default channels");
+}
+
+// --- Switch breaker ---
+{
+    var t0 = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    DateTime At(double seconds) => t0.AddSeconds(seconds);
+    var b = new SwitchBreaker();
+    Check(b.Check(At(0), true) == BreakerDecision.Allowed && b.Check(At(1), true) == BreakerDecision.Allowed
+        && b.Check(At(2), true) == BreakerDecision.Allowed, "three switches within 10 s are allowed");
+    Check(b.Check(At(3), true) == BreakerDecision.Tripped, "the fourth switch within 10 s trips the breaker");
+    Check(b.Check(At(4), true) == BreakerDecision.Paused && b.Check(At(13.5), true) == BreakerDecision.Paused,
+        "paused while device events keep coming within 10 s");
+    Check(b.Check(At(24), true) == BreakerDecision.Allowed, "the next event after a 10 s quiet period resumes");
+    Check(b.Check(At(25), true) == BreakerDecision.Allowed && b.Check(At(26), true) == BreakerDecision.Allowed
+        && b.Check(At(27), true) == BreakerDecision.Tripped, "after resuming the count starts again");
+
+    var spread = new SwitchBreaker();
+    foreach (var s in new[] { 0.0, 1, 2, 11, 12 })
+        Check(spread.Check(At(s), true) == BreakerDecision.Allowed, $"switches older than 10 s do not count ({s})");
+
+    var noSwitch = new SwitchBreaker();
+    noSwitch.Check(At(0), true);
+    noSwitch.Check(At(1), true);
+    Check(noSwitch.Check(At(2), false) == BreakerDecision.Allowed && noSwitch.Check(At(3), true) == BreakerDecision.Allowed,
+        "an event that needs no switch does not count");
+    Check(noSwitch.Check(At(4), true) == BreakerDecision.Tripped, "but switches still do");
+    Check(noSwitch.Check(At(9), false) == BreakerDecision.Paused, "an event while paused restarts the quiet period");
+    Check(noSwitch.Check(At(18), true) == BreakerDecision.Paused, "quiet period counts from the last event");
+    Check(noSwitch.Check(At(28.5), true) == BreakerDecision.Allowed, "resumes after 10 s without events");
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;
@@ -1527,4 +1567,7 @@ sealed class FakeAudio : IAudioView
     public void SetVolume(double level) => Calls.Add("SetVolume:" + level.ToString(CultureInfo.InvariantCulture));
     public void ToggleMute() => Calls.Add("ToggleMute");
     public void ToggleMicMute() => Calls.Add("ToggleMicMute");
+    public List<AudioApp> AppList { get; } = [];
+    public IReadOnlyList<AudioApp> Apps => AppList;
+    public void ApplyMix() => Calls.Add("ApplyMix");
 }

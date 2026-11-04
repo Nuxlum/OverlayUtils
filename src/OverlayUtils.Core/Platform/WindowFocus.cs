@@ -61,6 +61,23 @@ public static class WindowFocus
 
     public static bool IsAlive(nint hwnd) => hwnd != 0 && Native.IsWindow(hwnd);
 
+    /// <summary>True when the window covers its whole monitor (exclusive or borderless fullscreen).</summary>
+    public static bool IsFullscreen(nint hwnd)
+    {
+        if (hwnd == 0 || !Native.GetWindowRect(hwnd, out var rect)) return false;
+        var info = new Native.MONITORINFO { cbSize = (uint)Marshal.SizeOf<Native.MONITORINFO>() };
+        if (!Native.GetMonitorInfo(Native.MonitorFromWindow(hwnd, Native.MONITOR_DEFAULTTONEAREST), ref info)) return false;
+        var monitor = info.rcMonitor;
+        return rect.Left <= monitor.Left && rect.Top <= monitor.Top && rect.Right >= monitor.Right && rect.Bottom >= monitor.Bottom;
+    }
+
+    /// <summary>True when the foreground app window belongs to the process and is fullscreen.</summary>
+    public static bool IsFullscreenForeground(uint processId)
+    {
+        var hwnd = ForegroundApp();
+        return hwnd != 0 && ProcessOf(hwnd) == processId && IsFullscreen(hwnd);
+    }
+
     public static uint ProcessOf(nint hwnd)
     {
         Native.GetWindowThreadProcessId(hwnd, out var pid);

@@ -16,4 +16,6 @@ internal sealed class AudioServiceView(AudioService service) : IAudioView
     public void ToggleMute() => service.ToggleMute();
     public bool MicMuted => service.MicMuted;
     public void ToggleMicMute() => service.ToggleMicMute();
+    public IReadOnlyList<AudioApp> Apps => service.Apps;
+    public void ApplyMix() => service.ApplyMix();
 }

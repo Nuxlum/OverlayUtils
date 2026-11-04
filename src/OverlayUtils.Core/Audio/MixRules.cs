@@ -75,6 +75,17 @@ public static class MixRules
         return Classify(exePath, fullscreenForeground);
     }
 
+    /// <summary>
+    /// <see cref="ChannelOf"/> checked against the channel list (empty = the default channels):
+    /// a stored id of a deleted channel falls back to "other".
+    /// </summary>
+    public static string ChannelFor(string exePath, IReadOnlyDictionary<string, string> programs, IReadOnlyList<AudioChannel> channels)
+    {
+        var id = ChannelOf(exePath, programs, fullscreenForeground: false);
+        var list = channels.Count > 0 ? channels : DefaultChannels;
+        return list.Any(c => c.Id == id) ? id : Other;
+    }
+
     public static double Effective(MixLevel channel, MixLevel app) =>
         channel.Muted || app.Muted ? 0.0 : channel.Volume * app.Volume;
 

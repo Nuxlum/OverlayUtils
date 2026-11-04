@@ -5,8 +5,8 @@ namespace OverlayUtils.Core.Interop;
 
 // Windows Core Audio (MMDevice API, endpoint volume) and the undocumented
 // IPolicyConfig used to set the default endpoint. Declarations follow the
-// Windows SDK headers mmdeviceapi.h, endpointvolume.h, propsys.h and
-// functiondiscoverykeys_devpkey.h; vtable order matters, never reorder.
+// Windows SDK headers mmdeviceapi.h, endpointvolume.h, audiopolicy.h,
+// audioclient.h, propsys.h and functiondiscoverykeys_devpkey.h; vtable order matters, never reorder.
 // Interfaces Windows calls back into return HRESULTs ([PreserveSig]) so an
 // exception can never cross into Windows.
 
@@ -18,6 +18,7 @@ internal static partial class CoreAudio
     public static readonly Guid CLSID_PolicyConfigClient = new("870AF99C-171D-4F9E-AF0D-E63DF40C2BC9");
 
     public static readonly Guid IID_IAudioEndpointVolume = new("5CDF2C82-841E-4546-9722-0CF74078229A");
+    public static readonly Guid IID_IAudioSessionManager2 = new("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F");
 
     public const uint DEVICE_STATE_ACTIVE = 0x1;
     public const uint STGM_READ = 0x0;
@@ -33,6 +34,8 @@ internal static partial class CoreAudio
     public enum EDataFlow { Render = 0, Capture = 1, All = 2 }
 
     public enum ERole { Console = 0, Multimedia = 1, Communications = 2 }
+
+    public enum AudioSessionState { Inactive = 0, Active = 1, Expired = 2 }
 
     [StructLayout(LayoutKind.Sequential)]
     public struct PropertyKey
@@ -190,4 +193,94 @@ internal partial interface IPolicyConfig
     [PreserveSig] int SetPropertyValue(string deviceId, in CoreAudio.PropertyKey key, in CoreAudio.PropVariant value);
     [PreserveSig] int SetDefaultEndpoint(string deviceId, CoreAudio.ERole role);
     [PreserveSig] int SetEndpointVisibility(string deviceId, int visible);
+}
+
+// --- Audio sessions (audiopolicy.h, audioclient.h) ------------------------
+// Session controls and enumerators come back as raw pointers wrapped with
+// CoreAudio.Wrap (unique wrappers), so releasing one never touches another
+// wrapper of the same native session.
+
+/// <summary>IAudioSessionManager2, declared flat (IAudioSessionManager's two methods first).</summary>
+[GeneratedComInterface]
+[Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F")]
+internal partial interface IAudioSessionManager2
+{
+    // IAudioSessionManager
+    nint GetAudioSessionControl(in Guid sessionGuid, uint streamFlags);
+    nint GetSimpleAudioVolume(in Guid sessionGuid, uint streamFlags);
+    // IAudioSessionManager2
+    /// <summary>Raw IAudioSessionEnumerator pointer; wrap it with <see cref="CoreAudio.Wrap{T}"/>.</summary>
+    nint GetSessionEnumerator();
+    void RegisterSessionNotification(IAudioSessionNotification notification);
+    void UnregisterSessionNotification(IAudioSessionNotification notification);
+    void RegisterDuckNotification(nint sessionId, nint notification);
+    void UnregisterDuckNotification(nint notification);
+}
+
+[GeneratedComInterface]
+[Guid("E2F5BB11-0570-40CA-ACDD-3AA01277DEE8")]
+internal partial interface IAudioSessionEnumerator
+{
+    int GetCount();
+    /// <summary>Raw IAudioSessionControl pointer; wrap it with <see cref="CoreAudio.Wrap{T}"/>.</summary>
+    nint GetSession(int index);
+}
+
+/// <summary>IAudioSessionControl2, declared flat (IAudioSessionControl's nine methods first).</summary>
+[GeneratedComInterface]
+[Guid("BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D")]
+internal partial interface IAudioSessionControl2
+{
+    // IAudioSessionControl
+    CoreAudio.AudioSessionState GetState();
+    nint GetDisplayName();
+    void SetDisplayName(nint value, in Guid eventContext);
+    nint GetIconPath();
+    void SetIconPath(nint value, in Guid eventContext);
+    Guid GetGroupingParam();
+    void SetGroupingParam(in Guid param, in Guid eventContext);
+    void RegisterAudioSessionNotification(IAudioSessionEvents events);
+    void UnregisterAudioSessionNotification(IAudioSessionEvents events);
+    // IAudioSessionControl2
+    /// <summary>CoTaskMem string; free with Marshal.FreeCoTaskMem.</summary>
+    nint GetSessionIdentifier();
+    /// <summary>CoTaskMem string, unique per session; free with Marshal.FreeCoTaskMem.</summary>
+    nint GetSessionInstanceIdentifier();
+    uint GetProcessId();
+    /// <summary>S_OK (0) for the system sounds session, S_FALSE (1) otherwise.</summary>
+    [PreserveSig] int IsSystemSoundsSession();
+    void SetDuckingPreference(int optOut);
+}
+
+[GeneratedComInterface]
+[Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8")]
+internal partial interface ISimpleAudioVolume
+{
+    void SetMasterVolume(float level, in Guid eventContext);
+    float GetMasterVolume();
+    void SetMute(int mute, in Guid eventContext);
+    int GetMute();
+}
+
+/// <summary>New sessions on a device; Windows calls this on its own threads.</summary>
+[GeneratedComInterface]
+[Guid("641DD20B-4D41-49CC-ABA3-174B9477BB08")]
+internal partial interface IAudioSessionNotification
+{
+    /// <summary>The session pointer is only borrowed for the call.</summary>
+    [PreserveSig] int OnSessionCreated(nint newSession);
+}
+
+/// <summary>Events of one session; Windows calls these on its own threads.</summary>
+[GeneratedComInterface]
+[Guid("24918ACC-64B3-37C1-8CA9-74A66E9957A8")]
+internal partial interface IAudioSessionEvents
+{
+    [PreserveSig] int OnDisplayNameChanged(nint newDisplayName, nint eventContext);
+    [PreserveSig] int OnIconPathChanged(nint newIconPath, nint eventContext);
+    [PreserveSig] int OnSimpleVolumeChanged(float newVolume, int newMute, nint eventContext);
+    [PreserveSig] int OnChannelVolumeChanged(uint channelCount, nint newChannelVolumes, uint changedChannel, nint eventContext);
+    [PreserveSig] int OnGroupingParamChanged(nint newGroupingParam, nint eventContext);
+    [PreserveSig] int OnStateChanged(CoreAudio.AudioSessionState newState);
+    [PreserveSig] int OnSessionDisconnected(int disconnectReason);
 }
