@@ -3,9 +3,9 @@ using OverlayUtils.Core.Diagnostics;
 namespace OverlayUtils.Core.Legacy;
 
 /// <summary>
-/// First run after the rename: copy %APPDATA%\AppUtili (settings, the Discord
-/// token, caches) to %APPDATA%\OverlayUtils so nothing has to be set up again.
-/// The old folder is left in place; nothing reads it afterwards.
+/// First run after the rename: copy %APPDATA%\AppUtili (settings, caches) to
+/// %APPDATA%\OverlayUtils so nothing has to be set up again. The old folder is
+/// left in place; nothing reads it afterwards.
 /// </summary>
 public static class ConfigMigration
 {
@@ -14,12 +14,15 @@ public static class ConfigMigration
     /// <summary>Old file name -> new file name; null = do not copy.</summary>
     private static readonly Dictionary<string, string?> Renames = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["errori.log"] = null,         // old log, not useful
-        ["spotify_token.json"] = null, // Spotify is not ported: no login token kept for nothing
+        ["errori.log"] = null, // old log, not useful
+        // Spotify and Discord are not ported: no login tokens kept for nothing.
+        ["spotify_token.json"] = null,
+        ["discord_token.json"] = null,
+        ["discord_recent.json"] = null,
     };
 
     /// <summary>Top-level folders not copied.</summary>
-    private static readonly HashSet<string> SkippedDirs = new(StringComparer.OrdinalIgnoreCase) { "spotify_cache" };
+    private static readonly HashSet<string> SkippedDirs = new(StringComparer.OrdinalIgnoreCase) { "spotify_cache", "discord_cache" };
 
     /// <summary>Returns true if settings were migrated now.</summary>
     public static bool MigrateIfNeeded(string legacyDir, string newDir)

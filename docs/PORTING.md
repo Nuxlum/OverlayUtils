@@ -91,8 +91,10 @@ on the dev PC. No game has been launched from the overlay yet.
   can't be given to friends. Music is covered by the Windows media session (Now playing, LB / RB / X).
   The AppUtili migration no longer copies `spotify_token.json` / `spotify_cache`.
 
-### Stage 7 - Discord  `[ ]`
-- [ ] Named-pipe RPC client, OAuth, voice channels, mute/deafen, go-live hotkey, favourites  *(DISCORD)*
+### Stage 7 - Discord  `[dropped]`
+- [x] Dropped (see WORKLOG 2026-11-04): the voice RPC scopes are for approved partners only; friends would each
+  need their own developer app or be added by hand as testers. The migration no longer copies the Discord
+  token, recent list or cache, and `discord_*` / `spotify_*` config keys are removed on load.
 
 ### After parity
 - [ ] Delete `reference/python/`

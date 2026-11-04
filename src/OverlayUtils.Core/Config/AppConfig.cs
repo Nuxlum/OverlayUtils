@@ -6,9 +6,9 @@ namespace OverlayUtils.Core.Config;
 
 /// <summary>
 /// Contents of config.json. Property names match the Python AppUtili
-/// config so a migrated file loads as-is. Keys this version does not know
-/// yet (e.g. Spotify/Discord settings, ported in later stages) are kept in
-/// <see cref="Extra"/> and written back untouched.
+/// config so a migrated file loads as-is. Keys this version does not know are
+/// kept in <see cref="Extra"/> and written back untouched, except the settings
+/// of the dropped Spotify / Discord features (see ConfigStore.DropRemovedFeatures).
 /// </summary>
 public sealed class AppConfig
 {

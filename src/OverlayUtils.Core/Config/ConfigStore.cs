@@ -47,6 +47,18 @@ public sealed class ConfigStore
         Changed?.Invoke(snapshot);
     }
 
+    /// <summary>
+    /// Settings of AppUtili features that will not be ported (Spotify, Discord: their APIs can't be given to friends
+    /// without manual setup). Dropped on load, so the next save no longer keeps the Discord client secret.
+    /// </summary>
+    static void DropRemovedFeatures(AppConfig config)
+    {
+        if (config.Extra is not { } extra) return;
+        foreach (var key in extra.Keys.Where(k => k.StartsWith("spotify_", StringComparison.Ordinal)
+                                                 || k.StartsWith("discord_", StringComparison.Ordinal)).ToList())
+            extra.Remove(key);
+    }
+
     internal static AppConfig Load(string path)
     {
         try
@@ -66,6 +78,7 @@ public sealed class ConfigStore
                     loaded.AudioPresets ??= [];
                     loaded.GamesSourcesHidden ??= [];
                     loaded.GamesManualApps ??= [];
+                    DropRemovedFeatures(loaded);
                     return loaded;
                 }
             }

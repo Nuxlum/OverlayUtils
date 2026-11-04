@@ -326,8 +326,9 @@ Stage 5. Readers and rules in Core (`Games/`), Xbox and the service in App.
 
 `ConfigStore` owns `%APPDATA%\OverlayUtils\config.json`:
 - property names match the Python file, so migrated configs load unchanged;
-- unknown keys are kept (`[JsonExtensionData]`) - Spotify/Discord settings
-  survive until their stage is ported;
+- unknown keys are kept (`[JsonExtensionData]`), except `spotify_*` /
+  `discord_*` (dropped features; the Discord client secret goes with them),
+  removed on load by `ConfigStore.DropRemovedFeatures`;
 - overlay keys: `overlay_size` (`normal` / `large` / `auto`; auto picks by the
   active monitor profile) and `overlay_side` (`left` / `right`);
 - `Update(change)` saves atomically (temp file + move) and raises `Changed`;
@@ -350,7 +351,6 @@ footer, descriptions) and `Settings.*`.
 |---|---|
 | `%APPDATA%\OverlayUtils\config.json` | settings |
 | `%APPDATA%\OverlayUtils\errors.log` | `Log.Error` / `Log.Info`, restarts past 256 KB |
-| `%APPDATA%\OverlayUtils\discord_token.json`, `discord_cache\` | migrated now, used from stage 7 (Spotify's token is not copied) |
 | `%ProgramFiles%\OverlayUtils\` | full-mode install + `full-mode.json` |
 | `%LOCALAPPDATA%\Programs\OverlayUtils\` | where the app moves when leaving full mode |
 | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\OverlayUtils` | start-up entry |

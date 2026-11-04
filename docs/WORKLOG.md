@@ -155,6 +155,16 @@ The stage checklist lives in `PORTING.md`.
   command cycles All → each launcher that has games (`OverlayItem.AltAction`);
   a filter whose launcher empties falls back to All. The grid keeps the
   selected game by id across refreshes.
+- 2026-11-04 - **Discord dropped (stage 7):** reading voice channels and
+  mute / deafen need Discord's `rpc.voice.*` scopes, "only available to
+  approved partners"; outside that, only accounts added by hand as app
+  testers work, or each user registers their own app (the Python way, with a
+  client secret). The owner wants no manual setup for friends, so it goes;
+  "watch a friend's stream" was never in local RPC anyway. The migration
+  skips `discord_token.json`, `discord_recent.json`, `discord_cache`; the
+  config drops every `discord_*` / `spotify_*` key on load, so the next save
+  no longer holds the client secret. Files an earlier build already copied
+  are left alone (the user's files).
 - 2026-11-04 - **Spotify and YouTube Music dropped (stage 6):** since
   February 2026 a Spotify app in development mode allows 5 users, all with
   Premium, and more needs a business with 250k monthly users, so it can't
@@ -201,18 +211,19 @@ The stage checklist lives in `PORTING.md`.
   (Bardex application possibly covering software). Untested: OmniPad. A rename
   touches exe names, %APPDATA%/Program Files folders (migrate settings), Run
   key, certificate subject (re-enable full mode), README, repo name.
-- [ ] First-run setup for friends: guide a new user through full mode and
-  connecting Discord without reading docs. After stage 7 (Discord).
+- [ ] First-run setup for friends: guide a new user through full mode
+  without reading docs.
 - [ ] Research: a driver-free way to keep pad input away from the game
   while the overlay is open (nothing for the user to install). If found,
   offer it as an advanced option next to full mode.
-- [ ] Stage 7: "watch a friend's stream" in Discord is wanted; probably not
-  in Discord's local RPC, may need a workaround.
 - [ ] Optional Sonar integration after the built-in audio features (show
   the device Sonar routes to, ChatMix).
 
 ## Session log
 
+- 2026-11-04 - Stage 7 dropped (Discord, see Decisions); migration skips
+  Discord files, config drops `spotify_*` / `discord_*` keys. Self-test
+  1263/1263.
 - 2026-11-04 - Stage 6 dropped (Spotify / YouTube Music, see Decisions);
   migration no longer copies Spotify's token and cache. Self-test 1263/1263.
 - 2026-11-04 - Stage 5 final review fixes: GOG `launchParam` passed as

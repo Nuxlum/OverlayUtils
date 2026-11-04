@@ -75,7 +75,9 @@ string RepoRoot()
           "monitor_desk": "Main",
           "hidden_tabs": ["Giochi"],
           "spotify_client_id": "0123456789abcdef0123456789abcdef",
-          "discord_favorites": ["1", "2"]
+          "discord_client_secret": "not-a-real-secret",
+          "discord_favorites": ["1", "2"],
+          "future_key": ["1", "2"]
         }
         """);
     var store = new ConfigStore(path);
@@ -95,9 +97,9 @@ string RepoRoot()
     Check(changed == 1, "Changed raised once");
     var json = JsonDocument.Parse(File.ReadAllText(path)).RootElement;
     Check(json.GetProperty("language").GetString() == "it", "update saved");
-    Check(json.GetProperty("spotify_client_id").GetString() == "0123456789abcdef0123456789abcdef",
-        "unknown keys survive a save (Spotify/Discord settings not ported yet)");
-    Check(json.GetProperty("discord_favorites").GetArrayLength() == 2, "unknown arrays survive a save");
+    Check(json.GetProperty("future_key").GetArrayLength() == 2, "unknown keys survive a save");
+    Check(!json.TryGetProperty("spotify_client_id", out _) && !json.TryGetProperty("discord_client_secret", out _)
+        && !json.TryGetProperty("discord_favorites", out _), "Spotify / Discord settings (dropped, incl. the client secret) are removed on save");
 
     File.WriteAllText(path, "{ not json");
     Check(new ConfigStore(path).Current.HomeKeyMode == HomeKeyModes.None, "corrupt file falls back to defaults");
@@ -114,12 +116,18 @@ string RepoRoot()
     File.WriteAllText(Path.Combine(legacy, "spotify_cache", "a.jpg"), "x");
     File.WriteAllText(Path.Combine(legacy, "errori.log"), "old");
     File.WriteAllText(Path.Combine(legacy, "discord_token.json"), "{}");
+    File.WriteAllText(Path.Combine(legacy, "discord_recent.json"), "[]");
+    Directory.CreateDirectory(Path.Combine(legacy, "discord_cache"));
+    Directory.CreateDirectory(Path.Combine(legacy, "games_cache"));
+    File.WriteAllText(Path.Combine(legacy, "games_cache", "a.jpg"), "x");
 
     Check(ConfigMigration.MigrateIfNeeded(legacy, target), "migrates the first time");
     Check(File.Exists(Path.Combine(target, "config.json")), "config copied");
-    Check(File.Exists(Path.Combine(target, "discord_token.json")), "Discord token copied (stage 7)");
-    Check(!File.Exists(Path.Combine(target, "spotify_token.json")) && !Directory.Exists(Path.Combine(target, "spotify_cache")),
-        "Spotify token and cache not copied (Spotify dropped)");
+    Check(File.Exists(Path.Combine(target, "games_cache", "a.jpg")), "other caches copied");
+    Check(!File.Exists(Path.Combine(target, "spotify_token.json")) && !Directory.Exists(Path.Combine(target, "spotify_cache"))
+        && !File.Exists(Path.Combine(target, "discord_token.json")) && !File.Exists(Path.Combine(target, "discord_recent.json"))
+        && !Directory.Exists(Path.Combine(target, "discord_cache")),
+        "Spotify and Discord tokens and caches not copied (both dropped)");
     Check(!File.Exists(Path.Combine(target, "errori.log")), "old log skipped");
     Check(File.Exists(Path.Combine(legacy, "config.json")), "old folder left in place");
     Check(!ConfigMigration.MigrateIfNeeded(legacy, target), "runs only once");
