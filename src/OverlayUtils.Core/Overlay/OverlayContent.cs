@@ -17,6 +17,7 @@ namespace OverlayUtils.Core.Overlay;
 /// </summary>
 public sealed class OverlayContent
 {
+    public const string HomeTabId = "Home";
     public const string ControlsTabId = "Controlli"; // Python tab name, kept as the stored id
     public const string AudioTabId = "Audio";
     public const string GamesTabId = "Giochi"; // Python tab name, kept as the stored id
@@ -65,6 +66,7 @@ public sealed class OverlayContent
         _sendAltF4 = sendAltF4 ?? KeySender.AltF4;
         Tabs =
         [
+            new OverlayTab(HomeTabId, () => Loc.T("Overlay.Tab.Home"), Home, Tiles: true),
             new OverlayTab(ControlsTabId, () => Loc.T("Overlay.Tab.Controls"), Controls),
             new OverlayTab(AudioTabId, () => Loc.T("Overlay.Tab.Audio"), Audio),
             new OverlayTab(GamesTabId, () => Loc.T("Overlay.Tab.Games"), Games),
@@ -219,6 +221,18 @@ public sealed class OverlayContent
         return title;
     }
 
+    // --- Home ---------------------------------------------------------------
+
+    static readonly string[] HomeKeys =
+        ["audio.volume", "audio.media", "audio.input", "controls.monitor", "controls.closewindow", "controls.bigpicture"];
+
+    /// <summary>The Home tiles: items of one Audio() and one Controls() call (same instances, same callbacks).</summary>
+    public IReadOnlyList<OverlayItem> Home()
+    {
+        var pool = Audio().Concat(Controls()).ToList();
+        return HomeKeys.Select(key => pool.First(i => i.Key == key)).ToList();
+    }
+
     // --- Controls -------------------------------------------------------------
 
     public IReadOnlyList<OverlayItem> Controls() =>
@@ -226,7 +240,7 @@ public sealed class OverlayContent
         MonitorRow(),
         new OverlayItem
         {
-            Kind = ItemKind.Segmented, Icon = Glyphs.Game,
+            Kind = ItemKind.Segmented, Icon = Glyphs.Game, Key = "controls.bigpicture",
             Section = () => Loc.T("Overlay.Section.Steam"),
             Label = () => Loc.T("Overlay.BigPicture.Label"),
             Description = () => Loc.T("Overlay.BigPicture.Desc"),
@@ -246,7 +260,7 @@ public sealed class OverlayContent
         },
         new OverlayItem
         {
-            Kind = ItemKind.Action, Icon = Glyphs.Close,
+            Kind = ItemKind.Action, Icon = Glyphs.Close, Key = "controls.closewindow",
             Label = () => Loc.T("Overlay.CloseWindow.Label"),
             Description = () => Loc.T("Overlay.CloseWindow.Desc"),
             Hint = () => "Alt+F4",
@@ -283,7 +297,7 @@ public sealed class OverlayContent
         {
             return new OverlayItem
             {
-                Kind = ItemKind.Segmented, Icon = Glyphs.Monitor, Section = section, Label = label,
+                Kind = ItemKind.Segmented, Icon = Glyphs.Monitor, Key = "controls.monitor", Section = section, Label = label,
                 Description = description, Visible = visible,
                 Options = () => _monitors.List().Select(p => new OverlayOption(
                     () => p, () => _host.SwitchMonitor(p), Active: () => _monitors.Current == p)).ToList(),
@@ -292,7 +306,7 @@ public sealed class OverlayContent
 
         return new OverlayItem
         {
-            Kind = ItemKind.Choice, Icon = Glyphs.Monitor, Section = section, Label = label,
+            Kind = ItemKind.Choice, Icon = Glyphs.Monitor, Key = "controls.monitor", Section = section, Label = label,
             Description = description, Visible = visible,
             Value = () =>
             {
@@ -815,7 +829,8 @@ public sealed class OverlayContent
 
         return
         [
-            TabRow(ControlsTabId, "Overlay.Tab.Controls", "Overlay.Section.Tabs"),
+            TabRow(HomeTabId, "Overlay.Tab.Home", "Overlay.Section.Tabs"),
+            TabRow(ControlsTabId, "Overlay.Tab.Controls", null),
             TabRow(AudioTabId, "Overlay.Tab.Audio", null),
             TabRow(GamesTabId, "Overlay.Tab.Games", null),
             RoleRow(MonitorRole.Desk, "Settings.Desk.Label", "Settings.Desk.Desc", hasProfiles, Glyphs.Pc, "Overlay.Section.Monitor"),

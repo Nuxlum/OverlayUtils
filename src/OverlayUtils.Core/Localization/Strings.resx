@@ -217,6 +217,7 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Overlay.ShowDesktop.Label" xml:space="preserve"><value>Show desktop</value></data>
   <data name="Overlay.Tab.Audio" xml:space="preserve"><value>Audio</value></data>
   <data name="Overlay.Tab.Controls" xml:space="preserve"><value>Controls</value></data>
+  <data name="Overlay.Tab.Home" xml:space="preserve"><value>Home</value></data>
   <data name="Overlay.Tab.Games" xml:space="preserve"><value>Games</value></data>
   <data name="Settings.Audio.AddChannel" xml:space="preserve"><value>Add channel…</value></data>
   <data name="Settings.Audio.AddChannel.Desc" xml:space="preserve"><value>A new channel with a name of your choice. Programs are moved to it from Programs.</value></data>

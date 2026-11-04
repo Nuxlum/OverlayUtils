@@ -20,7 +20,7 @@ public readonly record struct NavResult(NavEffect Effect, Action? Action = null)
 /// <summary>One button of a segmented row.</summary>
 public sealed record OverlayOption(Func<string> Label, Action Action, bool Stay = false, Func<bool>? Active = null);
 
-public sealed record OverlayTab(string Id, Func<string> Title, Func<IReadOnlyList<OverlayItem>> Items);
+public sealed record OverlayTab(string Id, Func<string> Title, Func<IReadOnlyList<OverlayItem>> Items, bool Tiles = false);
 
 /// <summary>A footer hint; <paramref name="Command"/> is what clicking it does (null: not clickable).</summary>
 public sealed record FooterHint(string Keys, string Label, OverlayCommand? Command = null);

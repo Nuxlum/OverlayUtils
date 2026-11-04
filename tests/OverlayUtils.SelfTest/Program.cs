@@ -453,7 +453,7 @@ string RepoRoot()
     {
         var n = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
         content.ResetTransient();
-        n.Reset([]);
+        n.Reset(["Home"]);
         return n;
     }
     OverlayItem Row(IReadOnlyList<OverlayItem> items, string label) => items.First(i => i.Label() == label);
@@ -469,7 +469,7 @@ string RepoRoot()
     Check(monitorRow.Label() == Loc.T("Overlay.Monitor.Label") && !monitorRow.Visible(), "Monitor row hidden without profiles");
     Check(nav.Selected?.Label() == Loc.T("Overlay.BigPicture.Label"), "Big Picture is selected when Monitor is hidden");
     Check(nav.Description() == Loc.T("Overlay.BigPicture.Desc"), "description is Big Picture's, not Monitor's");
-    Check(content.Tabs.Count == 3 && content.Tabs[0].Id == OverlayContent.ControlsTabId, "Controls is the first tab");
+    Check(content.Tabs.Count == 4 && content.Tabs[1].Id == OverlayContent.ControlsTabId && nav.CurrentTab.Id == OverlayContent.ControlsTabId, "Controls is the first visible tab (Home hidden)");
 
     // Three profiles: segmented, cursor on the current profile.
     SetProfiles("Gaming", "Main", "TV");
@@ -561,7 +561,7 @@ string RepoRoot()
     Row(content.Settings(), Loc.T("Menu.Startup")).Toggle!();
     Check(host.Calls.SequenceEqual(["ToggleStartup"]), "Start with Windows toggles through the host");
     host.Calls.Clear();
-    var tabRow = content.Settings()[0];
+    var tabRow = content.Settings()[1];
     tabRow.Toggle!();
     Check(tabRow.IsOn() && store.Current.HiddenTabs.Count == 0, "the Controls tab toggle stays on");
     Row(content.Settings(), Loc.T("Menu.Notifications")).Toggle!();
@@ -605,7 +605,7 @@ string RepoRoot()
 
     // Italian.
     Loc.SetLanguage("it");
-    Check(content.Tabs[0].Title() == "Controlli" && content.Controls().Any(i => i.Label() == "Alimentazione"), "Italian tab and Power labels");
+    Check(content.Tabs[1].Title() == "Controlli" && content.Controls().Any(i => i.Label() == "Alimentazione"), "Italian tab and Power labels");
     Check(content.Controls().Any(i => i.Label() == "Mostra desktop") && content.Controls().Any(i => i.Label() == "Chiudi finestra"),
         "Italian window rows");
     Loc.SetLanguage("en");
@@ -767,7 +767,7 @@ string RepoRoot()
     var monitors = new MonitorProfiles(store, new MonitorSwitcherLocator(store), Path.Combine(temp, "padui", "none"));
     var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), new FakeHost(), new FakeAudio());
     var nav = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
-    nav.Reset([]);
+    nav.Reset(["Home"]);
     var pad = nav.Footer(pad: true);
     Check(pad.Contains(new FooterHint("A", Loc.T("Overlay.Footer.Confirm"), OverlayCommand.A)), "pad footer: A confirms");
     Check(pad.Contains(new FooterHint("B", Loc.T("Overlay.Footer.Close"), OverlayCommand.B)), "pad footer: B closes");
@@ -1097,6 +1097,7 @@ string RepoRoot()
 {
     Loc.SetLanguage("en");
     var store = new ConfigStore(Path.Combine(temp, "audiotab", "config.json"));
+    store.Update(c => c.HiddenTabs.Add("Home")); // these checks are about Controls and Audio; Home has its own section
     var monitors = new MonitorProfiles(store, new MonitorSwitcherLocator(store), Path.Combine(temp, "audiotab", "none"));
     var audio = new FakeAudio();
     audio.Outputs.AddRange([new AudioDeviceRef("spk", "Speakers"), new AudioDeviceRef("hs", "Headset")]);
@@ -1117,28 +1118,28 @@ string RepoRoot()
     }
 
     Check(content.Media == media, "content exposes the media control for the navigator");
-    Check(content.Tabs.Select(t => t.Id).SequenceEqual([OverlayContent.ControlsTabId, OverlayContent.AudioTabId, OverlayContent.GamesTabId])
+    Check(content.Tabs.Select(t => t.Id).SequenceEqual([OverlayContent.HomeTabId, OverlayContent.ControlsTabId, OverlayContent.AudioTabId, OverlayContent.GamesTabId])
         && OverlayContent.AudioTabId == "Audio", "Audio tab comes after Controls");
-    Check(content.Tabs[1].Title() == Loc.T("Overlay.Tab.Audio"), "Audio tab title");
-    var rows = content.Tabs[1].Items();
+    Check(content.Tabs[2].Title() == Loc.T("Overlay.Tab.Audio"), "Audio tab title");
+    var rows = content.Tabs[2].Items();
     Check(rows.Select(r => r.Kind).SequenceEqual([ItemKind.Choice, ItemKind.Choice, ItemKind.Slider, ItemKind.Media]),
         "Audio rows: Output, Input, Volume, Now playing");
     Check(rows[0].Label() == Loc.T("Overlay.Audio.Output") && rows[1].Label() == Loc.T("Overlay.Audio.Input")
         && rows[2].Label() == Loc.T("Overlay.Audio.Volume"), "Audio row labels");
     Check(rows[0].Value() == "Speakers" && rows[1].Value() == "Mic", "Output and Input show the default devices");
     audio.MicMuted = true;
-    rows = content.Tabs[1].Items();
+    rows = content.Tabs[2].Items();
     Check(rows[1].Value() == Loc.T("Overlay.Audio.InputMuted", "Mic") && rows[1].Icon == Glyphs.MicOff, "Input shows muted");
     audio.MicMuted = false;
-    rows = content.Tabs[1].Items();
+    rows = content.Tabs[2].Items();
     Check(rows[1].Icon == Glyphs.Mic, "Input icon is the mic when not muted");
     Check(rows[2].Value() == "45%" && !rows[2].IsOn() && rows[2].Icon == Glyphs.VolumeLevels[1], "Volume shows percent and level icon");
     audio.Muted = true;
-    rows = content.Tabs[1].Items();
+    rows = content.Tabs[2].Items();
     Check(rows[2].IsOn() && rows[2].Icon == Glyphs.Mute, "Volume muted: IsOn and mute icon");
     audio.Muted = false;
     audio.DefaultOutput = null;
-    Check(content.Tabs[1].Items()[0].Value() == Loc.T("Overlay.Audio.NoDevice"), "Output without a default device");
+    Check(content.Tabs[2].Items()[0].Value() == Loc.T("Overlay.Audio.NoDevice"), "Output without a default device");
     audio.DefaultOutput = "spk";
 
     var nav = Nav();
@@ -1164,11 +1165,11 @@ string RepoRoot()
         && muteRun.Effect == NavEffect.RunHere, "Volume Right/Left step, A mutes with the overlay open");
     audio.Calls.Clear();
 
-    Check(!content.Tabs[1].Items()[3].Visible(), "Now playing hidden with no media");
+    Check(!content.Tabs[2].Items()[3].Visible(), "Now playing hidden with no media");
     nav.Handle(OverlayCommand.Down);
     Check(nav.Selected?.Label() == Loc.T("Overlay.Audio.Output"), "selection skips the hidden Now playing row");
     media.Current = new NowPlaying("Song", "Artist", "Spotify", true);
-    var np = content.Tabs[1].Items()[3];
+    var np = content.Tabs[2].Items()[3];
     Check(np.Visible() && np.Label() == "Song" && np.Value() == "Artist · Spotify" && np.IsOn(), "Now playing shows title, artist · app");
     media.Current = new NowPlaying("Song", "", "Spotify", false);
     Check(np.Value() == "Spotify" && !np.IsOn(), "Now playing without artist, paused");
@@ -1321,6 +1322,7 @@ string RepoRoot()
 {
     Loc.SetLanguage("en");
     var store = new ConfigStore(Path.Combine(temp, "channels", "config.json"));
+    store.Update(c => c.HiddenTabs.Add("Home")); // these checks start from Controls; Home has its own section
     var monitors = new MonitorProfiles(store, new MonitorSwitcherLocator(store), Path.Combine(temp, "channels", "none"));
     var audio = new FakeAudio();
     audio.Outputs.AddRange([new AudioDeviceRef("spk", "Speakers"), new AudioDeviceRef("hs", "Headset")]);
@@ -1737,7 +1739,7 @@ string RepoRoot()
     audio.DefaultOutput = "spk";
     var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), new FakeHost(), audio);
     var nav = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
-    nav.Reset([]);
+    nav.Reset(["Home"]);
     nav.ClickTab(1);
     var volumeRow = nav.Items.ToList().FindIndex(i => i.Key == "audio.volume");
     Check(volumeRow >= 0, "Volume row found");
@@ -2154,6 +2156,81 @@ string RepoRoot()
     Check(json.Contains("\"games_sources_hidden\"") && json.Contains("\"games_manual_apps\""), "games config keys");
 }
 
+// --- Home tab ---------------------------------------------------------------
+{
+    Loc.SetLanguage("en");
+    var store = new ConfigStore(Path.Combine(temp, "hometab", "config.json"));
+    var monitors = new MonitorProfiles(store, new MonitorSwitcherLocator(store), Path.Combine(temp, "hometab", "none"));
+    var audio = new FakeAudio();
+    audio.Outputs.Add(new AudioDeviceRef("spk", "Speakers"));
+    audio.Inputs.Add(new AudioDeviceRef("mic", "Mic"));
+    audio.DefaultOutput = "spk";
+    audio.DefaultInput = "mic";
+    var media = new FakeMedia(new List<string>());
+    var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), new FakeHost(), audio, media);
+    void Run(NavResult r) => r.Action?.Invoke();
+    OverlayNavigator Nav()
+    {
+        var n = new OverlayNavigator(content.Tabs, content.Settings, content.Info, media: content.Media);
+        content.ResetTransient();
+        n.Reset(store.Current.HiddenTabs);
+        return n;
+    }
+
+    Check(content.Tabs.Select(t => t.Id).SequenceEqual(["Home", "Controlli", "Audio", "Giochi"]) && OverlayContent.HomeTabId == "Home",
+        "tabs: Home, Controls, Audio, Games");
+    Check(content.Tabs[0].Tiles && !content.Tabs[1].Tiles && !content.Tabs[2].Tiles && !content.Tabs[3].Tiles, "only Home draws tiles");
+    Check(content.Tabs[0].Title() == "Home", "Home tab title");
+    Check(content.Home().Select(i => i.Key).SequenceEqual(
+        ["audio.volume", "audio.media", "audio.input", "controls.monitor", "controls.closewindow", "controls.bigpicture"]),
+        "Home items in order");
+
+    var nav = Nav();
+    Check(nav.CurrentTab.Id == "Home" && nav.Selected?.Key == "audio.volume", "overlay opens on Home, Volume selected");
+    nav.Handle(OverlayCommand.Down);
+    Check(nav.Selected?.Key == "audio.input", "Down from Volume skips the Now playing tile without media");
+    nav.Handle(OverlayCommand.Down);
+    Check(nav.Selected?.Key == "controls.closewindow", "invisible monitor tile skipped too");
+    nav.Handle(OverlayCommand.Up); nav.Handle(OverlayCommand.Up);
+    Check(nav.Selected?.Key == "audio.volume", "Up returns to Volume");
+    Run(nav.Handle(OverlayCommand.Right));
+    Run(nav.Handle(OverlayCommand.A));
+    Check(audio.Calls.SequenceEqual(["StepVolume:1", "ToggleMute"]), "Volume tile: Right steps, A mutes");
+    audio.Calls.Clear();
+    nav.Handle(OverlayCommand.Down);
+    Run(nav.Handle(OverlayCommand.A));
+    Check(audio.Calls.SequenceEqual(["ToggleMicMute"]), "Input tile: A toggles the mic mute");
+    audio.Calls.Clear();
+
+    media.Current = new NowPlaying("Song", "Artist", "Spotify", true);
+    nav = Nav();
+    nav.Handle(OverlayCommand.Down);
+    Check(nav.Selected?.Key == "audio.media", "Now playing tile selectable with media");
+    media.Current = null;
+
+    store.Update(c => c.HiddenTabs.Add("Home"));
+    nav = Nav();
+    Check(nav.CurrentTab.Id == "Controlli" && nav.Selected != null, "Home hidden: the overlay opens on Controls");
+    store.Update(c => c.HiddenTabs.Clear());
+
+    var home = content.Home();
+    Check(home.Where(i => i.Visible()).Select(i => i.Key).SequenceEqual(["audio.volume", "audio.input", "controls.closewindow", "controls.bigpicture"]),
+        "Home without media or profiles still has Volume, Mic, Close window");
+    var audioRows = content.Audio();
+    Check(content.Home()[0] != audioRows[0] && content.Home().Count == 6, "each Home call builds its own items");
+
+    var settingsNav = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
+    settingsNav.Reset([]);
+    var tabRows = content.Settings().Take(4).ToList();
+    Check(tabRows[0].Label() == "Home" && tabRows[0].Section?.Invoke() == Loc.T("Overlay.Section.Tabs")
+        && tabRows[1].Label() == Loc.T("Overlay.Tab.Controls") && tabRows[1].Section == null, "Settings: Home row first with the Tabs section");
+    Check(tabRows[0].IsOn(), "Home tab on by default");
+    tabRows[0].Toggle!();
+    Check(store.Current.HiddenTabs.Contains("Home") && !content.Settings()[0].IsOn(), "Home toggle hides it");
+    content.Settings()[0].Toggle!();
+    Check(!store.Current.HiddenTabs.Contains("Home"), "Home toggle shows it again");
+}
+
 // --- Games tab --------------------------------------------------------------
 {
     var store = new ConfigStore(Path.Combine(temp, "gamestab", "config.json"));
@@ -2166,8 +2243,8 @@ string RepoRoot()
     var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), host, new FakeAudio(), null, null, view);
     var nav = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
     nav.Reset([]);
-    Check(content.Tabs.Select(t => t.Id).SequenceEqual(["Controlli", "Audio", "Giochi"]), "Games tab after Audio, stored id Giochi");
-    nav.ClickTab(2);
+    Check(content.Tabs.Select(t => t.Id).SequenceEqual(["Home", "Controlli", "Audio", "Giochi"]), "Games tab after Audio, stored id Giochi");
+    nav.ClickTab(3);
     Check(nav.Selected?.Kind == ItemKind.Grid && nav.SelectedTile?.Id == "steam:1", "Games tab opens on the first tile");
 
     // 3 columns: [1 2 3] [4 5]

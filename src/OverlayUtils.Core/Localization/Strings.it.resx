@@ -217,6 +217,7 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.ShowDesktop.Label" xml:space="preserve"><value>Mostra desktop</value></data>
   <data name="Overlay.Tab.Audio" xml:space="preserve"><value>Audio</value></data>
   <data name="Overlay.Tab.Controls" xml:space="preserve"><value>Controlli</value></data>
+  <data name="Overlay.Tab.Home" xml:space="preserve"><value>Home</value></data>
   <data name="Overlay.Tab.Games" xml:space="preserve"><value>Giochi</value></data>
   <data name="Settings.Audio.AddChannel" xml:space="preserve"><value>Aggiungi canale…</value></data>
   <data name="Settings.Audio.AddChannel.Desc" xml:space="preserve"><value>Un nuovo canale con il nome che vuoi. I programmi si spostano lì da Programmi.</value></data>
