@@ -594,7 +594,7 @@ string RepoRoot()
 
     // Italian.
     Loc.SetLanguage("it");
-    Check(content.Tabs[0].Title() == "Controlli" && content.Controls().Any(i => i.Label() == "Energia"), "Italian tab and Power labels");
+    Check(content.Tabs[0].Title() == "Controlli" && content.Controls().Any(i => i.Label() == "Alimentazione"), "Italian tab and Power labels");
     Check(content.Controls().Any(i => i.Label() == "Mostra desktop") && content.Controls().Any(i => i.Label() == "Chiudi finestra"),
         "Italian window rows");
     Loc.SetLanguage("en");
