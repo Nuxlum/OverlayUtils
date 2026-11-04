@@ -133,6 +133,13 @@ internal static partial class Native
     [LibraryImport("kernel32.dll", SetLastError = true)]
     public static partial nint OpenProcess(uint access, [MarshalAs(UnmanagedType.Bool)] bool inheritHandle, uint processId);
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct FILETIME { public uint LowDateTime, HighDateTime; }
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetProcessTimes(nint process, out FILETIME creation, out FILETIME exit, out FILETIME kernel, out FILETIME user);
+
     /// <summary>Full Win32 path of the process image; <paramref name="size"/> is in/out, in characters.</summary>
     [LibraryImport("kernel32.dll", EntryPoint = "QueryFullProcessImageNameW", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

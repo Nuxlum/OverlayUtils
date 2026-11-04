@@ -297,4 +297,7 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Tooltip.Mode.Full" xml:space="preserve"><value>Full mode</value></data>
   <data name="Tooltip.Mode.Standard" xml:space="preserve"><value>Standard mode</value></data>
   <data name="Tooltip.Monitor" xml:space="preserve"><value>Monitor: {0}</value></data>
+  <data name="Overlay.Playing.Minutes" xml:space="preserve"><value>{0} min</value></data>
+  <data name="Overlay.Playing.Hours" xml:space="preserve"><value>{0} h {1} min</value></data>
+  <data name="Overlay.Eyebrow.Game" xml:space="preserve"><value>{0} · {1}</value></data>
 </root>

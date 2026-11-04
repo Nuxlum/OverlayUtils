@@ -2279,6 +2279,28 @@ string RepoRoot()
     Check(store.Current.GamesManualApps.Count == 0, "Remove deletes the app");
 }
 
+// Current game.
+{
+    static GameEntry Game(string id, string? installDir) => new(id, GameSource.App, id, @"C:\x.exe", 0, null, null, InstallDir: installDir);
+    var a = Game("a", @"C:\Games\Foo");
+    var b = Game("b", @"C:\Games\Foobar");
+    var launcher = Game("l", @"C:\Launcher");
+    var inner = Game("i", @"C:\Launcher\games\Inner");
+    var root = Game("r", @"D:\");
+    Check(CurrentGame.Match(@"C:\Games\Foo\bin\foo.exe", [a, b])?.Id == "a", "exe under the folder matches");
+    Check(CurrentGame.Match(@"c:\games\FOOBAR\x.exe", [a, b])?.Id == "b", "case-insensitive, no prefix-by-name match");
+    Check(CurrentGame.Match(@"C:\Launcher\games\Inner\i.exe", [launcher, inner])?.Id == "i", "longest folder wins");
+    Check(CurrentGame.Match(@"D:\anything.exe", [root]) is null, "a drive root never matches");
+    Check(CurrentGame.Match(@"C:\Other\x.exe", [a]) is null, "no match");
+    Check(CurrentGame.Match(@"C:\Games\Foo\x.exe", [Game("n", null), Game("e", "")]) is null, "missing folders are skipped");
+    Check(CurrentGame.Match(@"C:\Games\Foo", [a]) is null, "the folder itself is not a file inside it");
+    Check(CurrentGame.Match("", [a]) is null && CurrentGame.Match(@"C:\Games\Foo\x.exe", []) is null, "empty exe / no games");
+    Check(CurrentGame.PlayTime(TimeSpan.FromSeconds(20)) == "0 min", "under a minute");
+    Check(CurrentGame.PlayTime(TimeSpan.FromMinutes(72)) == "1 h 12 min", "hours and minutes");
+    Check(CurrentGame.PlayTime(TimeSpan.FromMinutes(59)) == "59 min", "59 minutes stay in minutes");
+    Check(CurrentGame.PlayTime(TimeSpan.FromMinutes(-5)) == "0 min", "negative time clamps to zero");
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;
