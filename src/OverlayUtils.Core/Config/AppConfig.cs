@@ -62,6 +62,12 @@ public sealed class AppConfig
 
     [JsonPropertyName("audio_presets")] public List<MixPreset> AudioPresets { get; set; } = [];
 
+    /// <summary>Game sources hidden from the Games tab ("steam", "epic", "gog", "xbox", "emulator", "app").</summary>
+    [JsonPropertyName("games_sources_hidden")] public List<string> GamesSourcesHidden { get; set; } = [];
+
+    /// <summary>Exe paths added by hand in Settings → Games.</summary>
+    [JsonPropertyName("games_manual_apps")] public List<string> GamesManualApps { get; set; } = [];
+
     [JsonExtensionData] public Dictionary<string, JsonElement>? Extra { get; set; }
 
     public AppConfig Clone() =>

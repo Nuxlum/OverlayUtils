@@ -2013,6 +2013,91 @@ string RepoRoot()
     Check(SteamLibrary.Read(reg).Count == 2, "truncated shortcuts.vdf: shortcuts skipped, games kept");
 }
 
+// --- Other libraries and library rules -------------------------------------
+{
+    var hk = Microsoft.Win32.RegistryHive.LocalMachine;
+    var reg = new FakeRegistry();
+
+    // Epic: manifests folder from the launcher's registry AppDataPath.
+    var epicData = Path.Combine(temp, "epic", "Data");
+    Directory.CreateDirectory(Path.Combine(epicData, "Manifests"));
+    reg.Set(hk, @"SOFTWARE\WOW6432Node\Epic Games\EpicGamesLauncher", "AppDataPath", epicData + Path.DirectorySeparatorChar);
+    void Item(string file, string json) => File.WriteAllText(Path.Combine(epicData, "Manifests", file), json);
+    Item("a.item", """{"DisplayName":"Fortnite & Friends","AppName":"Fort","MainGameAppName":"Fort","InstallLocation":"D:\\Epic Games\\Fort","LaunchExecutable":"Fort.exe","AppCategories":["public","games"]}""");
+    Item("b.item", """{"DisplayName":"Fort DLC","AppName":"FortDlc","MainGameAppName":"Fort","InstallLocation":"D:\\Epic Games\\Fort","AppCategories":["public","games","addons"]}""");
+    Item("c.item", """{"DisplayName":"Some Tool","AppName":"Tool","MainGameAppName":"Tool","AppCategories":["public","applications"]}""");
+    Item("d.item", "{ not json");
+    var epic = EpicLibrary.Read(reg);
+    Check(epic.Count == 1 && epic[0].Id == "epic:Fort" && epic[0].Title == "Fortnite & Friends"
+        && epic[0].LaunchTarget == "com.epicgames.launcher://apps/Fort?action=launch&silent=true", "Epic game read, DLC/apps/garbage skipped");
+    Check(EpicLibrary.Read(new FakeRegistry()).Count == 0, "no Epic: empty");
+
+    // GOG: games from GOG's registry entries.
+    var gogKey = @"SOFTWARE\WOW6432Node\GOG.com\Games";
+    var gogDir = Path.Combine(temp, "gog", "The Witcher 3");
+    Directory.CreateDirectory(gogDir);
+    var gogExe = Path.Combine(gogDir, "witcher3.exe");
+    File.WriteAllText(gogExe, "x");
+    reg.Set(hk, gogKey + @"\1207664643", "gameName", "The Witcher 3");
+    reg.Set(hk, gogKey + @"\1207664643", "gameID", "1207664643");
+    reg.Set(hk, gogKey + @"\1207664643", "exe", gogExe);
+    reg.Set(hk, gogKey + @"\1207664643", "workingDir", gogDir);
+    reg.Set(hk, gogKey + @"\555", "gameName", "A DLC");
+    var gog = GogLibrary.Read(reg);
+    Check(gog.Count == 1 && gog[0].Id == "gog:1207664643" && gog[0].LaunchTarget == gogExe && gog[0].WorkingDir == gogDir,
+        "GOG game read with its working directory; entry without exe skipped");
+
+    // Emulators: uninstall entries matched by name, exe must exist.
+    var uninstall = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+    var raDir = Path.Combine(temp, "emu", "RetroArch");
+    Directory.CreateDirectory(raDir);
+    File.WriteAllText(Path.Combine(raDir, "retroarch.exe"), "x");
+    reg.Set(hk, uninstall + @"\RetroArch", "DisplayName", "RetroArch 1.19");
+    reg.Set(hk, uninstall + @"\RetroArch", "InstallLocation", raDir);
+    var dolphinExe = Path.Combine(temp, "emu", "Dolphin Emulator", "Dolphin.exe");
+    Directory.CreateDirectory(Path.GetDirectoryName(dolphinExe)!);
+    File.WriteAllText(dolphinExe, "x");
+    reg.Set(Microsoft.Win32.RegistryHive.CurrentUser, uninstall + @"\Dolphin", "DisplayName", "Dolphin");
+    reg.Set(Microsoft.Win32.RegistryHive.CurrentUser, uninstall + @"\Dolphin", "DisplayIcon", "\"" + dolphinExe + "\",0");
+    reg.Set(hk, uninstall + @"\Notepad++", "DisplayName", "Notepad++");
+    reg.Set(hk, uninstall + @"\PCSX2", "DisplayName", "PCSX2");
+    reg.Set(hk, uninstall + @"\PCSX2", "InstallLocation", Path.Combine(temp, "emu", "missing"));
+    var emulators = EmulatorLibrary.Read(reg).ToDictionary(e => e.Title);
+    Check(emulators.ContainsKey("RetroArch 1.19") && emulators.ContainsKey("Dolphin"), "installed emulators detected");
+    Check(!emulators.ContainsKey("Notepad++") && !emulators.ContainsKey("PCSX2"), "unrelated apps and missing exes skipped");
+    Check(emulators["Dolphin"].LaunchTarget == dolphinExe && emulators["Dolphin"].Source == GameSource.Emulator, "emulator exe from DisplayIcon");
+
+    // Hand-added apps.
+    var appExe = Path.Combine(temp, "apps", "Quiver Launcher & Co", "quiver.exe");
+    Directory.CreateDirectory(Path.GetDirectoryName(appExe)!);
+    File.WriteAllText(appExe, "x");
+    var apps = ManualApps.Read([appExe, Path.Combine(temp, "apps", "gone.exe")]);
+    Check(apps.Count == 1 && apps[0].Title == "quiver" && apps[0].LaunchTarget == appExe && apps[0].Id == "app:" + appExe.ToLowerInvariant(),
+        "hand-added app read (path with spaces and &), missing one skipped");
+
+    // Library rules.
+    GameEntry G(string id, GameSource src, string title, long played = 0) => new(id, src, title, "x", played, null, null);
+    var all = GameLibrary.Merge([[G("steam:1", GameSource.Steam, "b", 5), G("steam:2", GameSource.Steam, "Zed")],
+                                 [G("epic:1", GameSource.Epic, "alpha"), G("steam:1", GameSource.Steam, "dup")]], [GameSource.Gog]);
+    Check(all.Count == 3, "merge drops duplicate ids");
+    Check(GameLibrary.Merge([[G("epic:1", GameSource.Epic, "a")]], [GameSource.Epic]).Count == 0, "hidden source dropped");
+    var sorted = GameLibrary.Sort(all);
+    Check(sorted.Select(g => g.Id).SequenceEqual(["steam:1", "epic:1", "steam:2"]), "sort: last played, then title A-Z ignoring case");
+    Check(GameLibrary.Filter(sorted, GameSource.Epic).Single().Id == "epic:1" && GameLibrary.Filter(sorted, null).Count == 3, "filter by source");
+    Check(GameLibrary.FilterCycle(sorted).SequenceEqual(new GameSource?[] { null, GameSource.Steam, GameSource.Epic }), "filter cycle lists present sources");
+    Check(GameLibrary.NextFilter(null, sorted) == GameSource.Steam && GameLibrary.NextFilter(GameSource.Epic, sorted) == null, "next filter wraps to All");
+    Check(GameLibrary.NextFilter(GameSource.Gog, sorted) == null, "vanished filter falls back to All");
+    var many = Enumerable.Range(0, 1000).Select(i => G($"steam:{i}", (GameSource)(i % 6), $"Game {i % 97}", i % 13)).ToList();
+    var watch = System.Diagnostics.Stopwatch.StartNew();
+    var big = GameLibrary.Filter(GameLibrary.Sort(many), GameSource.Steam);
+    Check(watch.ElapsedMilliseconds < 50 && big.Count > 0, "sort and filter of 1,000 games is fast");
+
+    var store = new ConfigStore(Path.Combine(temp, "games", "config.json"));
+    Check(store.Current.GamesSourcesHidden.Count == 0 && store.Current.GamesManualApps.Count == 0, "games config defaults");
+    var json = JsonSerializer.Serialize(store.Current, ConfigStore.JsonOptions);
+    Check(json.Contains("\"games_sources_hidden\"") && json.Contains("\"games_manual_apps\""), "games config keys");
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;

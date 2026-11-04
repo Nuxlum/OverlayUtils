@@ -64,6 +64,8 @@ public sealed class ConfigStore
                     loaded.AudioPrograms ??= [];
                     loaded.AudioMix ??= [];
                     loaded.AudioPresets ??= [];
+                    loaded.GamesSourcesHidden ??= [];
+                    loaded.GamesManualApps ??= [];
                     return loaded;
                 }
             }
