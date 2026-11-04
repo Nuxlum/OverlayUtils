@@ -1484,6 +1484,15 @@ string RepoRoot()
     Check(MixRules.ChannelFor(@"C:\x\chrome.exe", programs, channels) == "chat", "a stored default channel is kept");
     Check(MixRules.ChannelFor(@"C:\x\vlc.exe", programs, channels) == "media", "an unknown program uses the rule");
     Check(MixRules.ChannelFor(@"C:\x\vlc.exe", programs, []) == "media", "no channel list means the default channels");
+
+    var sl = MixRules.SessionLevel(new MixLevel(0.5, true), new MixLevel(0.8, false));
+    Check(Math.Abs(sl.Volume - 0.4) < 1e-9 && sl.Muted, "muted channel: session volume kept, mute flag set");
+    sl = MixRules.SessionLevel(new MixLevel(0.5, false), new MixLevel(0.8, true));
+    Check(Math.Abs(sl.Volume - 0.4) < 1e-9 && sl.Muted, "muted app: session volume kept, mute flag set");
+    sl = MixRules.SessionLevel(new MixLevel(0.5, false), new MixLevel(0.8, false));
+    Check(Math.Abs(sl.Volume - 0.4) < 1e-9 && !sl.Muted, "unmuted: product, not muted");
+    Check(MixRules.SessionLevel(new MixLevel(1.5, false), new MixLevel(1.2, false)).Volume == 1.0, "session volume clamped above 1");
+    Check(MixRules.SessionLevel(new MixLevel(-0.5, false), new MixLevel(0.8, false)).Volume == 0.0, "session volume clamped below 0");
 }
 
 // --- Switch breaker ---

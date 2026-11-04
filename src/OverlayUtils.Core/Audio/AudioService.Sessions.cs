@@ -321,8 +321,8 @@ public sealed partial class AudioService
         programs.ContainsKey(exe) || programs.Keys.Any(k => string.Equals(k, exe, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// Writes channel x app to each session: volume = <see cref="MixRules.Effective"/>, and the session mute
-    /// set when the channel or the app is muted (so the Windows mixer shows it muted).
+    /// Writes channel x app to each session via <see cref="MixRules.SessionLevel"/>: the volume product and the
+    /// session mute flag (so the Windows mixer shows it muted, and unmuting there restores the level).
     /// </summary>
     private void ApplyLevels(List<TrackedSession> sessions)
     {
@@ -337,9 +337,10 @@ public sealed partial class AudioService
                 var channelId = MixRules.ChannelFor(exe, config.AudioPrograms, config.AudioChannels);
                 var channel = mix.Channels.TryGetValue(channelId, out var level) ? level : new MixLevel(1.0, false);
                 var app = MixRules.AppLevel(mix, exe);
+                var (sessionVolume, muted) = MixRules.SessionLevel(channel, app);
                 var volume = (ISimpleAudioVolume)session.Control;
-                volume.SetMasterVolume((float)Math.Clamp(MixRules.Effective(channel, app), 0.0, 1.0), EventContext);
-                volume.SetMute(channel.Muted || app.Muted ? 1 : 0, EventContext);
+                volume.SetMasterVolume((float)sessionVolume, EventContext);
+                volume.SetMute(muted ? 1 : 0, EventContext);
             }
             catch (Exception e)
             {

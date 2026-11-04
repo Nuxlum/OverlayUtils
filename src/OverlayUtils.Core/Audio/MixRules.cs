@@ -86,6 +86,14 @@ public static class MixRules
         return list.Any(c => c.Id == id) ? id : Other;
     }
 
+    /// <summary>
+    /// What a Windows session gets: volume = channel x app (clamped to 0..1) even when muted, and the mute flag
+    /// when either is muted. Windows remembers per-app levels, so a mute never leaves the app at volume 0.
+    /// The audible result equals <see cref="Effective"/>.
+    /// </summary>
+    public static (double Volume, bool Muted) SessionLevel(MixLevel channel, MixLevel app) =>
+        (Math.Clamp(channel.Volume * app.Volume, 0.0, 1.0), channel.Muted || app.Muted);
+
     public static double Effective(MixLevel channel, MixLevel app) =>
         channel.Muted || app.Muted ? 0.0 : channel.Volume * app.Volume;
 
