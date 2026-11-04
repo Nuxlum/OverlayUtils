@@ -1,3 +1,4 @@
+using OverlayUtils.Core.Audio;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -49,6 +50,17 @@ public sealed class AppConfig
 
     /// <summary>Volume cap per output device id, in percent (missing = 100).</summary>
     [JsonPropertyName("audio_volume_caps")] public Dictionary<string, int> AudioVolumeCaps { get; set; } = [];
+
+    /// <summary>Mixer channels in display order (empty = the defaults, seeded by the audio service).</summary>
+    [JsonPropertyName("audio_channels")] public List<AudioChannel> AudioChannels { get; set; } = [];
+
+    /// <summary>Program (exe path) to channel id.</summary>
+    [JsonPropertyName("audio_programs")] public Dictionary<string, string> AudioPrograms { get; set; } = [];
+
+    /// <summary>Channel and app levels per output device id.</summary>
+    [JsonPropertyName("audio_mix")] public Dictionary<string, DeviceMix> AudioMix { get; set; } = [];
+
+    [JsonPropertyName("audio_presets")] public List<MixPreset> AudioPresets { get; set; } = [];
 
     [JsonExtensionData] public Dictionary<string, JsonElement>? Extra { get; set; }
 

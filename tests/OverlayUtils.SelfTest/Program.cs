@@ -1387,6 +1387,75 @@ string RepoRoot()
     Check(audio.Calls.Contains("SetVolume:0.5"), "clicking the middle of the bar sets 50 %");
 }
 
+// --- Mixing rules ---
+{
+    Check(MixRules.DefaultChannels.Select(c => c.Id).SequenceEqual(new[] { "game", "chat", "media", "other" }), "default channels in order");
+    Check(MixRules.Classify(@"C:\Users\a\AppData\Local\Discord\Discord.exe", false) == "chat", "Discord is chat");
+    Check(MixRules.Classify(@"C:\x\chrome.exe", false) == "media" && MixRules.Classify(@"C:\x\Spotify.exe", false) == "media" && MixRules.Classify(@"C:\x\vlc.exe", false) == "media", "browser and players are media");
+    Check(MixRules.Classify(@"D:\SteamLibrary\steamapps\common\X\x.exe", false) == "game", "Steam library exe is game");
+    Check(MixRules.Classify("D:/SteamLibrary/steamapps/common/X/x.exe", false) == "game", "forward slashes work for game folders");
+    Check(MixRules.Classify(@"C:\Program Files\Epic Games\Y\y.exe", false) == "game", "Epic exe is game");
+    Check(MixRules.Classify(@"C:\GOG Galaxy\Games\Z\z.exe", false) == "game", "GOG exe is game");
+    Check(MixRules.Classify(@"C:\tools\unknown.exe", true) == "game" && MixRules.Classify(@"C:\tools\unknown.exe", false) == "other", "unknown: fullscreen game, else other");
+    Check(MixRules.Classify(@"C:\x\DISCORD.EXE", true) == "chat", "known app wins over fullscreen, case-insensitive");
+    var programs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { [@"C:\x\chrome.exe"] = "chat" };
+    Check(MixRules.ChannelOf(@"c:\X\Chrome.exe", programs, false) == "chat", "stored choice wins over the rule");
+    Check(MixRules.ChannelOf(@"C:\x\vlc.exe", programs, false) == "media", "no stored choice uses the rule");
+    Check(Math.Abs(MixRules.Effective(new MixLevel(0.5, false), new MixLevel(0.8, false)) - 0.4) < 1e-9, "effective is the product");
+    Check(MixRules.Effective(new MixLevel(0.5, true), new MixLevel(0.8, false)) == 0 && MixRules.Effective(new MixLevel(0.5, false), new MixLevel(0.8, true)) == 0, "either mute gives 0");
+
+    var mixA = new DeviceMix(new() { ["game"] = new MixLevel(0.3, false) }, new() { ["a.exe"] = new MixLevel(0.9, true) });
+    var mixes = new Dictionary<string, DeviceMix> { ["A"] = mixA };
+    var copied = MixRules.MixFor(mixes, "B", "A");
+    Check(copied.Channels["game"].Volume == 0.3 && copied.Apps["a.exe"].Muted && !ReferenceEquals(copied.Channels, mixA.Channels), "unknown device copies the current mix");
+    Check(ReferenceEquals(MixRules.MixFor(mixes, "A", "B"), mixA), "known device returns its own mix");
+    var empty = MixRules.MixFor(mixes, "C", null);
+    Check(empty.Channels.Count == MixRules.DefaultChannels.Count && empty.Channels.Values.All(l => l.Volume == 1.0 && !l.Muted) && empty.Apps.Count == 0, "no current device gives defaults");
+    var empty2 = MixRules.MixFor(mixes, "C", "missing");
+    Check(empty2.Channels.Count == MixRules.DefaultChannels.Count, "current device without a mix gives defaults");
+
+    var chans = new List<AudioChannel>(MixRules.DefaultChannels) { new("c1", "One", "star") };
+    var progs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["a.exe"] = "c1", ["b.exe"] = "c1", ["c.exe"] = "chat" };
+    var (left, moved) = MixRules.DeleteChannel(chans, progs, "c1");
+    Check(left.Count == 4 && left.All(c => c.Id != "c1") && moved["a.exe"] == "other" && moved["b.exe"] == "other" && moved["c.exe"] == "chat", "deleting a custom channel moves its programs to other");
+    var (same, samePrograms) = MixRules.DeleteChannel(chans, progs, "game");
+    Check(same.Count == 5 && samePrograms["a.exe"] == "c1", "default channels are not deletable");
+    Check(MixRules.NextCustomId(chans) == "c2", "next custom id after c1");
+    Check(MixRules.NextCustomId([.. MixRules.DefaultChannels, new("c1", "", ""), new("c3", "", "")]) == "c4", "next custom id after c1, c3");
+
+    var baseMix = new DeviceMix(new() { ["game"] = new MixLevel(1, false), ["chat"] = new MixLevel(1, false) }, new() { ["a.exe"] = new MixLevel(0.5, false) });
+    var preset = new MixPreset("P", new() { ["game"] = new MixLevel(0.2, true), ["gone"] = new MixLevel(0.1, false) });
+    var applied = MixRules.ApplyPreset(baseMix, preset, chans);
+    Check(applied.Channels["game"].Volume == 0.2 && applied.Channels["game"].Muted && applied.Channels["chat"].Volume == 1 && !applied.Channels.ContainsKey("gone") && applied.Apps["a.exe"].Volume == 0.5, "preset ignores unknown channels and keeps the rest");
+    Check(baseMix.Channels["game"].Volume == 1, "preset does not mutate the original mix");
+
+    var groups = MixRules.GroupByProgram(new[] { "CHROME.EXE", "chrome.exe", "Chrome.exe", "vlc.exe" }, s => s);
+    Check(groups.Count == 2 && groups[0].Sessions.Count == 3 && groups[1].Sessions.Count == 1, "sessions group by exe case-insensitively");
+
+    var ac = new AppConfig();
+    Check(ac.AudioChannels.Count == 0 && ac.AudioPrograms.Count == 0 && ac.AudioMix.Count == 0 && ac.AudioPresets.Count == 0, "mixing config defaults are empty");
+    var json = System.Text.Json.JsonSerializer.Serialize(ac, ConfigStore.JsonOptions);
+    foreach (var key in new[] { "audio_channels", "audio_programs", "audio_mix", "audio_presets" })
+        Check(json.Contains($"\"{key}\""), $"config key {key}");
+    var mixPath = Path.Combine(temp, "mixcfg", "config.json");
+    var mixStore = new ConfigStore(mixPath);
+    mixStore.Update(c =>
+    {
+        c.AudioChannels = [.. MixRules.DefaultChannels, new AudioChannel("c1", "Mine", "star")];
+        c.AudioPrograms[@"C:\x\a.exe"] = "c1";
+        c.AudioMix["dev"] = mixA;
+        c.AudioPresets = [preset];
+    });
+    var back = new ConfigStore(mixPath).Current;
+    Check(back.AudioChannels.Count == 5 && back.AudioChannels[4] == new AudioChannel("c1", "Mine", "star") && back.AudioPrograms[@"C:\x\a.exe"] == "c1"
+        && back.AudioMix["dev"].Channels["game"].Volume == 0.3 && back.AudioMix["dev"].Apps["a.exe"].Muted
+        && back.AudioPresets[0].Name == "P" && back.AudioPresets[0].Channels["game"].Muted, "mixing config round-trips through ConfigStore");
+    var nullMix = Path.Combine(temp, "mixnull.json");
+    File.WriteAllText(nullMix, """{ "audio_channels": null, "audio_programs": null, "audio_mix": null, "audio_presets": null }""");
+    var nm = new ConfigStore(nullMix).Current;
+    Check(nm.AudioChannels.Count == 0 && nm.AudioPrograms.Count == 0 && nm.AudioMix.Count == 0 && nm.AudioPresets.Count == 0, "null mixing collections load as empty");
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;

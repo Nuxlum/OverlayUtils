@@ -60,6 +60,10 @@ public sealed class ConfigStore
                     loaded.AudioOutputOrder ??= [];
                     loaded.AudioInputOrder ??= [];
                     loaded.AudioVolumeCaps ??= [];
+                    loaded.AudioChannels ??= [];
+                    loaded.AudioPrograms ??= [];
+                    loaded.AudioMix ??= [];
+                    loaded.AudioPresets ??= [];
                     return loaded;
                 }
             }
