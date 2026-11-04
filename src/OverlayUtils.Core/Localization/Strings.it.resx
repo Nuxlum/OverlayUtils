@@ -179,7 +179,7 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.Page.Info" xml:space="preserve"><value>Informazioni</value></data>
   <data name="Overlay.Page.Settings" xml:space="preserve"><value>Impostazioni</value></data>
   <data name="Overlay.Power.Desc" xml:space="preserve"><value>Sospendi, riavvia o spegni il PC. Chiede conferma con una seconda pressione.</value></data>
-  <data name="Overlay.Power.Label" xml:space="preserve"><value>Energia</value></data>
+  <data name="Overlay.Power.Label" xml:space="preserve"><value>Alimentazione</value></data>
   <data name="Overlay.Power.Restart" xml:space="preserve"><value>Riavvia</value></data>
   <data name="Overlay.Power.ShutDown" xml:space="preserve"><value>Spegni</value></data>
   <data name="Overlay.Power.Sleep" xml:space="preserve"><value>Sospendi</value></data>
