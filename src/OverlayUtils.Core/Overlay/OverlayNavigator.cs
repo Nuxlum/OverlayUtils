@@ -358,6 +358,8 @@ public sealed class OverlayNavigator
                 hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.Volume")));
             else if (item.Kind == ItemKind.Media)
                 hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.Track")));
+            else if (item.Kind == ItemKind.Reorder && item.Step != null)
+                hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.Icon")));
             else if (item.Kind == ItemKind.Expander)
                 hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.OpenClose")));
         }
@@ -432,6 +434,9 @@ public sealed class OverlayNavigator
                 return item.Step is { } step ? new NavResult(NavEffect.RunHere, () => step(direction)) : None;
             case ItemKind.Media:
                 return Media(_media is { } m ? (direction < 0 ? m.Previous : m.Next) : null);
+            case ItemKind.Reorder:
+                // Not while held (HandleHolding ignores Left/Right): e.g. the icon of a channel.
+                return item.Step is { } change ? new NavResult(NavEffect.RunHere, () => change(direction)) : None;
             case ItemKind.Toggle:
                 return item.Toggle is { } toggle ? new NavResult(NavEffect.RunHere, toggle) : None;
             case ItemKind.Expander:

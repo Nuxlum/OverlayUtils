@@ -24,4 +24,13 @@ public interface IOverlayHost
     void SwitchFullMode();
 
     void Exit();
+
+    /// <summary>
+    /// Small name dialog owned by the overlay, prefilled with <paramref name="suggested"/>; <paramref name="done"/>
+    /// runs on the UI thread with the accepted text, and not at all on cancel.
+    /// </summary>
+    void AskName(string suggested, Action<string> done);
+
+    /// <summary>File picker for a program (.exe); <paramref name="done"/> runs on the UI thread with the full path, not on cancel.</summary>
+    void ChooseProgram(Action<string> done);
 }

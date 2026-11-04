@@ -11,7 +11,7 @@ namespace OverlayUtils.Core.Overlay;
 /// The rows of the overlay: Controls and Audio tabs, Settings page and Info page (Python OVERLAY_ITEMS,
 /// SETTINGS_ITEMS and _info_panels). Only features that exist in the .NET app are listed. Lists are rebuilt on every
 /// call, so row kinds, icons and labels follow the current profiles, devices, config and language; the only state
-/// kept here is the monitor pick, the open Info panel and a device list being reordered, all cleared by
+/// kept here is the monitor, preset and rename picks, the open Info panel and a list being reordered, all cleared by
 /// <see cref="ResetTransient"/>.
 /// </summary>
 public sealed class OverlayContent
@@ -39,6 +39,10 @@ public sealed class OverlayContent
     // A priority list while an entry is picked up: moves change only this copy; drop saves it, cancel drops it.
     List<AudioDeviceRef>? _outputDraft;
     List<AudioDeviceRef>? _inputDraft;
+    // The channel order while a channel is picked up (ids), as the device drafts.
+    List<string>? _channelDraft;
+    string? _presetPick;   // Presets row: the preset Left/Right landed on (applied by A)
+    string? _renamePick;   // Channels page, Rename row: the channel id to rename
 
     public OverlayContent(ConfigStore config, MonitorProfiles monitors, MonitorSwitcherLocator locator,
         IOverlayHost host, IAudioView audio, IMediaControl? media = null, Action? sendAltF4 = null)
@@ -48,6 +52,7 @@ public sealed class OverlayContent
         _locator = locator;
         _host = host;
         _audio = audio;
+        Mix = new MixController(config, audio);
         Media = media;
         _sendAltF4 = sendAltF4 ?? KeySender.AltF4;
         Tabs =
@@ -59,16 +64,25 @@ public sealed class OverlayContent
 
     public IReadOnlyList<OverlayTab> Tabs { get; }
 
+    /// <summary>All mix edits of the Channels rows and the Channels / Programs pages.</summary>
+    public MixController Mix { get; }
+
     /// <summary>The media session the Now playing row shows; the navigator takes it for LB / RB / X.</summary>
     public IMediaControl? Media { get; }
 
-    /// <summary>Called when the overlay opens: monitor pick cleared, Info shows Shortcuts, no list being reordered.</summary>
+    /// <summary>
+    /// Called when the overlay opens: monitor, preset and rename picks cleared, Info shows Shortcuts, no list being
+    /// reordered.
+    /// </summary>
     public void ResetTransient()
     {
         _monitorPick = null;
         _openPanel = ShortcutsPanel;
         _outputDraft = null;
         _inputDraft = null;
+        _channelDraft = null;
+        _presetPick = null;
+        _renamePick = null;
     }
 
     // --- Controls -------------------------------------------------------------
@@ -218,6 +232,7 @@ public sealed class OverlayContent
                 SetLevel = _audio.SetVolume,
                 Toggle = _audio.ToggleMute,
             },
+            .. ChannelRows(),
             new OverlayItem
             {
                 Kind = ItemKind.Media, Icon = Glyphs.Music, Key = "audio.media",
@@ -241,6 +256,229 @@ public sealed class OverlayContent
     }
 
     static string Percent(double level) => $"{Math.Round(level * 100)}%";
+
+    /// <summary>
+    /// Channels section: each channel with at least one app playing (in channel order), its apps indented under
+    /// it; then Presets (only with presets) and Save preset (only with channel rows).
+    /// </summary>
+    IEnumerable<OverlayItem> ChannelRows()
+    {
+        var config = _config.Current;
+        var channels = Mix.Channels;
+        var byChannel = _audio.Apps
+            .GroupBy(app => MixRules.ChannelFor(app.Exe, config.AudioPrograms, config.AudioChannels))
+            .ToDictionary(g => g.Key, g => g.ToList());
+        var first = true;
+        foreach (var channel in channels)
+        {
+            if (!byChannel.TryGetValue(channel.Id, out var members)) continue;
+            var id = channel.Id;
+            yield return new OverlayItem
+            {
+                Kind = ItemKind.Slider, Icon = Glyphs.ChannelIcon(channel.Icon), Key = "ch." + id,
+                Section = first ? () => Loc.T("Overlay.Section.Channels") : null,
+                Label = () => channel.Name,
+                Description = () => Loc.T("Overlay.Audio.Channel.Desc"),
+                Value = () => Percent(Mix.ChannelLevel(id).Volume),
+                IsOn = () => Mix.ChannelLevel(id).Muted,
+                Step = direction => Mix.StepChannel(id, direction),
+                SetLevel = level => Mix.SetChannelLevel(id, level),
+                Toggle = () => Mix.ToggleChannelMute(id),
+            };
+            first = false;
+            foreach (var app in members)
+            {
+                var exe = app.Exe;
+                var level = Mix.AppLevel(exe);
+                yield return new OverlayItem
+                {
+                    Kind = ItemKind.Slider, Child = true, Icon = Glyphs.VolumeIcon(level.Volume, level.Muted), Key = "app." + exe,
+                    Label = () => app.Name,
+                    Description = () => Loc.T("Overlay.Audio.App.Desc"),
+                    Value = () => Percent(Mix.AppLevel(exe).Volume),
+                    IsOn = () => Mix.AppLevel(exe).Muted,
+                    Step = direction => Mix.StepApp(exe, direction),
+                    SetLevel = value => Mix.SetAppLevel(exe, value),
+                    Toggle = () => Mix.ToggleAppMute(exe),
+                };
+            }
+        }
+
+        var hasPresets = config.AudioPresets.Count > 0;
+        if (hasPresets)
+        {
+            yield return new OverlayItem
+            {
+                Kind = ItemKind.Choice, Icon = Glyphs.ChannelIcon("star"), Key = "audio.presets",
+                Section = () => Loc.T("Overlay.Section.Presets"),
+                Label = () => Loc.T("Overlay.Audio.Presets"),
+                Description = () => Loc.T("Overlay.Audio.Presets.Desc"),
+                Value = PresetPick,
+                Step = StepPreset,
+                Toggle = () =>
+                {
+                    if (PresetPick() is { Length: > 0 } name) Mix.ApplyPreset(name);
+                },
+            };
+        }
+        if (!first)
+        {
+            yield return new OverlayItem
+            {
+                Kind = ItemKind.Action, Icon = Glyphs.Add, Key = "audio.savepreset", Stay = true,
+                Section = hasPresets ? null : () => Loc.T("Overlay.Section.Presets"),
+                Label = () => Loc.T("Overlay.Audio.SavePreset"),
+                Description = () => Loc.T("Overlay.Audio.SavePreset.Desc"),
+                Action = () => _host.AskName(SuggestedPresetName(), name =>
+                {
+                    Mix.SavePreset(name);
+                    _presetPick = name.Trim();
+                }),
+            };
+        }
+    }
+
+    /// <summary>The preset Left/Right picked, else the first.</summary>
+    string PresetPick()
+    {
+        var presets = _config.Current.AudioPresets;
+        if (_presetPick is { } pick && presets.Find(p => string.Equals(p.Name, pick, StringComparison.OrdinalIgnoreCase)) is { } found)
+            return found.Name;
+        return presets.Count > 0 ? presets[0].Name : "";
+    }
+
+    void StepPreset(int direction)
+    {
+        var names = _config.Current.AudioPresets.Select(p => p.Name).ToList();
+        if (names.Count == 0) return;
+        var index = Math.Max(names.IndexOf(PresetPick()), 0);
+        _presetPick = names[(((index + Math.Sign(direction)) % names.Count) + names.Count) % names.Count];
+    }
+
+    /// <summary>"Preset N" with N one past the number of presets, skipping names in use.</summary>
+    string SuggestedPresetName()
+    {
+        var names = _config.Current.AudioPresets.Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        for (var n = names.Count + 1; ; n++)
+            if (Loc.T("Overlay.Audio.PresetName", n) is var name && !names.Contains(name)) return name;
+    }
+
+    /// <summary>Rows of the Channels page: the channels (reorderable, Left/Right = icon), Add channel, Rename.</summary>
+    IReadOnlyList<OverlayItem> ChannelsPage()
+    {
+        var stored = Mix.Channels;
+        var list = _channelDraft is { } draft
+            ? draft.Select(id => stored.FirstOrDefault(c => c.Id == id)).OfType<AudioChannel>().ToList()
+            : [.. stored];
+        var rows = list.Select(channel =>
+        {
+            var id = channel.Id;
+            var custom = !MixRules.DefaultChannels.Any(c => c.Id == id);
+            return new OverlayItem
+            {
+                Kind = ItemKind.Reorder, Key = id, Icon = Glyphs.ChannelIcon(channel.Icon),
+                Label = () => channel.Name,
+                Value = () => Loc.T("Icon." + channel.Icon),
+                Description = () => Loc.T(custom ? "Settings.Audio.Channel.CustomDesc" : "Settings.Audio.Channel.Desc"),
+                Step = direction => Mix.CycleIcon(id, direction),
+                Move = direction => MoveChannel(id, direction),
+                Commit = CommitChannels,
+                Cancel = () => _channelDraft = null,
+                RemoveEntry = custom ? () => Mix.DeleteChannel(id) : null,
+            };
+        }).ToList();
+
+        rows.Add(new OverlayItem
+        {
+            Kind = ItemKind.Action, Icon = Glyphs.Add, Key = "channels.add", Stay = true,
+            Label = () => Loc.T("Settings.Audio.AddChannel"),
+            Description = () => Loc.T("Settings.Audio.AddChannel.Desc"),
+            Action = () => _host.AskName(Loc.T("Settings.Audio.ChannelName", Mix.Channels.Count + 1), Mix.AddChannel),
+        });
+        rows.Add(new OverlayItem
+        {
+            Kind = ItemKind.Choice, Icon = Glyphs.Rename, Key = "channels.rename",
+            Label = () => Loc.T("Settings.Audio.Rename"),
+            Description = () => Loc.T("Settings.Audio.Rename.Desc"),
+            Value = () => RenamePick()?.Name ?? "",
+            Step = direction =>
+            {
+                var channels = Mix.Channels;
+                var index = Math.Max(channels.ToList().FindIndex(c => c.Id == RenamePick()?.Id), 0);
+                _renamePick = channels[(((index + Math.Sign(direction)) % channels.Count) + channels.Count) % channels.Count].Id;
+            },
+            Toggle = () =>
+            {
+                if (RenamePick() is not { } channel) return;
+                _host.AskName(channel.Name, name => Mix.RenameChannel(channel.Id, name));
+            },
+        });
+        return rows;
+    }
+
+    AudioChannel? RenamePick()
+    {
+        var channels = Mix.Channels;
+        return channels.FirstOrDefault(c => c.Id == _renamePick) ?? channels.FirstOrDefault();
+    }
+
+    void MoveChannel(string id, int direction)
+    {
+        var draft = _channelDraft ??= Mix.Channels.Select(c => c.Id).ToList();
+        var from = draft.IndexOf(id);
+        var to = from + Math.Sign(direction);
+        if (from < 0 || to < 0 || to >= draft.Count) return;
+        (draft[from], draft[to]) = (draft[to], draft[from]);
+    }
+
+    void CommitChannels()
+    {
+        if (_channelDraft is not { } draft) return;
+        _channelDraft = null;
+        Mix.SetOrder(draft);
+    }
+
+    /// <summary>Rows of the Programs page: every known program (by name) with its channel, then Add program.</summary>
+    IReadOnlyList<OverlayItem> ProgramsPage()
+    {
+        var config = _config.Current;
+        var channels = Mix.Channels;
+        var live = _audio.Apps.GroupBy(a => a.Exe, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Name, StringComparer.OrdinalIgnoreCase);
+        var rows = config.AudioPrograms.Keys
+            .Select(exe => (Exe: exe, Name: live.TryGetValue(exe, out var name) ? name : FileName(exe)))
+            .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
+            .Select(program =>
+            {
+                var exe = program.Exe;
+                var channel = channels.FirstOrDefault(c => c.Id == Mix.ChannelOf(exe));
+                return new OverlayItem
+                {
+                    Kind = ItemKind.Choice, Key = "prog." + exe, Icon = Glyphs.ChannelIcon(channel?.Icon),
+                    Label = () => program.Name,
+                    Description = () => Loc.T("Settings.Audio.Program.Desc", exe),
+                    Value = () => Mix.Channels.FirstOrDefault(c => c.Id == Mix.ChannelOf(exe))?.Name ?? "",
+                    Step = direction => Mix.CycleProgram(exe, direction),
+                };
+            }).ToList();
+        if (rows.Count == 0)
+            rows.Add(new OverlayItem { Kind = ItemKind.Info, Label = () => Loc.T("Settings.Audio.NoPrograms"), Value = () => "" });
+        rows.Add(new OverlayItem
+        {
+            Kind = ItemKind.Action, Icon = Glyphs.Add, Key = "programs.add", Stay = true,
+            Label = () => Loc.T("Settings.Audio.AddProgram"),
+            Description = () => Loc.T("Settings.Audio.AddProgram.Desc"),
+            Action = () => _host.ChooseProgram(Mix.AddProgram),
+        });
+        return rows;
+    }
+
+    /// <summary>File name of a Windows path, on any OS.</summary>
+    static string FileName(string path)
+    {
+        var normalized = path.Replace('/', '\\');
+        return normalized[(normalized.LastIndexOf('\\') + 1)..];
+    }
 
     /// <summary>Rows of the Output order / Input order page: the stored list, best first.</summary>
     IReadOnlyList<OverlayItem> OrderPage(AudioFlow flow)
@@ -363,6 +601,20 @@ public sealed class OverlayContent
             Description = () => Loc.T("Settings.Audio.MaxVolume.Desc", _audio.Default(AudioFlow.Output)?.Name ?? ""),
             Value = () => _audio.Default(AudioFlow.Output) is { } device ? $"{CurrentCap(device.Id)}%" : "",
             Step = StepCap,
+        };
+        yield return new OverlayItem
+        {
+            Kind = ItemKind.Action, Icon = Glyphs.ChannelIcon("music"), Key = "settings.channels",
+            Label = () => Loc.T("Settings.Audio.Channels"),
+            Description = () => Loc.T("Settings.Audio.Channels.Desc"),
+            SubPage = ChannelsPage,
+        };
+        yield return new OverlayItem
+        {
+            Kind = ItemKind.Action, Icon = Glyphs.List, Key = "settings.programs",
+            Label = () => Loc.T("Settings.Audio.Programs"),
+            Description = () => Loc.T("Settings.Audio.Programs.Desc"),
+            SubPage = ProgramsPage,
         };
     }
 

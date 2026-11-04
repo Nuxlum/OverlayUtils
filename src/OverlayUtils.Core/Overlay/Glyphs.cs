@@ -22,6 +22,8 @@ public static class Glyphs
     public const string ChevronLeft = "";
     public const string ChevronRight = "";
     public const string Settings = "";
+    public const string Add = "";
+    public const string Rename = "";
 
     // Audio (Python ICON_SPEAKER, ICON_HEADPHONE, ICON_VOLUME*, ICON_MUTE, ICON_MIC*, ICON_PLAY ... ICON_MUSIC).
     public const string Speaker = "";
@@ -41,4 +43,25 @@ public static class Glyphs
     /// <summary>Python _volume_icon: mute, else one of four levels.</summary>
     public static string VolumeIcon(double level, bool muted) =>
         muted ? Mute : VolumeLevels[Math.Clamp((int)(level * 4), 0, 3)];
+
+    /// <summary>
+    /// Icons a mixer channel can have, in the order Left/Right cycles them (name = stored key, also "Icon.name").
+    /// </summary>
+    public static IReadOnlyList<string> ChannelIconNames { get; } =
+    [
+        "game", "chat", "music", "video", "browser", "mic", "headphones", "speaker",
+        "star", "heart", "people", "globe", "bolt", "home", "code", "other",
+    ];
+
+    static readonly Dictionary<string, string> ChannelGlyphs = new()
+    {
+        ["game"] = Game, ["chat"] = "", ["music"] = Music, ["video"] = "",
+        ["browser"] = "", ["mic"] = Mic, ["headphones"] = Headphone, ["speaker"] = Speaker,
+        ["star"] = "", ["heart"] = "", ["people"] = "", ["globe"] = "",
+        ["bolt"] = "", ["home"] = Home, ["code"] = "", ["other"] = "",
+    };
+
+    /// <summary>Glyph of a channel icon name; an unknown name shows the "other" glyph.</summary>
+    public static string ChannelIcon(string? name) =>
+        name is not null && ChannelGlyphs.TryGetValue(name, out var glyph) ? glyph : ChannelGlyphs["other"];
 }

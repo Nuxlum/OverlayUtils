@@ -380,6 +380,11 @@ internal sealed class TrayController : IOverlayHost, IDisposable
 
     void IOverlayHost.Exit() => OnUi(Exit);
 
+    // The name dialog and the program picker come with the mixing UI (stage 4b, task 4); until then these rows do nothing.
+    public void AskName(string suggested, Action<string> done) { }
+
+    public void ChooseProgram(Action<string> done) { }
+
     private sealed class WindowOwner(nint handle) : IWin32Window
     {
         public nint Handle => handle;

@@ -1297,6 +1297,262 @@ string RepoRoot()
         Check(shortcuts.Contains(expected), $"Info shortcuts list {expected}");
 }
 
+// --- Channels in the overlay -------------------------------------------------
+{
+    Loc.SetLanguage("en");
+    var store = new ConfigStore(Path.Combine(temp, "channels", "config.json"));
+    var monitors = new MonitorProfiles(store, new MonitorSwitcherLocator(store), Path.Combine(temp, "channels", "none"));
+    var audio = new FakeAudio();
+    audio.Outputs.AddRange([new AudioDeviceRef("spk", "Speakers"), new AudioDeviceRef("hs", "Headset")]);
+    audio.DefaultOutput = "spk";
+    var host = new FakeHost();
+    var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), host, audio);
+    void Run(NavResult r) => r.Action?.Invoke();
+    OverlayNavigator Nav()
+    {
+        var n = new OverlayNavigator(content.Tabs, content.Settings, content.Info, media: content.Media);
+        content.ResetTransient();
+        n.Reset(store.Current.HiddenTabs);
+        return n;
+    }
+    List<string?> Keys() => content.Audio().Where(i => i.Visible()).Select(i => i.Key).ToList();
+    DeviceMix Stored(string device) => store.Current.AudioMix[device];
+    const string game = @"C:\Steam\steamapps\common\Foo\foo.exe";
+    const string discord = @"C:\Users\u\AppData\Local\Discord\Discord.exe";
+    const string spotify = @"C:\Spotify\Spotify.exe";
+
+    Check(!Keys().Any(k => k?.StartsWith("ch.") == true || k?.StartsWith("app.") == true), "no channel rows without apps");
+    Check(!Keys().Contains("audio.presets") && !Keys().Contains("audio.savepreset"), "no preset rows without apps or presets");
+
+    store.Update(c => c.AudioChannels = [.. MixRules.DefaultChannels]);
+    audio.AppList.AddRange([new AudioApp(discord, "Discord"), new AudioApp(game, "Foo")]);
+    Check(Keys().SequenceEqual(["audio.output", "audio.input", "audio.volume", "ch.game", "app." + game, "ch.chat", "app." + discord,
+        "audio.savepreset"]), "channel rows only for channels with apps, in channel order, apps under them");
+    var rows = content.Audio();
+    var gameRow = rows.First(r => r.Key == "ch.game");
+    var fooRow = rows.First(r => r.Key == "app." + game);
+    Check(gameRow.Kind == ItemKind.Slider && !gameRow.Child && fooRow.Kind == ItemKind.Slider && fooRow.Child,
+        "channel rows are sliders, app rows are child sliders");
+    Check(gameRow.Section?.Invoke() == Loc.T("Overlay.Section.Channels") && rows.First(r => r.Key == "ch.chat").Section == null,
+        "Channels section header on the first channel");
+    Check(gameRow.Label() == "Game" && gameRow.Icon == Glyphs.ChannelIcon("game") && fooRow.Label() == "Foo", "channel and app labels and icon");
+    Check(gameRow.Value() == "100%" && !gameRow.IsOn() && fooRow.Value() == "100%", "levels start at 100%");
+
+    store.Update(c => c.AudioMix["spk"] = new DeviceMix(new() { ["game"] = new MixLevel(0.5, false) }, []));
+    audio.Calls.Clear();
+    var nav = Nav();
+    Run(nav.Handle(OverlayCommand.NextTab));
+    while (nav.Selected?.Key != "ch.game") nav.Handle(OverlayCommand.Down);
+    Run(nav.Handle(OverlayCommand.Right));
+    Check(Math.Abs(Stored("spk").Channels["game"].Volume - 0.55) < 1e-9 && audio.Calls.SequenceEqual(["ApplyMix"]),
+        "Right on a channel raises its stored volume 5% and applies the mix");
+    Check(!store.Current.AudioMix.ContainsKey("hs"), "only the current device's mix changes");
+    Check(nav.Selected?.Value() == "55%", "channel row shows the new level");
+    Run(nav.Handle(OverlayCommand.Left));
+    Run(nav.Handle(OverlayCommand.LeftRepeat));
+    Check(Math.Abs(Stored("spk").Channels["game"].Volume - 0.45) < 1e-9, "Left (and held Left) lower it");
+    Run(nav.Handle(OverlayCommand.A));
+    Check(Stored("spk").Channels["game"] == new MixLevel(0.45, true) && nav.Selected!.IsOn(), "A mutes the channel, volume kept");
+    Run(nav.Handle(OverlayCommand.A));
+    Check(!Stored("spk").Channels["game"].Muted, "A again unmutes");
+    Run(nav.ClickLevel(nav.Index, 0.3));
+    Check(Math.Abs(Stored("spk").Channels["game"].Volume - 0.3) < 1e-9, "clicking the bar sets the channel level");
+    for (var i = 0; i < 30; i++) content.Audio().First(r => r.Key == "ch.game").Step!(1);
+    Check(Stored("spk").Channels["game"].Volume == 1.0, "channel volume never above 100%");
+    for (var i = 0; i < 30; i++) content.Audio().First(r => r.Key == "ch.game").Step!(-1);
+    Check(Stored("spk").Channels["game"].Volume == 0.0, "channel volume never below 0%");
+
+    // App rows, with a stored key in other casing (JSON dictionaries are case-sensitive).
+    store.Update(c => c.AudioMix["spk"] = new DeviceMix(new(c.AudioMix["spk"].Channels), new() { [discord.ToUpperInvariant()] = new MixLevel(0.3, false) }));
+    audio.Calls.Clear();
+    while (nav.Selected?.Key != "app." + discord) nav.Handle(OverlayCommand.Down);
+    Check(nav.Selected?.Value() == "30%", "app row reads its level case-insensitively");
+    Run(nav.Handle(OverlayCommand.A));
+    Check(Stored("spk").Apps.Count == 1 && MixRules.AppLevel(Stored("spk"), discord) == new MixLevel(0.3, true) && audio.Calls.SequenceEqual(["ApplyMix"]),
+        "A on an app mutes it (one key, volume kept) and applies the mix");
+    Run(nav.Handle(OverlayCommand.Right));
+    Check(Stored("spk").Apps.Count == 1 && Math.Abs(MixRules.AppLevel(Stored("spk"), discord).Volume - 0.35) < 1e-9, "Right on an app raises it 5%");
+
+    // A device seen for the first time gets the mix stored.
+    audio.DefaultOutput = "hs";
+    content.Audio().First(r => r.Key == "ch.chat").Step!(-1);
+    Check(store.Current.AudioMix.ContainsKey("hs") && Math.Abs(Stored("hs").Channels["chat"].Volume - 0.95) < 1e-9
+        && Stored("spk").Channels.GetValueOrDefault("chat", new MixLevel(1.0, false)).Volume == 1.0, "a new device gets its own mix");
+    audio.DefaultOutput = null;
+    content.Mix.StepChannel("chat", -1);
+    Check(store.Current.AudioMix.Count == 2, "no default output: nothing stored");
+    audio.DefaultOutput = "spk";
+
+    // Selection follows the app by Key.
+    while (nav.Selected?.Key != "app." + discord) nav.Handle(OverlayCommand.Down);
+    audio.AppList.Insert(0, new AudioApp(@"C:\Games\other.exe", "Other game"));
+    store.Update(c => c.AudioPrograms[@"C:\Games\other.exe"] = "chat");
+    var before = nav.Index;
+    nav.Refresh();
+    Check(nav.Selected?.Key == "app." + discord && nav.Index == before + 1, "selection follows the app when another appears above it");
+    audio.AppList.RemoveAt(0);
+    store.Update(c => c.AudioPrograms.Remove(@"C:\Games\other.exe"));
+    nav.Refresh();
+
+    // Settings → Audio → Programs.
+    OverlayItem SettingsRow(string key) => content.Settings().First(i => i.Label() == Loc.T(key));
+    var settingsLabels = content.Settings().Select(i => i.Label()).ToList();
+    Check(settingsLabels.IndexOf(Loc.T("Settings.Audio.Channels")) == settingsLabels.IndexOf(Loc.T("Settings.Audio.MaxVolume")) + 1
+        && settingsLabels.IndexOf(Loc.T("Settings.Audio.Programs")) == settingsLabels.IndexOf(Loc.T("Settings.Audio.Channels")) + 1,
+        "Channels and Programs after Max volume");
+    store.Update(c =>
+    {
+        c.AudioPrograms[discord] = "chat";
+        c.AudioPrograms[game] = "game";
+        c.AudioPrograms[spotify] = "other";
+    });
+    var programs = SettingsRow("Settings.Audio.Programs");
+    Check(programs.SubPage != null, "Programs opens a sub-page");
+    var programRows = programs.SubPage!().Where(r => r.Kind == ItemKind.Choice).ToList();
+    Check(programRows.Count == 3 && programRows.Any(r => r.Key == "prog." + discord && r.Value() == "Chat"),
+        "one Choice row per known program, value = channel name");
+    nav = Nav();
+    nav.Handle(OverlayCommand.Settings);
+    while (nav.Selected?.Label() != Loc.T("Settings.Audio.Programs")) nav.Handle(OverlayCommand.Down);
+    Run(nav.Handle(OverlayCommand.A));
+    Check(nav.Page == OverlayPage.Sub, "A opens the Programs page");
+    while (nav.Selected?.Key != "prog." + discord) nav.Handle(OverlayCommand.Down);
+    audio.Calls.Clear();
+    Run(nav.Handle(OverlayCommand.Right));
+    Check(store.Current.AudioPrograms[discord] == "media" && nav.Selected?.Value() == "Media" && audio.Calls.SequenceEqual(["ApplyMix"]),
+        "Right moves the program to the next channel (Media) and applies the mix");
+    var keys = Keys();
+    Check(keys.IndexOf("app." + discord) == keys.IndexOf("ch.media") + 1 && !keys.Contains("ch.chat"),
+        "the Audio tab shows it under Media");
+    Run(nav.Handle(OverlayCommand.Right));
+    Run(nav.Handle(OverlayCommand.Right));
+    Check(store.Current.AudioPrograms[discord] == "game", "Right wraps through the channels");
+    Run(nav.Handle(OverlayCommand.Left));
+    Check(store.Current.AudioPrograms[discord] == "other", "Left goes back");
+    host.NextProgram = @"C:\Apps\Zoom\Zoom.exe";
+    while (nav.Selected?.Label() != Loc.T("Settings.Audio.AddProgram")) nav.Handle(OverlayCommand.Down);
+    var add = nav.Handle(OverlayCommand.A);
+    Check(add.Effect == NavEffect.RunHere, "Add program runs with the overlay open");
+    Run(add);
+    nav.Refresh();
+    Check(host.Calls.Contains("ChooseProgram") && store.Current.AudioPrograms[@"C:\Apps\Zoom\Zoom.exe"] == "chat",
+        "Add program stores the picked exe with its automatic channel");
+    store.Update(c => c.AudioPrograms[@"C:\Apps\Zoom\Zoom.exe"] = "game");
+    host.NextProgram = @"C:\APPS\ZOOM\ZOOM.EXE";
+    Run(nav.Handle(OverlayCommand.A));
+    var zoom = store.Current.AudioPrograms.Where(p => p.Key.Equals(@"C:\Apps\Zoom\Zoom.exe", StringComparison.OrdinalIgnoreCase)).ToList();
+    Check(zoom.Count == 1 && zoom[0].Value == "game", "adding a known program in other casing keeps its entry and channel");
+    store.Update(c => c.AudioPrograms.Remove(@"C:\Apps\Zoom\Zoom.exe"));
+
+    // Settings → Audio → Channels.
+    var channels = SettingsRow("Settings.Audio.Channels");
+    var channelRows = channels.SubPage!().Where(r => r.Kind == ItemKind.Reorder).ToList();
+    Check(channelRows.Select(r => r.Key).SequenceEqual(["game", "chat", "media", "other"]), "Channels page lists the channels in order");
+    Check(channelRows[0].Value() == Loc.T("Icon.game") && channelRows.All(r => r.RemoveEntry == null), "value = icon name; defaults not deletable");
+    nav = Nav();
+    nav.Handle(OverlayCommand.Settings);
+    while (nav.Selected?.Label() != Loc.T("Settings.Audio.Channels")) nav.Handle(OverlayCommand.Down);
+    Run(nav.Handle(OverlayCommand.A));
+    Check(nav.Page == OverlayPage.Sub && nav.Selected?.Key == "game", "A opens the Channels page");
+    Run(nav.Handle(OverlayCommand.Right));
+    Check(store.Current.AudioChannels[0].Icon == Glyphs.ChannelIconNames[1] && nav.Selected?.Icon == Glyphs.ChannelIcon(Glyphs.ChannelIconNames[1]),
+        "Right cycles the channel icon");
+    Run(nav.Handle(OverlayCommand.Left));
+    Run(nav.Handle(OverlayCommand.Left));
+    Check(store.Current.AudioChannels[0].Icon == Glyphs.ChannelIconNames[^1], "Left wraps the icons");
+    Run(nav.Handle(OverlayCommand.Right));
+    Check(nav.Footer().Any(f => f.Keys == "← →" && f.Label == Loc.T("Overlay.Footer.Icon")), "footer: arrows change the icon");
+    Run(nav.Handle(OverlayCommand.A));
+    Run(nav.Handle(OverlayCommand.Down));
+    Check(nav.Holding && store.Current.AudioChannels[0].Id == "game", "picked up; config unchanged while holding");
+    Check(nav.Handle(OverlayCommand.Right).Effect == NavEffect.None, "Left/Right ignored while holding");
+    Run(nav.Handle(OverlayCommand.A));
+    Check(store.Current.AudioChannels.Select(c => c.Id).SequenceEqual(["chat", "game", "media", "other"]), "dropping saves the channel order");
+    Check(Keys().IndexOf("ch.chat") < Keys().IndexOf("ch.game"), "Audio tab follows the channel order");
+    Run(nav.Handle(OverlayCommand.A));
+    Run(nav.Handle(OverlayCommand.Up));
+    Run(nav.Handle(OverlayCommand.B));
+    Check(store.Current.AudioChannels.Select(c => c.Id).SequenceEqual(["chat", "game", "media", "other"])
+        && nav.Items.Where(r => r.Kind == ItemKind.Reorder).Select(r => r.Key).SequenceEqual(["chat", "game", "media", "other"]), "B cancels the move");
+
+    host.NextName = null; // accept the suggestion
+    while (nav.Selected?.Label() != Loc.T("Settings.Audio.AddChannel")) nav.Handle(OverlayCommand.Down);
+    var addChannel = nav.Handle(OverlayCommand.A);
+    Check(addChannel.Effect == NavEffect.RunHere, "Add channel runs with the overlay open");
+    Run(addChannel);
+    nav.Refresh();
+    Check(host.Calls.Contains("AskName:" + Loc.T("Settings.Audio.ChannelName", 5)), "Add channel suggests Channel 5");
+    Check(store.Current.AudioChannels.Last() is { Id: "c1", Name: "Channel 5" }, "Add channel appends c1 with the name");
+    host.NextName = "   ";
+    Run(nav.Handle(OverlayCommand.A));
+    Check(store.Current.AudioChannels.Count == 5, "a blank name adds nothing");
+    host.NextName = "Voice";
+    while (nav.Selected?.Label() != Loc.T("Settings.Audio.Rename")) nav.Handle(OverlayCommand.Down);
+    Check(nav.Selected?.Value() == "Chat", "Rename starts on the first channel");
+    while (nav.Selected?.Value() != "Channel 5") Run(nav.Handle(OverlayCommand.Right));
+    Run(nav.Handle(OverlayCommand.A));
+    Check(host.Calls.Last() == "AskName:Channel 5" && store.Current.AudioChannels.Last().Name == "Voice", "Rename asks with the current name and saves it");
+    Check(nav.Selected?.Value() == "Voice", "Rename keeps the renamed channel picked");
+
+    store.Update(c => c.AudioPrograms[spotify] = "c1");
+    Check(programs.SubPage!().First(r => r.Key == "prog." + spotify).Value() == "Voice", "Programs page shows the custom channel");
+    while (nav.Selected?.Key != "c1") nav.Handle(OverlayCommand.Down);
+    Check(nav.Selected?.RemoveEntry != null, "a custom channel can be deleted");
+    audio.Calls.Clear();
+    Run(nav.Handle(OverlayCommand.Remove));
+    nav.Refresh();
+    Check(store.Current.AudioChannels.Count == 4 && store.Current.AudioPrograms[spotify] == "other" && audio.Calls.Contains("ApplyMix"),
+        "deleting a custom channel moves its programs to Other");
+    while (nav.Selected?.Key != "game") nav.Handle(OverlayCommand.Down);
+    Check(nav.Handle(OverlayCommand.Remove).Effect == NavEffect.None, "Y does nothing on a default channel");
+
+    // Presets.
+    store.Update(c => c.AudioMix["spk"] = new DeviceMix(new() { ["game"] = new MixLevel(0.4, false), ["chat"] = new MixLevel(0.7, true) }, []));
+    host.NextName = null;
+    var save = content.Audio().First(r => r.Key == "audio.savepreset");
+    Check(save.Kind == ItemKind.Action && save.Stay, "Save preset runs with the overlay open");
+    save.Action!();
+    Check(host.Calls.Last() == "AskName:" + Loc.T("Overlay.Audio.PresetName", 1) && store.Current.AudioPresets.Single().Name == "Preset 1",
+        "Save preset suggests Preset 1 and stores it");
+    var presetsRow = content.Audio().First(r => r.Key == "audio.presets");
+    Check(presetsRow.Kind == ItemKind.Choice && presetsRow.Visible() && presetsRow.Value() == "Preset 1", "Presets row shows the preset");
+    store.Update(c => c.AudioMix["spk"] = new DeviceMix(new() { ["game"] = new MixLevel(0.9, false), ["chat"] = new MixLevel(0.2, false) }, []));
+    host.NextName = "Night";
+    content.Audio().First(r => r.Key == "audio.savepreset").Action!();
+    host.NextName = "preset 1"; // same name, other casing: replaces
+    store.Update(c => c.AudioMix["spk"] = new DeviceMix(new() { ["game"] = new MixLevel(0.4, false), ["chat"] = new MixLevel(0.7, true) }, []));
+    content.Audio().First(r => r.Key == "audio.savepreset").Action!();
+    Check(store.Current.AudioPresets.Select(p => p.Name).SequenceEqual(["preset 1", "Night"]), "same name replaces the preset");
+    host.NextName = null;
+    content.Audio().First(r => r.Key == "audio.savepreset").Action!();
+    Check(host.Calls.Last() == "AskName:" + Loc.T("Overlay.Audio.PresetName", 3), "suggested name skips names in use");
+    store.Update(c => c.AudioPresets.RemoveAt(2));
+    store.Update(c => c.AudioMix["spk"] = new DeviceMix(new() { ["game"] = new MixLevel(1.0, false), ["chat"] = new MixLevel(1.0, false) }, []));
+    nav = Nav();
+    Run(nav.Handle(OverlayCommand.NextTab));
+    while (nav.Selected?.Key != "audio.presets") nav.Handle(OverlayCommand.Down);
+    Check(nav.Selected?.Value() == "preset 1", "Presets starts on the first preset");
+    Run(nav.Handle(OverlayCommand.Right));
+    Check(nav.Selected?.Value() == "Night" && Stored("spk").Channels["game"].Volume == 1.0, "Right picks the next preset without applying");
+    Run(nav.Handle(OverlayCommand.Right));
+    audio.Calls.Clear();
+    var apply = nav.Handle(OverlayCommand.A);
+    Run(apply);
+    Check(Stored("spk").Channels["game"] == new MixLevel(0.4, false) && Stored("spk").Channels["chat"] == new MixLevel(0.7, true)
+        && audio.Calls.SequenceEqual(["ApplyMix"]), "applying the saved preset restores the channel volumes");
+    Check(apply.Effect == NavEffect.RunHere, "applying keeps the overlay open");
+    Run(nav.Handle(OverlayCommand.Right));
+    content.ResetTransient();
+    Check(content.Audio().First(r => r.Key == "audio.presets").Value() == "preset 1", "preset pick resets when the overlay opens");
+
+    var strings = Loc.AllStrings(CultureInfo.InvariantCulture);
+    foreach (var name in Glyphs.ChannelIconNames)
+        Check(strings.ContainsKey("Icon." + name) && Glyphs.ChannelIcon(name).Length == 1, $"icon {name} has a name and a glyph");
+    Check(Glyphs.ChannelIconNames.Count == 16 && MixRules.DefaultChannels.All(c => Glyphs.ChannelIconNames.Contains(c.Icon)),
+        "16 channel icons incl. the defaults");
+    Check(Glyphs.ChannelIcon("bogus") == Glyphs.ChannelIcon("other"), "unknown icon falls back to other");
+}
+
 // --- Mouse entry points -----------------------------------------------------
 {
     var log = new List<string>();
@@ -1544,6 +1800,19 @@ sealed class FakeHost : IOverlayHost
     public void ChooseMonitorSwitcher() => Calls.Add("ChooseMonitorSwitcher");
     public void SwitchFullMode() => Calls.Add("SwitchFullMode");
     public void Exit() => Calls.Add("Exit");
+    /// <summary>What the name dialog returns: null accepts the suggestion.</summary>
+    public string? NextName { get; set; }
+    public string? NextProgram { get; set; }
+    public void AskName(string suggested, Action<string> done)
+    {
+        Calls.Add("AskName:" + suggested);
+        done(NextName ?? suggested);
+    }
+    public void ChooseProgram(Action<string> done)
+    {
+        Calls.Add("ChooseProgram");
+        if (NextProgram is { } exe) done(exe);
+    }
 }
 
 sealed class FakeMedia(List<string> log) : IMediaControl

@@ -34,7 +34,7 @@ public sealed class OverlayItem
     public Func<bool> Visible { get; init; } = () => true;
     public Func<IReadOnlyList<OverlayOption>> Options { get; init; } = () => [];  // Segmented
     public Func<string> Value { get; init; } = () => "";                         // Choice, Info
-    public Action<int>? Step { get; init; }              // Choice
+    public Action<int>? Step { get; init; }              // Choice, Slider; Reorder: Left/Right when not held
     public Action<double>? SetLevel { get; init; }       // Slider: level 0..1 (click on the bar)
     public Action? Apply { get; init; }                  // Choice: A runs this after hiding
     public Func<bool> IsOn { get; init; } = () => false; // Toggle, Expander
@@ -50,4 +50,5 @@ public sealed class OverlayItem
     public Action? Commit { get; init; }                 // Reorder: drop the picked-up entry
     public Action? Cancel { get; init; }                 // Reorder: put the picked-up entry back
     public Action? RemoveEntry { get; init; }            // any row: the Remove command (Y on the pad)
+    public bool Child { get; init; }                     // drawn indented under the row above (an app under its channel)
 }
