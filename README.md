@@ -10,8 +10,8 @@ mouse, and that can sit on top of fullscreen games:
   `Ctrl+Alt+Down` / `Ctrl+Alt+Up` or the tray menu
 - **Home key remapping** - make the keyboard's "Browser Home" key act as the
   Windows key or Alt+Tab
-- **Overlay** *(being ported)* - system controls, Steam library, Spotify and
-  Discord, navigable with any SDL-supported controller
+- **Overlay** *(being ported)* - system controls, audio and media, games
+  library and Discord, navigable with any SDL-supported controller
 - **English and Italian**, following the Windows language or chosen in the menu
 
 > **Status:** OverlayUtils is being ported from Python to .NET in stages.
@@ -38,7 +38,7 @@ with it, so only enable full mode for builds from someone you trust.
 
 See [README.txt](README.txt) (the same file ships in the zip).
 
-Coming from **AppUtili**? Settings, Spotify and Discord logins are copied
+Coming from **AppUtili**? Settings and the Discord login are copied
 automatically on first start, and the tray menu offers to remove the old
 install.
 

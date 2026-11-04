@@ -8,7 +8,7 @@ work here; the deeper docs live in `docs/`.
 **OverlayUtils** - a Windows tray utility with a gamepad-driven overlay that
 can sit on top of fullscreen games: monitor profile switching, Home key
 remapping, global gamepad combos, and an overlay with system controls, the
-Steam library, Spotify and Discord.
+games library (Steam, Epic, GOG, Xbox, apps), media controls and Discord.
 
 It is being **ported from Python (the "AppUtili" app) to C# / .NET 10 + WPF**,
 in stages. The Python app in `reference/python/` is the behaviour spec for

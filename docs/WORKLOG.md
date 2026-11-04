@@ -155,6 +155,14 @@ The stage checklist lives in `PORTING.md`.
   command cycles All → each launcher that has games (`OverlayItem.AltAction`);
   a filter whose launcher empties falls back to All. The grid keeps the
   selected game by id across refreshes.
+- 2026-11-04 - **Spotify and YouTube Music dropped (stage 6):** since
+  February 2026 a Spotify app in development mode allows 5 users, all with
+  Premium, and more needs a business with 250k monthly users, so it can't
+  ship to friends; YouTube Music has no official API. The owner doesn't use
+  music while gaming. The generic Windows media session (stage 4a) already
+  shows and controls any player. The migration skips the Spotify token and
+  cache; an already-migrated `spotify_token.json` in %APPDATA%\OverlayUtils
+  is left alone (the user's file) and unused.
 - 2026-11-04 - **Art only near the view** (review fix): the grid asks for the
   covers of the rows on screen plus one on each side, tiles four rows away
   drop theirs, and decoded covers sit in a 120-entry most-recently-used cache
@@ -202,10 +210,11 @@ The stage checklist lives in `PORTING.md`.
   in Discord's local RPC, may need a workaround.
 - [ ] Optional Sonar integration after the built-in audio features (show
   the device Sonar routes to, ChatMix).
-- [ ] Stage 6: YouTube Music integration in addition to Spotify (keep both).
 
 ## Session log
 
+- 2026-11-04 - Stage 6 dropped (Spotify / YouTube Music, see Decisions);
+  migration no longer copies Spotify's token and cache. Self-test 1263/1263.
 - 2026-11-04 - Stage 5 final review fixes: GOG `launchParam` passed as
   arguments, emulator `DisplayIcon` used only when it names the emulator's
   exe (not an uninstaller), launch and click by game id, grid tile kept

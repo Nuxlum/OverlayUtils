@@ -350,7 +350,7 @@ footer, descriptions) and `Settings.*`.
 |---|---|
 | `%APPDATA%\OverlayUtils\config.json` | settings |
 | `%APPDATA%\OverlayUtils\errors.log` | `Log.Error` / `Log.Info`, restarts past 256 KB |
-| `%APPDATA%\OverlayUtils\spotify_token.json` etc. | migrated now, used from stages 6-7 |
+| `%APPDATA%\OverlayUtils\discord_token.json`, `discord_cache\` | migrated now, used from stage 7 (Spotify's token is not copied) |
 | `%ProgramFiles%\OverlayUtils\` | full-mode install + `full-mode.json` |
 | `%LOCALAPPDATA%\Programs\OverlayUtils\` | where the app moves when leaving full mode |
 | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\OverlayUtils` | start-up entry |

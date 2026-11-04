@@ -3,9 +3,9 @@ using OverlayUtils.Core.Diagnostics;
 namespace OverlayUtils.Core.Legacy;
 
 /// <summary>
-/// First run after the rename: copy %APPDATA%\AppUtili (settings, Spotify and
-/// Discord tokens, caches) to %APPDATA%\OverlayUtils so nothing has to be set
-/// up again. The old folder is left in place; nothing reads it afterwards.
+/// First run after the rename: copy %APPDATA%\AppUtili (settings, the Discord
+/// token, caches) to %APPDATA%\OverlayUtils so nothing has to be set up again.
+/// The old folder is left in place; nothing reads it afterwards.
 /// </summary>
 public static class ConfigMigration
 {
@@ -14,8 +14,12 @@ public static class ConfigMigration
     /// <summary>Old file name -> new file name; null = do not copy.</summary>
     private static readonly Dictionary<string, string?> Renames = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["errori.log"] = null, // old log, not useful
+        ["errori.log"] = null,         // old log, not useful
+        ["spotify_token.json"] = null, // Spotify is not ported: no login token kept for nothing
     };
+
+    /// <summary>Top-level folders not copied.</summary>
+    private static readonly HashSet<string> SkippedDirs = new(StringComparer.OrdinalIgnoreCase) { "spotify_cache" };
 
     /// <summary>Returns true if settings were migrated now.</summary>
     public static bool MigrateIfNeeded(string legacyDir, string newDir)
@@ -25,7 +29,7 @@ public static class ConfigMigration
             if (!Directory.Exists(legacyDir)) return false;
             if (File.Exists(Path.Combine(newDir, "config.json"))) return false;
 
-            CopyTree(legacyDir, newDir);
+            CopyTree(legacyDir, newDir, top: true);
             File.WriteAllText(Path.Combine(newDir, MarkerFile),
                 $"Settings copied from {legacyDir} on {DateTime.Now:yyyy-MM-dd HH:mm}.{Environment.NewLine}" +
                 $"The old folder can be deleted once everything works.{Environment.NewLine}");
@@ -39,7 +43,7 @@ public static class ConfigMigration
         }
     }
 
-    private static void CopyTree(string source, string target)
+    private static void CopyTree(string source, string target, bool top = false)
     {
         Directory.CreateDirectory(target);
         foreach (var file in Directory.EnumerateFiles(source))
@@ -54,6 +58,9 @@ public static class ConfigMigration
             if (!File.Exists(destination)) File.Copy(file, destination);
         }
         foreach (var dir in Directory.EnumerateDirectories(source))
+        {
+            if (top && SkippedDirs.Contains(Path.GetFileName(dir))) continue;
             CopyTree(dir, Path.Combine(target, Path.GetFileName(dir)));
+        }
     }
 }

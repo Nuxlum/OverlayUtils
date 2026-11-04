@@ -86,8 +86,10 @@ on the dev PC. No game has been launched from the overlay yet.
 - [~] Games tab: 3-column cover grid, Y / Delete (or the filter pill) cycles the source filter, mouse hover / click, empty state
 - [~] Settings → Games: a switch per source, Manage apps page (Add app…, Y removes)
 
-### Stage 6 - Spotify  `[ ]`
-- [ ] PKCE login, token refresh (reuse migrated `spotify_token.json`), recent / playlists, play, shuffle  *(SPOTIFY)*
+### Stage 6 - Spotify  `[dropped]`
+- [x] Dropped (see WORKLOG 2026-11-04): Spotify's development mode allows 5 users, all with Premium, so it
+  can't be given to friends. Music is covered by the Windows media session (Now playing, LB / RB / X).
+  The AppUtili migration no longer copies `spotify_token.json` / `spotify_cache`.
 
 ### Stage 7 - Discord  `[ ]`
 - [ ] Named-pipe RPC client, OAuth, voice channels, mute/deafen, go-live hotkey, favourites  *(DISCORD)*

@@ -113,11 +113,13 @@ string RepoRoot()
     File.WriteAllText(Path.Combine(legacy, "spotify_token.json"), "{}");
     File.WriteAllText(Path.Combine(legacy, "spotify_cache", "a.jpg"), "x");
     File.WriteAllText(Path.Combine(legacy, "errori.log"), "old");
+    File.WriteAllText(Path.Combine(legacy, "discord_token.json"), "{}");
 
     Check(ConfigMigration.MigrateIfNeeded(legacy, target), "migrates the first time");
     Check(File.Exists(Path.Combine(target, "config.json")), "config copied");
-    Check(File.Exists(Path.Combine(target, "spotify_token.json")), "tokens copied");
-    Check(File.Exists(Path.Combine(target, "spotify_cache", "a.jpg")), "caches copied");
+    Check(File.Exists(Path.Combine(target, "discord_token.json")), "Discord token copied (stage 7)");
+    Check(!File.Exists(Path.Combine(target, "spotify_token.json")) && !Directory.Exists(Path.Combine(target, "spotify_cache")),
+        "Spotify token and cache not copied (Spotify dropped)");
     Check(!File.Exists(Path.Combine(target, "errori.log")), "old log skipped");
     Check(File.Exists(Path.Combine(legacy, "config.json")), "old folder left in place");
     Check(!ConfigMigration.MigrateIfNeeded(legacy, target), "runs only once");

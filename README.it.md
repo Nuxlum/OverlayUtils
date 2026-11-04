@@ -10,8 +10,8 @@ pad, la tastiera o il mouse, che può stare sopra i giochi a schermo intero:
   `Ctrl+Alt+Giù` / `Ctrl+Alt+Su` o il menu dell'icona
 - **Rimappatura del tasto Home** - il tasto "Browser Home" della tastiera
   diventa il tasto Windows o Alt+Tab
-- **Overlay** *(in fase di passaggio)* - controlli di sistema, libreria Steam,
-  Spotify e Discord, con qualsiasi controller supportato da SDL
+- **Overlay** *(in fase di passaggio)* - controlli di sistema, audio e media,
+  libreria giochi e Discord, con qualsiasi controller supportato da SDL
 - **Italiano e inglese**, secondo la lingua di Windows o scelta dal menu
 
 > **Stato:** OverlayUtils sta passando da Python a .NET, per fasi. La fase 1
@@ -40,7 +40,7 @@ modalità completa solo con versioni ricevute da qualcuno di cui ti fidi.
 
 Vedi [README.txt](README.txt) (lo stesso file è nello zip).
 
-Arrivi da **AppUtili**? Impostazioni e accessi a Spotify e Discord vengono
+Arrivi da **AppUtili**? Le impostazioni e l'accesso a Discord vengono
 copiati da soli al primo avvio, e il menu dell'icona propone di rimuovere la
 vecchia installazione.
 
