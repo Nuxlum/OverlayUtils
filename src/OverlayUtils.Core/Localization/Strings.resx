@@ -42,6 +42,12 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Channel.game" xml:space="preserve"><value>Game</value></data>
   <data name="Channel.media" xml:space="preserve"><value>Media</value></data>
   <data name="Channel.other" xml:space="preserve"><value>Other</value></data>
+  <data name="Games.Source.App" xml:space="preserve"><value>Apps</value></data>
+  <data name="Games.Source.Emulator" xml:space="preserve"><value>Emulators</value></data>
+  <data name="Games.Source.Epic" xml:space="preserve"><value>Epic Games</value></data>
+  <data name="Games.Source.Gog" xml:space="preserve"><value>GOG</value></data>
+  <data name="Games.Source.Steam" xml:space="preserve"><value>Steam</value></data>
+  <data name="Games.Source.Xbox" xml:space="preserve"><value>Xbox</value></data>
   <data name="Icon.bolt" xml:space="preserve"><value>Bolt</value></data>
   <data name="Icon.browser" xml:space="preserve"><value>Browser</value></data>
   <data name="Icon.chat" xml:space="preserve"><value>Chat</value></data>
@@ -133,9 +139,11 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Overlay.Footer.Change" xml:space="preserve"><value>Change</value></data>
   <data name="Overlay.Footer.Close" xml:space="preserve"><value>Close</value></data>
   <data name="Overlay.Footer.Confirm" xml:space="preserve"><value>Confirm</value></data>
+  <data name="Overlay.Footer.Filter" xml:space="preserve"><value>Filter</value></data>
   <data name="Overlay.Footer.Icon" xml:space="preserve"><value>Icon</value></data>
   <data name="Overlay.Footer.Open" xml:space="preserve"><value>Open</value></data>
   <data name="Overlay.Footer.OpenClose" xml:space="preserve"><value>Close / open</value></data>
+  <data name="Overlay.Footer.Play" xml:space="preserve"><value>Play</value></data>
   <data name="Overlay.Footer.Select" xml:space="preserve"><value>Select</value></data>
   <data name="Overlay.Footer.Settings" xml:space="preserve"><value>Settings</value></data>
   <data name="Overlay.Footer.SettingsHold" xml:space="preserve"><value>Settings (hold)</value></data>
@@ -149,6 +157,10 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Overlay.Footer.Track" xml:space="preserve"><value>Track</value></data>
   <data name="Overlay.Footer.Volume" xml:space="preserve"><value>Volume</value></data>
   <data name="Overlay.Footer.Toggle" xml:space="preserve"><value>Turn on/off</value></data>
+  <data name="Overlay.Games.All" xml:space="preserve"><value>All games</value></data>
+  <data name="Overlay.Games.Desc" xml:space="preserve"><value>A plays the selected game; Y or Delete changes which launcher is shown.</value></data>
+  <data name="Overlay.Games.Empty" xml:space="preserve"><value>No games found</value></data>
+  <data name="Overlay.Games.EmptyHint" xml:space="preserve"><value>Add programs in Settings → Games → Manage apps</value></data>
   <data name="Overlay.Info.Config" xml:space="preserve"><value>Configuration</value></data>
   <data name="Overlay.Info.Download" xml:space="preserve"><value>Download</value></data>
   <data name="Overlay.Info.Folder" xml:space="preserve"><value>Folder</value></data>
@@ -186,6 +198,7 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Overlay.Section.Audio" xml:space="preserve"><value>Audio</value></data>
   <data name="Overlay.Section.Channels" xml:space="preserve"><value>Channels</value></data>
   <data name="Overlay.Section.Devices" xml:space="preserve"><value>Devices</value></data>
+  <data name="Overlay.Section.Games" xml:space="preserve"><value>Games</value></data>
   <data name="Overlay.Section.General" xml:space="preserve"><value>General</value></data>
   <data name="Overlay.Section.Monitor" xml:space="preserve"><value>Monitor</value></data>
   <data name="Overlay.Section.NowPlaying" xml:space="preserve"><value>Now playing</value></data>
@@ -202,6 +215,7 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Overlay.ShowDesktop.Label" xml:space="preserve"><value>Show desktop</value></data>
   <data name="Overlay.Tab.Audio" xml:space="preserve"><value>Audio</value></data>
   <data name="Overlay.Tab.Controls" xml:space="preserve"><value>Controls</value></data>
+  <data name="Overlay.Tab.Games" xml:space="preserve"><value>Games</value></data>
   <data name="Settings.Audio.AddChannel" xml:space="preserve"><value>Add channel…</value></data>
   <data name="Settings.Audio.AddChannel.Desc" xml:space="preserve"><value>A new channel with a name of your choice. Programs are moved to it from Programs.</value></data>
   <data name="Settings.Audio.AddProgram" xml:space="preserve"><value>Add program…</value></data>
@@ -242,6 +256,13 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Settings.FullMode.Label" xml:space="preserve"><value>Over fullscreen games · {0}</value></data>
   <data name="Settings.FullMode.Off" xml:space="preserve"><value>Off</value></data>
   <data name="Settings.FullMode.On" xml:space="preserve"><value>On</value></data>
+  <data name="Settings.Games.AddApp" xml:space="preserve"><value>Add app…</value></data>
+  <data name="Settings.Games.AddApp.Desc" xml:space="preserve"><value>Pick a program (.exe) to show in the Games tab.</value></data>
+  <data name="Settings.Games.App.Desc" xml:space="preserve"><value>{0} — Y or Delete removes it.</value></data>
+  <data name="Settings.Games.Apps" xml:space="preserve"><value>Manage apps</value></data>
+  <data name="Settings.Games.Apps.Desc" xml:space="preserve"><value>Programs added by hand to the Games tab: launchers we can't read, portable emulators, anything else.</value></data>
+  <data name="Settings.Games.NoApps" xml:space="preserve"><value>No apps added</value></data>
+  <data name="Settings.Games.Source.Desc" xml:space="preserve"><value>Show the {0} games in the Games tab.</value></data>
   <data name="Settings.HomeKey.Desc" xml:space="preserve"><value>What the keyboard's Home media key does (None = opens the browser).</value></data>
   <data name="Settings.HomeKey.None" xml:space="preserve"><value>None</value></data>
   <data name="Settings.HomeKey.Windows" xml:space="preserve"><value>Windows</value></data>

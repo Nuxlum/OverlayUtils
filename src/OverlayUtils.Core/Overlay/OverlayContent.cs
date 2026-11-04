@@ -1,5 +1,6 @@
 using OverlayUtils.Core.Audio;
 using OverlayUtils.Core.Config;
+using OverlayUtils.Core.Games;
 using OverlayUtils.Core.Input;
 using OverlayUtils.Core.Localization;
 using OverlayUtils.Core.Monitors;
@@ -18,6 +19,7 @@ public sealed class OverlayContent
 {
     public const string ControlsTabId = "Controlli"; // Python tab name, kept as the stored id
     public const string AudioTabId = "Audio";
+    public const string GamesTabId = "Giochi"; // Python tab name, kept as the stored id
     public const int MonitorMaxPills = 3;
     public const int MinVolumeCap = 20;
     public const int MaxVolumeCap = 100;
@@ -33,6 +35,9 @@ public sealed class OverlayContent
     readonly IOverlayHost _host;
     readonly Action _sendAltF4;
     readonly IAudioView _audio;
+    readonly IGameView? _games;
+    // Manual apps: path -> title (the file description is read once, not on every list rebuild).
+    readonly Dictionary<string, string> _appTitles = new(StringComparer.OrdinalIgnoreCase);
 
     string? _monitorPick;
     string _openPanel = ShortcutsPanel;
@@ -43,15 +48,18 @@ public sealed class OverlayContent
     List<string>? _channelDraft;
     string? _presetPick;   // Presets row: the preset Left/Right landed on (applied by A)
     string? _renamePick;   // Channels page, Rename row: the channel id to rename
+    GameSource? _gamesFilter; // Games tab: the source shown (null: all); kept between openings
 
     public OverlayContent(ConfigStore config, MonitorProfiles monitors, MonitorSwitcherLocator locator,
-        IOverlayHost host, IAudioView audio, IMediaControl? media = null, Action? sendAltF4 = null)
+        IOverlayHost host, IAudioView audio, IMediaControl? media = null, Action? sendAltF4 = null,
+        IGameView? games = null)
     {
         _config = config;
         _monitors = monitors;
         _locator = locator;
         _host = host;
         _audio = audio;
+        _games = games;
         Mix = new MixController(config, audio);
         Media = media;
         _sendAltF4 = sendAltF4 ?? KeySender.AltF4;
@@ -59,6 +67,7 @@ public sealed class OverlayContent
         [
             new OverlayTab(ControlsTabId, () => Loc.T("Overlay.Tab.Controls"), Controls),
             new OverlayTab(AudioTabId, () => Loc.T("Overlay.Tab.Audio"), Audio),
+            new OverlayTab(GamesTabId, () => Loc.T("Overlay.Tab.Games"), Games),
         ];
     }
 
@@ -83,6 +92,125 @@ public sealed class OverlayContent
         _channelDraft = null;
         _presetPick = null;
         _renamePick = null;
+    }
+
+    // --- Games ----------------------------------------------------------------
+
+    public IReadOnlyList<OverlayItem> Games()
+    {
+        var games = _games?.Games ?? [];
+        var filter = GameLibrary.Valid(_gamesFilter, games);
+        var tiles = GameLibrary.Filter(games, filter);
+        return
+        [
+            new OverlayItem
+            {
+                Kind = ItemKind.Grid, Icon = Glyphs.Game, Key = "games.grid",
+                Visible = () => games.Count > 0,
+                Label = () => filter is { } source ? SourceLabel(source) : Loc.T("Overlay.Games.All"),
+                Description = () => Loc.T("Overlay.Games.Desc"),
+                Tiles = () => tiles,
+                Launch = game => _games?.Launch(game),
+                AltAction = () =>
+                {
+                    var current = _games?.Games ?? [];
+                    _gamesFilter = GameLibrary.NextFilter(GameLibrary.Valid(_gamesFilter, current), current);
+                },
+                AltLabel = () => Loc.T("Overlay.Footer.Filter"),
+            },
+            new OverlayItem
+            {
+                Kind = ItemKind.Info, Icon = Glyphs.Game,
+                Visible = () => games.Count == 0,
+                Label = () => Loc.T("Overlay.Games.Empty"),
+                Value = () => "",
+            },
+            new OverlayItem
+            {
+                Kind = ItemKind.Info, Icon = Glyphs.Info,
+                Visible = () => games.Count == 0,
+                Label = () => Loc.T("Overlay.Games.EmptyHint"),
+                Value = () => "",
+            },
+        ];
+    }
+
+    static string SourceName(GameSource source) => source.ToString().ToLowerInvariant();
+
+    static string SourceLabel(GameSource source) => Loc.T("Games.Source." + source);
+
+    IEnumerable<OverlayItem> GamesSettings()
+    {
+        var first = true;
+        foreach (var source in Enum.GetValues<GameSource>())
+        {
+            var name = SourceName(source);
+            var section = first;
+            first = false;
+            yield return new OverlayItem
+            {
+                Kind = ItemKind.Toggle, Icon = Glyphs.Game, Key = "settings.games." + name,
+                Section = section ? () => Loc.T("Overlay.Section.Games") : null,
+                Label = () => SourceLabel(source),
+                Description = () => Loc.T("Settings.Games.Source.Desc", SourceLabel(source)),
+                IsOn = () => !_config.Current.GamesSourcesHidden.Contains(name, StringComparer.OrdinalIgnoreCase),
+                Toggle = () =>
+                {
+                    _config.Update(c =>
+                    {
+                        if (c.GamesSourcesHidden.RemoveAll(s => string.Equals(s, name, StringComparison.OrdinalIgnoreCase)) == 0)
+                            c.GamesSourcesHidden.Add(name);
+                    });
+                    _games?.Refresh();
+                },
+            };
+        }
+        yield return new OverlayItem
+        {
+            Kind = ItemKind.Action, Icon = Glyphs.List, Key = "settings.games.apps",
+            Label = () => Loc.T("Settings.Games.Apps"),
+            Description = () => Loc.T("Settings.Games.Apps.Desc"),
+            SubPage = GameAppsPage,
+        };
+    }
+
+    IReadOnlyList<OverlayItem> GameAppsPage()
+    {
+        var rows = _config.Current.GamesManualApps.Select(path => new OverlayItem
+        {
+            Kind = ItemKind.Action, Icon = Glyphs.Game, Key = "games.app." + path, Stay = true,
+            Label = () => AppTitle(path),
+            Description = () => Loc.T("Settings.Games.App.Desc", path),
+            RemoveEntry = () =>
+            {
+                _config.Update(c => c.GamesManualApps.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)));
+                _games?.Refresh();
+            },
+        }).ToList();
+        if (rows.Count == 0)
+            rows.Add(new OverlayItem { Kind = ItemKind.Info, Label = () => Loc.T("Settings.Games.NoApps"), Value = () => "" });
+        rows.Add(new OverlayItem
+        {
+            Kind = ItemKind.Action, Icon = Glyphs.Add, Key = "games.apps.add", Stay = true,
+            Label = () => Loc.T("Settings.Games.AddApp"),
+            Description = () => Loc.T("Settings.Games.AddApp.Desc"),
+            Action = () => _host.ChooseProgram(path =>
+            {
+                _config.Update(c =>
+                {
+                    if (!c.GamesManualApps.Contains(path, StringComparer.OrdinalIgnoreCase)) c.GamesManualApps.Add(path);
+                });
+                _games?.Refresh();
+            }),
+        });
+        return rows;
+    }
+
+    string AppTitle(string path)
+    {
+        if (!_appTitles.TryGetValue(path, out var title))
+            _appTitles[path] = title = File.Exists(path) ? ManualApps.TitleOf(path) : Path.GetFileNameWithoutExtension(path);
+        return title;
     }
 
     // --- Controls -------------------------------------------------------------
@@ -656,7 +784,7 @@ public sealed class OverlayContent
 
     OverlayItem TabRow(string tabId, string titleKey, string? sectionKey) => new()
     {
-        Kind = ItemKind.Toggle, Icon = tabId == AudioTabId ? Glyphs.Volume : Glyphs.List,
+        Kind = ItemKind.Toggle, Icon = tabId switch { AudioTabId => Glyphs.Volume, GamesTabId => Glyphs.Game, _ => Glyphs.List },
         Section = sectionKey is null ? null : () => Loc.T(sectionKey),
         Label = () => Loc.T(titleKey),
         Description = () => Loc.T("Settings.Tab.Desc", Loc.T(titleKey)),
@@ -683,6 +811,7 @@ public sealed class OverlayContent
         [
             TabRow(ControlsTabId, "Overlay.Tab.Controls", "Overlay.Section.Tabs"),
             TabRow(AudioTabId, "Overlay.Tab.Audio", null),
+            TabRow(GamesTabId, "Overlay.Tab.Games", null),
             RoleRow(MonitorRole.Desk, "Settings.Desk.Label", "Settings.Desk.Desc", hasProfiles, Glyphs.Pc, "Overlay.Section.Monitor"),
             RoleRow(MonitorRole.Tv, "Settings.Tv.Label", "Settings.Tv.Desc", hasProfiles, Glyphs.Monitor, null),
             new OverlayItem
@@ -741,6 +870,7 @@ public sealed class OverlayContent
                 Step = StepLanguage,
             },
             .. AudioSettings(),
+            .. GamesSettings(),
             new OverlayItem
             {
                 Kind = ItemKind.Segmented, Icon = Glyphs.Monitor,

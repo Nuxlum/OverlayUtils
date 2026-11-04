@@ -459,7 +459,7 @@ string RepoRoot()
     Check(monitorRow.Label() == Loc.T("Overlay.Monitor.Label") && !monitorRow.Visible(), "Monitor row hidden without profiles");
     Check(nav.Selected?.Label() == Loc.T("Overlay.BigPicture.Label"), "Big Picture is selected when Monitor is hidden");
     Check(nav.Description() == Loc.T("Overlay.BigPicture.Desc"), "description is Big Picture's, not Monitor's");
-    Check(content.Tabs.Count == 2 && content.Tabs[0].Id == OverlayContent.ControlsTabId, "Controls is the first tab");
+    Check(content.Tabs.Count == 3 && content.Tabs[0].Id == OverlayContent.ControlsTabId, "Controls is the first tab");
 
     // Three profiles: segmented, cursor on the current profile.
     SetProfiles("Gaming", "Main", "TV");
@@ -1103,7 +1103,7 @@ string RepoRoot()
     }
 
     Check(content.Media == media, "content exposes the media control for the navigator");
-    Check(content.Tabs.Select(t => t.Id).SequenceEqual([OverlayContent.ControlsTabId, OverlayContent.AudioTabId])
+    Check(content.Tabs.Select(t => t.Id).SequenceEqual([OverlayContent.ControlsTabId, OverlayContent.AudioTabId, OverlayContent.GamesTabId])
         && OverlayContent.AudioTabId == "Audio", "Audio tab comes after Controls");
     Check(content.Tabs[1].Title() == Loc.T("Overlay.Tab.Audio"), "Audio tab title");
     var rows = content.Tabs[1].Items();
@@ -1259,7 +1259,8 @@ string RepoRoot()
     Check(!maxVolume.Visible(), "Max volume hidden without a default output");
     audio.DefaultOutput = "spk";
 
-    // Hiding the Audio tab.
+    // Hiding the Audio tab (with the Games tab hidden, so Controls and Audio are the only tabs).
+    store.Update(c => c.HiddenTabs.Add(OverlayContent.GamesTabId));
     var audioTabRow = content.Settings().First(i => i.Kind == ItemKind.Toggle && i.Label() == Loc.T("Overlay.Tab.Audio"));
     Check(audioTabRow.IsOn(), "Audio tab shown by default");
     audioTabRow.Toggle!();
@@ -1291,7 +1292,11 @@ string RepoRoot()
     nav.SetHiddenTabs(store.Current.HiddenTabs);
     Check(nav.CurrentTab.Id == OverlayContent.ControlsTabId && nav.Selected?.Label() == content.Controls().First(i => i.Visible()).Label(),
         "hiding the open tab moves to Controls and selects its first row");
-    store.Update(c => c.HiddenTabs.Remove("Audio"));
+    store.Update(c =>
+    {
+        c.HiddenTabs.Remove("Audio");
+        c.HiddenTabs.Remove(OverlayContent.GamesTabId);
+    });
 
     var shortcuts = content.Info().Where(i => i.Kind == ItemKind.Info && i.Visible()).Select(i => i.Value()).ToList();
     foreach (var expected in new[] { "Back + ← / →", "Back + Y", "LB / RB / X" })
@@ -2098,6 +2103,90 @@ string RepoRoot()
     Check(json.Contains("\"games_sources_hidden\"") && json.Contains("\"games_manual_apps\""), "games config keys");
 }
 
+// --- Games tab --------------------------------------------------------------
+{
+    var store = new ConfigStore(Path.Combine(temp, "gamestab", "config.json"));
+    var monitors = new MonitorProfiles(store, new MonitorSwitcherLocator(store), Path.Combine(temp, "gamestab", "none"));
+    var host = new FakeHost();
+    GameEntry G(string id, GameSource src, string title) => new(id, src, title, "launch:" + id, 0, null, null);
+    var view = new FakeGames();
+    view.Set([G("steam:1", GameSource.Steam, "A"), G("steam:2", GameSource.Steam, "B"), G("steam:3", GameSource.Steam, "C"),
+              G("epic:4", GameSource.Epic, "D"), G("epic:5", GameSource.Epic, "E")]);
+    var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), host, new FakeAudio(), null, null, view);
+    var nav = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
+    nav.Reset([]);
+    Check(content.Tabs.Select(t => t.Id).SequenceEqual(["Controlli", "Audio", "Giochi"]), "Games tab after Audio, stored id Giochi");
+    nav.ClickTab(2);
+    Check(nav.Selected?.Kind == ItemKind.Grid && nav.SelectedTile?.Id == "steam:1", "Games tab opens on the first tile");
+
+    // 3 columns: [1 2 3] [4 5]
+    nav.Handle(OverlayCommand.Right); nav.Handle(OverlayCommand.Right);
+    Check(nav.SelectedTile?.Id == "steam:3", "right moves along the row");
+    nav.Handle(OverlayCommand.Right);
+    Check(nav.SelectedTile?.Id == "epic:4", "right at the row end goes to the next row");
+    nav.Handle(OverlayCommand.Up);
+    Check(nav.SelectedTile?.Id == "steam:1", "up keeps the column");
+    nav.Handle(OverlayCommand.Up);
+    Check(nav.SelectedTile?.Id == "steam:1", "up at the top stays");
+    nav.Handle(OverlayCommand.Right); nav.Handle(OverlayCommand.Right); nav.Handle(OverlayCommand.Down);
+    Check(nav.SelectedTile?.Id == "epic:5", "down on a short last row clamps to its last tile");
+    nav.Handle(OverlayCommand.RightRepeat);
+    Check(nav.SelectedTile?.Id == "epic:5", "right past the last tile stays");
+    nav.Handle(OverlayCommand.LeftRepeat);
+    Check(nav.SelectedTile?.Id == "epic:4", "held left keeps moving");
+
+    var launch = nav.Handle(OverlayCommand.A);
+    Check(launch.Effect == NavEffect.HideAndRun, "A launches after hiding");
+    launch.Action?.Invoke();
+    Check(view.Launched.SequenceEqual(["epic:4"]), "A launches the selected tile");
+
+    view.Set([G("steam:0", GameSource.Steam, "New"), .. view.Games]);
+    nav.Refresh();
+    Check(nav.SelectedTile?.Id == "epic:4", "a game added before the selection keeps the same tile selected");
+    view.Set(view.Games.Where(g => g.Id != "epic:4").ToList());
+    nav.Refresh();
+    Check(nav.SelectedTile is { } neighbour && neighbour.Id != "epic:4", "removing the selected game selects a neighbour");
+
+    // Y cycles the source filter.
+    var footer = nav.Footer(pad: true);
+    Check(footer.Any(h => h.Keys == "A" && h.Label == Loc.T("Overlay.Footer.Play"))
+        && footer.Any(h => h.Keys == "Y" && h.Label == Loc.T("Overlay.Footer.Filter") && h.Command == OverlayCommand.Remove), "footer: A Play, Y Filter");
+    nav.Handle(OverlayCommand.Remove).Action?.Invoke();
+    nav.Refresh();
+    Check(nav.Selected?.Label() == Loc.T("Games.Source.Steam") && nav.SelectedTile?.Source == GameSource.Steam, "Y filters to Steam");
+    nav.Handle(OverlayCommand.Remove).Action?.Invoke();
+    nav.Refresh();
+    Check(nav.SelectedTile?.Source == GameSource.Epic, "Y filters to Epic");
+    view.Set(view.Games.Where(g => g.Source != GameSource.Epic).ToList());
+    nav.Refresh();
+    Check(nav.Selected?.Label() == Loc.T("Overlay.Games.All"), "filtered source gone: back to All");
+
+    view.Set([]);
+    nav.Refresh();
+    Check(content.Games().Any(i => i.Visible() && i.Label() == Loc.T("Overlay.Games.Empty")), "empty state shown");
+
+    // Mouse.
+    view.Set([G("steam:1", GameSource.Steam, "A"), G("steam:2", GameSource.Steam, "B")]);
+    nav.Refresh();
+    Check(nav.HoverTile(1) && nav.SelectedTile?.Id == "steam:2", "hover selects a tile");
+    var click = nav.ClickTile(0);
+    click.Action?.Invoke();
+    Check(click.Effect == NavEffect.HideAndRun && view.Launched.Last() == "steam:1", "click launches that tile");
+
+    // Settings -> Games.
+    var settings = content.Settings();
+    var epicToggle = settings.First(i => i.Label() == Loc.T("Games.Source.Epic"));
+    epicToggle.Toggle!();
+    Check(store.Current.GamesSourcesHidden.Contains("epic") && view.Refreshes > 0, "hiding a source stores it and refreshes");
+    var appsPage = settings.First(i => i.Label() == Loc.T("Settings.Games.Apps")).SubPage!();
+    host.NextProgram = @"C:\Tools\quiver.exe";
+    appsPage.First(i => i.Label() == Loc.T("Settings.Games.AddApp")).Action!();
+    Check(store.Current.GamesManualApps.SequenceEqual([@"C:\Tools\quiver.exe"]), "Add app stores the exe");
+    var entry = content.Settings().First(i => i.Label() == Loc.T("Settings.Games.Apps")).SubPage!().First(i => i.RemoveEntry != null);
+    entry.RemoveEntry!();
+    Check(store.Current.GamesManualApps.Count == 0, "Remove deletes the app");
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;
@@ -2192,4 +2281,15 @@ sealed class FakeRegistry : IRegistryView
         _values.TryGetValue(K(hive, key, wow64) + "|" + value, out var data) ? data : null;
     public IReadOnlyList<string> SubKeys(Microsoft.Win32.RegistryHive hive, string key, bool wow64 = false) =>
         _subKeys.TryGetValue(K(hive, key, wow64), out var list) ? list : [];
+}
+
+sealed class FakeGames : IGameView
+{
+    public IReadOnlyList<GameEntry> Games { get; private set; } = [];
+    public List<string> Launched { get; } = [];
+    public int Refreshes { get; private set; }
+    public event Action? Changed;
+    public void Set(IReadOnlyList<GameEntry> games) { Games = games; Changed?.Invoke(); }
+    public void Refresh() => Refreshes++;
+    public void Launch(GameEntry game) => Launched.Add(game.Id);
 }

@@ -42,6 +42,12 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Channel.game" xml:space="preserve"><value>Gioco</value></data>
   <data name="Channel.media" xml:space="preserve"><value>Media</value></data>
   <data name="Channel.other" xml:space="preserve"><value>Altro</value></data>
+  <data name="Games.Source.App" xml:space="preserve"><value>App</value></data>
+  <data name="Games.Source.Emulator" xml:space="preserve"><value>Emulatori</value></data>
+  <data name="Games.Source.Epic" xml:space="preserve"><value>Epic Games</value></data>
+  <data name="Games.Source.Gog" xml:space="preserve"><value>GOG</value></data>
+  <data name="Games.Source.Steam" xml:space="preserve"><value>Steam</value></data>
+  <data name="Games.Source.Xbox" xml:space="preserve"><value>Xbox</value></data>
   <data name="Icon.bolt" xml:space="preserve"><value>Fulmine</value></data>
   <data name="Icon.browser" xml:space="preserve"><value>Browser</value></data>
   <data name="Icon.chat" xml:space="preserve"><value>Chat</value></data>
@@ -133,9 +139,11 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.Footer.Change" xml:space="preserve"><value>Cambia</value></data>
   <data name="Overlay.Footer.Close" xml:space="preserve"><value>Chiudi</value></data>
   <data name="Overlay.Footer.Confirm" xml:space="preserve"><value>Conferma</value></data>
+  <data name="Overlay.Footer.Filter" xml:space="preserve"><value>Filtra</value></data>
   <data name="Overlay.Footer.Icon" xml:space="preserve"><value>Icona</value></data>
   <data name="Overlay.Footer.Open" xml:space="preserve"><value>Apri</value></data>
   <data name="Overlay.Footer.OpenClose" xml:space="preserve"><value>Chiudi / apri</value></data>
+  <data name="Overlay.Footer.Play" xml:space="preserve"><value>Gioca</value></data>
   <data name="Overlay.Footer.Select" xml:space="preserve"><value>Seleziona</value></data>
   <data name="Overlay.Footer.Settings" xml:space="preserve"><value>Impostazioni</value></data>
   <data name="Overlay.Footer.SettingsHold" xml:space="preserve"><value>Impostazioni (tieni)</value></data>
@@ -149,6 +157,10 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.Footer.Track" xml:space="preserve"><value>Traccia</value></data>
   <data name="Overlay.Footer.Volume" xml:space="preserve"><value>Volume</value></data>
   <data name="Overlay.Footer.Toggle" xml:space="preserve"><value>Attiva/disattiva</value></data>
+  <data name="Overlay.Games.All" xml:space="preserve"><value>Tutti i giochi</value></data>
+  <data name="Overlay.Games.Desc" xml:space="preserve"><value>A avvia il gioco selezionato; Y o Canc cambia il launcher mostrato.</value></data>
+  <data name="Overlay.Games.Empty" xml:space="preserve"><value>Nessun gioco trovato</value></data>
+  <data name="Overlay.Games.EmptyHint" xml:space="preserve"><value>Aggiungi programmi in Impostazioni → Giochi → Gestisci app</value></data>
   <data name="Overlay.Info.Config" xml:space="preserve"><value>Configurazione</value></data>
   <data name="Overlay.Info.Download" xml:space="preserve"><value>Scarica</value></data>
   <data name="Overlay.Info.Folder" xml:space="preserve"><value>Cartella</value></data>
@@ -186,6 +198,7 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.Section.Audio" xml:space="preserve"><value>Audio</value></data>
   <data name="Overlay.Section.Channels" xml:space="preserve"><value>Canali</value></data>
   <data name="Overlay.Section.Devices" xml:space="preserve"><value>Dispositivi</value></data>
+  <data name="Overlay.Section.Games" xml:space="preserve"><value>Giochi</value></data>
   <data name="Overlay.Section.General" xml:space="preserve"><value>Generale</value></data>
   <data name="Overlay.Section.Monitor" xml:space="preserve"><value>Monitor</value></data>
   <data name="Overlay.Section.NowPlaying" xml:space="preserve"><value>In riproduzione</value></data>
@@ -202,6 +215,7 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.ShowDesktop.Label" xml:space="preserve"><value>Mostra desktop</value></data>
   <data name="Overlay.Tab.Audio" xml:space="preserve"><value>Audio</value></data>
   <data name="Overlay.Tab.Controls" xml:space="preserve"><value>Controlli</value></data>
+  <data name="Overlay.Tab.Games" xml:space="preserve"><value>Giochi</value></data>
   <data name="Settings.Audio.AddChannel" xml:space="preserve"><value>Aggiungi canale…</value></data>
   <data name="Settings.Audio.AddChannel.Desc" xml:space="preserve"><value>Un nuovo canale con il nome che vuoi. I programmi si spostano lì da Programmi.</value></data>
   <data name="Settings.Audio.AddProgram" xml:space="preserve"><value>Aggiungi programma…</value></data>
@@ -242,6 +256,13 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Settings.FullMode.Label" xml:space="preserve"><value>Sopra i giochi a schermo intero · {0}</value></data>
   <data name="Settings.FullMode.Off" xml:space="preserve"><value>No</value></data>
   <data name="Settings.FullMode.On" xml:space="preserve"><value>Sì</value></data>
+  <data name="Settings.Games.AddApp" xml:space="preserve"><value>Aggiungi app…</value></data>
+  <data name="Settings.Games.AddApp.Desc" xml:space="preserve"><value>Scegli un programma (.exe) da mostrare nella scheda Giochi.</value></data>
+  <data name="Settings.Games.App.Desc" xml:space="preserve"><value>{0} — Y o Canc lo rimuove.</value></data>
+  <data name="Settings.Games.Apps" xml:space="preserve"><value>Gestisci app</value></data>
+  <data name="Settings.Games.Apps.Desc" xml:space="preserve"><value>Programmi aggiunti a mano alla scheda Giochi: launcher non letti, emulatori portatili, qualsiasi altra cosa.</value></data>
+  <data name="Settings.Games.NoApps" xml:space="preserve"><value>Nessuna app aggiunta</value></data>
+  <data name="Settings.Games.Source.Desc" xml:space="preserve"><value>Mostra i giochi di {0} nella scheda Giochi.</value></data>
   <data name="Settings.HomeKey.Desc" xml:space="preserve"><value>Cosa fa il tasto multimediale Home della tastiera (Nessuno = apre il browser).</value></data>
   <data name="Settings.HomeKey.None" xml:space="preserve"><value>Nessuno</value></data>
   <data name="Settings.HomeKey.Windows" xml:space="preserve"><value>Windows</value></data>

@@ -1,4 +1,5 @@
 using OverlayUtils.Core.Audio;
+using OverlayUtils.Core.Games;
 using OverlayUtils.Core.Localization;
 
 namespace OverlayUtils.Core.Overlay;
@@ -35,6 +36,8 @@ public sealed class OverlayNavigator
     OverlayPage _subOrigin;
     int _subIndex;
     int _subSegment;
+    int _tile;          // Grid row: the selected tile
+    string? _tileId;    // its id, so a refresh keeps the same game selected
 
     public OverlayNavigator(IReadOnlyList<OverlayTab> tabs, Func<IReadOnlyList<OverlayItem>> settings,
         Func<IReadOnlyList<OverlayItem>> info, TimeProvider? time = null, IMediaControl? media = null)
@@ -85,6 +88,19 @@ public sealed class OverlayNavigator
         }
     }
 
+    /// <summary>The selected tile of the selected Grid row (null when it is not a grid or it is empty).</summary>
+    public GameEntry? SelectedTile
+    {
+        get
+        {
+            var tiles = Tiles();
+            return tiles.Count == 0 ? null : tiles[Math.Clamp(_tile, 0, tiles.Count - 1)];
+        }
+    }
+
+    /// <summary>Index of <see cref="SelectedTile"/> in the grid's tiles (0 when there is none).</summary>
+    public int SelectedTileIndex => Math.Clamp(_tile, 0, Math.Max(Tiles().Count - 1, 0));
+
     public bool IsPending(int index, int segment) => _pending is { } p && p.Index == index && p.Segment == segment;
 
     /// <summary>A Remove on a <see cref="OverlayItem.ConfirmRemove"/> row is armed: the next one within 3 s deletes.</summary>
@@ -103,6 +119,8 @@ public sealed class OverlayNavigator
         _savedIndex = 0;
         _savedSegment = 0;
         _subItem = null;
+        _tile = 0;
+        _tileId = null;
         SelectFirst();
         return cancel;
     }
@@ -139,6 +157,13 @@ public sealed class OverlayNavigator
     /// </summary>
     public Action? Refresh()
     {
+        var cancel = RefreshRows();
+        SyncTile();
+        return cancel;
+    }
+
+    Action? RefreshRows()
+    {
         var items = Items;
         if (_selectedKey != null)
         {
@@ -169,6 +194,7 @@ public sealed class OverlayNavigator
     {
         if (command != OverlayCommand.Remove) _removePending = null; // any other command disarms a pending delete
         if (_holding) return HandleHolding(command);
+        if (Selected?.Kind == ItemKind.Grid && GridCommand(command) is { } grid) return grid;
         switch (command)
         {
             case OverlayCommand.Up: return Move(-1);
@@ -200,6 +226,7 @@ public sealed class OverlayNavigator
     /// <summary>Runs the row's RemoveEntry; a <see cref="OverlayItem.ConfirmRemove"/> row needs a second press within 3 s.</summary>
     NavResult Remove()
     {
+        if (Selected?.AltAction is { } alt) return new NavResult(NavEffect.RunHere, alt);
         if (Selected is not { RemoveEntry: { } remove } item) return None;
         if (item.ConfirmRemove)
         {
@@ -290,6 +317,105 @@ public sealed class OverlayNavigator
             }
         }
         return Activate();
+    }
+
+    // --- grid -------------------------------------------------------------------
+
+    IReadOnlyList<GameEntry> Tiles() => Selected is { Kind: ItemKind.Grid, Tiles: { } tiles } ? tiles() : [];
+
+    /// <summary>Python _CoverGrid.move: Left/Right step through the tiles (wrapping to the next/previous row),
+    /// Up/Down keep the column (clamped on a short last row); the edges stay.</summary>
+    NavResult? GridCommand(OverlayCommand command) => command switch
+    {
+        OverlayCommand.Left or OverlayCommand.LeftRepeat => MoveTile(-1, 0),
+        OverlayCommand.Right or OverlayCommand.RightRepeat => MoveTile(1, 0),
+        OverlayCommand.Up or OverlayCommand.WheelUp => MoveTile(0, -1),
+        OverlayCommand.Down or OverlayCommand.WheelDown => MoveTile(0, 1),
+        _ => null,
+    };
+
+    NavResult MoveTile(int dx, int dy)
+    {
+        var tiles = Tiles();
+        if (tiles.Count == 0) return None;
+        var columns = Math.Max(1, Selected!.Columns);
+        var current = Math.Clamp(_tile, 0, tiles.Count - 1);
+        int target;
+        if (dx != 0)
+        {
+            target = Math.Clamp(current + dx, 0, tiles.Count - 1);
+        }
+        else
+        {
+            var row = current / columns + dy;
+            if (row < 0 || row > (tiles.Count - 1) / columns) return None;
+            target = Math.Min(row * columns + current % columns, tiles.Count - 1);
+        }
+        if (target == current) return None;
+        SetTile(target, tiles);
+        return Redraw;
+    }
+
+    void SetTile(int index, IReadOnlyList<GameEntry> tiles)
+    {
+        _tile = index;
+        _tileId = tiles[index].Id;
+    }
+
+    /// <summary>After the tiles changed: the same game stays selected; if it is gone, the tile now at its place.</summary>
+    void SyncTile()
+    {
+        var tiles = Tiles();
+        if (tiles.Count == 0) return; // keep the id: the game comes back selected if the list refills
+        var index = -1;
+        if (_tileId != null)
+            for (var i = 0; i < tiles.Count; i++)
+                if (tiles[i].Id == _tileId) { index = i; break; }
+        SetTile(index >= 0 ? index : Math.Clamp(_tile, 0, tiles.Count - 1), tiles);
+    }
+
+    NavResult LaunchTile()
+    {
+        if (Selected?.Launch is not { } launch || SelectedTile is not { } tile) return None;
+        return new NavResult(NavEffect.HideAndRun, () => launch(tile));
+    }
+
+    /// <summary>Selects the page's grid row if it is not selected (changed: the row selection moved).</summary>
+    bool SelectGrid(out bool changed)
+    {
+        changed = false;
+        if (Selected?.Kind == ItemKind.Grid) return true;
+        var items = Items;
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (items[i].Kind != ItemKind.Grid || !IsSelectable(items[i])) continue;
+            Select(i);
+            changed = true;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Mouse over a tile: it becomes the selection (true if that changed).</summary>
+    public bool HoverTile(int tile)
+    {
+        if (_holding || !SelectGrid(out var changed)) return false;
+        var tiles = Tiles();
+        if (tile < 0 || tile >= tiles.Count) return changed;
+        if (tile == _tile && _tileId == tiles[tile].Id) return changed;
+        SetTile(tile, tiles);
+        return true;
+    }
+
+    /// <summary>Click on a tile: select it and launch it.</summary>
+    public NavResult ClickTile(int tile)
+    {
+        if (_holding || !SelectGrid(out _)) return None;
+        var tiles = Tiles();
+        if (tile < 0 || tile >= tiles.Count) return None;
+        _removePending = null;
+        SetTile(tile, tiles);
+        return LaunchTile();
     }
 
     // --- mouse ------------------------------------------------------------------
@@ -387,6 +513,7 @@ public sealed class OverlayNavigator
                 ItemKind.Toggle => "Overlay.Footer.Toggle",
                 ItemKind.Expander => "Overlay.Footer.Open",
                 ItemKind.Info => "Overlay.Footer.Select",
+                ItemKind.Grid => "Overlay.Footer.Play",
                 _ => "Overlay.Footer.Confirm",
             }), OverlayCommand.A));
             if (item.Kind is ItemKind.Segmented or ItemKind.Choice)
@@ -399,6 +526,8 @@ public sealed class OverlayNavigator
                 hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.Icon")));
             else if (item.Kind == ItemKind.Expander)
                 hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.OpenClose")));
+            if (item.AltAction != null)
+                hints.Add(new FooterHint(pad ? "Y" : "Del", item.AltLabel?.Invoke() ?? "", OverlayCommand.Remove));
             if (IsRemovePending(Index))
                 hints.Add(new FooterHint(pad ? "Y" : "Del", Loc.T("Overlay.Footer.ConfirmDelete"), OverlayCommand.Remove));
         }
@@ -425,11 +554,17 @@ public sealed class OverlayNavigator
     /// <summary>Select a row: clears the pending confirm, puts the segment cursor on the active option.</summary>
     void Select(int index)
     {
+        var items = Items;
+        var key = index >= 0 && index < items.Count ? items[index].Key : null;
+        if (key == null || key != _selectedKey)
+        {
+            _tile = 0; // another row: a grid starts on its first tile
+            _tileId = null;
+        }
         Index = index;
         _pending = null;
         _removePending = null;
         Segment = 0;
-        var items = Items;
         _selectedKey = index >= 0 && index < items.Count ? items[index].Key : null;
         if (index < 0 || index >= items.Count || items[index].Kind != ItemKind.Segmented) return;
         var options = items[index].Options();
@@ -520,6 +655,8 @@ public sealed class OverlayNavigator
                 return item.Toggle is { } toggle ? new NavResult(NavEffect.RunHere, toggle) : None;
             case ItemKind.Segmented:
                 return ActivateSegment(item);
+            case ItemKind.Grid:
+                return LaunchTile();
             case ItemKind.Action when item.OpensInfo:
                 OpenPage(OverlayPage.Info);
                 return Redraw;

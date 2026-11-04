@@ -1,6 +1,8 @@
+using OverlayUtils.Core.Games;
+
 namespace OverlayUtils.Core.Overlay;
 
-public enum ItemKind { Action, Segmented, Choice, Toggle, Expander, Info, Slider, Media, Reorder }
+public enum ItemKind { Action, Segmented, Choice, Toggle, Expander, Info, Slider, Media, Reorder, Grid }
 
 public enum OverlayPage { Tabs, Settings, Info, Sub }
 
@@ -53,4 +55,9 @@ public sealed class OverlayItem
     public bool ConfirmRemove { get; init; }             // Remove: second Y / Delete within 3 s (destructive deletes)
     public bool Child { get; init; }                     // drawn indented under the row above (an app under its channel)
     public Func<string>? ActionLabel { get; init; }      // footer label of A when the kind's default does not fit
+    public Func<IReadOnlyList<GameEntry>>? Tiles { get; init; } // Grid: the tiles, in display order
+    public int Columns { get; init; } = 3;               // Grid
+    public Action<GameEntry>? Launch { get; init; }      // Grid: A on a tile (runs after hiding)
+    public Action? AltAction { get; init; }              // the Remove command (Y / Delete) does this instead, when set
+    public Func<string>? AltLabel { get; init; }         // footer label of AltAction
 }
