@@ -166,7 +166,7 @@ internal sealed class OverlayController : IDisposable
         {
             var cfg = _config.Current;
             _prev = WindowFocus.ForegroundApp();
-            var (work, dpiScale) = _prev != 0 ? DisplayArea.ForWindow(_prev) : DisplayArea.ForCursor();
+            var (work, dpiScale) = _prev != 0 ? DisplayArea.MonitorForWindow(_prev) : DisplayArea.MonitorForCursor();
 
             _content.ResetTransient();
             RunCancel(_navigator.Reset(cfg.HiddenTabs));
@@ -176,7 +176,7 @@ internal sealed class OverlayController : IDisposable
             Layout(cfg, work, dpiScale);
             Render();
 
-            _window.PrepareOpening(cfg.OverlaySide);
+            _window.PrepareOpening();
             _window.ResetPointer();
             _window.Show();
             Place(); // Show must not have moved it
@@ -229,7 +229,7 @@ internal sealed class OverlayController : IDisposable
     {
         var sizeFactor = OverlayLayout.SizeFactor(cfg.OverlaySize, _monitors.Current, _monitors.ForRole(MonitorRole.Tv));
         _vm.SizeFactor = sizeFactor;
-        _placement = OverlayLayout.Place(work, dpiScale, sizeFactor, cfg.OverlaySide);
+        _placement = work; // full monitor; the frame inside it is rebuilt in a later task
         _window.Width = _placement.Width / dpiScale;
         _window.Height = _placement.Height / dpiScale;
         Place();
@@ -243,7 +243,7 @@ internal sealed class OverlayController : IDisposable
     {
         try
         {
-            var (work, dpiScale) = DisplayArea.ForWindow(_hwnd);
+            var (work, dpiScale) = DisplayArea.MonitorForWindow(_hwnd);
             Layout(cfg, work, dpiScale);
         }
         catch (Exception e)

@@ -98,6 +98,9 @@ public sealed class OverlayContent
 
     // --- Games ----------------------------------------------------------------
 
+    /// <summary>Columns of the Games grid; the UI sets it from the frame's cover columns.</summary>
+    public int GameColumns { get; set; } = 3;
+
     public IReadOnlyList<OverlayItem> Games()
     {
         var games = _games?.Games ?? [];
@@ -113,7 +116,7 @@ public sealed class OverlayContent
                 Visible = () => games.Count > 0,
                 Label = () => filter is { } source ? SourceLabel(source) : Loc.T("Overlay.Games.All"),
                 Description = () => Loc.T("Overlay.Games.Desc"),
-                Tiles = () => tiles,
+                Tiles = () => tiles, Columns = GameColumns,
                 Launch = game => _games?.Launch(game),
                 AltAction = () =>
                 {
@@ -903,17 +906,6 @@ public sealed class OverlayContent
                     ConfigOption("Settings.Size.Normal", c => c.OverlaySize, (c, v) => c.OverlaySize = v, OverlaySizes.Normal),
                     ConfigOption("Settings.Size.Large", c => c.OverlaySize, (c, v) => c.OverlaySize = v, OverlaySizes.Large),
                     ConfigOption("Settings.Size.Auto", c => c.OverlaySize, (c, v) => c.OverlaySize = v, OverlaySizes.Auto),
-                ],
-            },
-            new OverlayItem
-            {
-                Kind = ItemKind.Segmented, Icon = Glyphs.Desktop,
-                Label = () => Loc.T("Settings.Position.Label"),
-                Description = () => Loc.T("Settings.Position.Desc"),
-                Options = () =>
-                [
-                    ConfigOption("Settings.Position.Left", c => c.OverlaySide, (c, v) => c.OverlaySide = v, OverlaySides.Left),
-                    ConfigOption("Settings.Position.Right", c => c.OverlaySide, (c, v) => c.OverlaySide = v, OverlaySides.Right),
                 ],
             },
             new OverlayItem

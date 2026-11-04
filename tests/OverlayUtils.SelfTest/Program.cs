@@ -190,10 +190,16 @@ string RepoRoot()
 
 // --- Overlay layout ---------------------------------------------------------
 {
-    Check(new AppConfig().OverlaySize == OverlaySizes.Auto && new AppConfig().OverlaySide == OverlaySides.Left,
-        "overlay defaults");
+    Check(new AppConfig().OverlaySize == OverlaySizes.Auto, "overlay defaults");
     var json = JsonSerializer.Serialize(new AppConfig(), ConfigStore.JsonOptions);
-    Check(json.Contains("\"overlay_size\"") && json.Contains("\"overlay_side\""), "overlay keys are snake_case");
+    Check(json.Contains("\"overlay_size\"") && !json.Contains("\"overlay_side\""), "overlay key is snake_case, side is gone");
+
+    var sidePath = Path.Combine(temp, "oldside", "config.json");
+    Directory.CreateDirectory(Path.GetDirectoryName(sidePath)!);
+    File.WriteAllText(sidePath, """{ "overlay_side": "right", "overlay_size": "large" }""");
+    var sideCfg = new ConfigStore(sidePath).Current;
+    Check(sideCfg.OverlaySize == "large" && sideCfg.Extra is { } sideExtra && sideExtra.ContainsKey("overlay_side"),
+        "an old overlay_side loads and stays in Extra");
 
     Check(OverlayLayout.SizeFactor("normal", "TV", "TV") == 1.0, "normal stays normal on TV");
     Check(OverlayLayout.SizeFactor("large", "Desk", "TV") == 1.35, "large is large everywhere");
@@ -202,15 +208,13 @@ string RepoRoot()
     Check(OverlayLayout.SizeFactor("auto", "", "") == 1.0, "auto without a TV profile is normal");
     Check(OverlayLayout.SizeFactor("bogus", "TV", "TV") == 1.35, "unknown setting behaves as auto");
 
-    var hd = new RectI(0, 0, 1920, 1040);
-    Check(OverlayLayout.Place(hd, 1.0, 1.0, "left") == new RectI(36, 36, 456, 756), "left placement");
-    Check(OverlayLayout.Place(hd, 1.0, 1.0, "right") == new RectI(1464, 36, 1884, 756), "right placement");
-    Check(OverlayLayout.Place(new RectI(0, 0, 3840, 2100), 1.5, 1.35, "right") == new RectI(2935, 54, 3786, 1512),
-        "dpi and large factor multiply, rounded away from zero");
-    Check(OverlayLayout.Place(new RectI(0, 0, 1920, 1032), 1.0, 1.35, "left").Height == 960,
-        "height clamped to the work area minus both margins");
-    Check(OverlayLayout.Place(new RectI(-1920, 0, 0, 1040), 1.0, 1.0, "left").Left == -1884,
-        "monitors left of the primary have negative coordinates");
+    var f1 = OverlayLayout.Frame(1920, 1.35);
+    Check(f1.CoverColumns == 8 && f1.ColumnWidth == 768, "Frame 1920 large: 8 cover columns, column 768");
+    var f2 = OverlayLayout.Frame(2048, 1.0);
+    Check(f2.CoverColumns == 12 && f2.ColumnWidth == 614.4, "Frame 2048 normal: 12 cover columns (clamped), column 614.4");
+    Check(OverlayLayout.Frame(1280, 1.0).CoverColumns == 7, "Frame 1280 normal: 7 cover columns");
+    Check(OverlayLayout.Frame(800, 1.35).CoverColumns == 4, "Frame 800 large: clamped to 4 cover columns");
+    Check(f1.RailWidth == 0.07 * 1920 && f1.Gutter == 48 * 1.35, "Frame rail and gutter");
 }
 
 // --- Overlay navigator ------------------------------------------------------
@@ -530,9 +534,7 @@ string RepoRoot()
     size.Options().First(o => o.Label() == Loc.T("Settings.Size.Large")).Action();
     Check(store.Current.OverlaySize == "large" && size.Options().All(o => o.Stay), "Size Large is saved and stays open");
     Check(size.Options().First(o => o.Label() == Loc.T("Settings.Size.Large")).Active!(), "active size is marked");
-    var position = Row(settings, Loc.T("Settings.Position.Label"));
-    position.Options().First(o => o.Label() == Loc.T("Settings.Position.Right")).Action();
-    Check(store.Current.OverlaySide == "right", "Position Right is saved");
+    Check(!settings.Any(r => r.Icon == Glyphs.Desktop && r.Kind == ItemKind.Segmented), "no Position row in Settings");
 
     host.InFullMode = false;
     var full = FullModeRow();
@@ -2246,6 +2248,10 @@ string RepoRoot()
     Check(content.Tabs.Select(t => t.Id).SequenceEqual(["Home", "Controlli", "Audio", "Giochi"]), "Games tab after Audio, stored id Giochi");
     nav.ClickTab(3);
     Check(nav.Selected?.Kind == ItemKind.Grid && nav.SelectedTile?.Id == "steam:1", "Games tab opens on the first tile");
+    Check(content.Games().First(i => i.Kind == ItemKind.Grid).Columns == 3, "Games grid defaults to 3 columns");
+    content.GameColumns = 8;
+    Check(content.Games().First(i => i.Kind == ItemKind.Grid).Columns == 8, "GameColumns sets the Games grid columns");
+    content.GameColumns = 3;
 
     // 3 columns: [1 2 3] [4 5]
     nav.Handle(OverlayCommand.Right); nav.Handle(OverlayCommand.Right);

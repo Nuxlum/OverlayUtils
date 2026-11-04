@@ -9,16 +9,12 @@ public readonly record struct RectI(int Left, int Top, int Right, int Bottom)
     public int Height => Bottom - Top;
 }
 
-/// <summary>Size and position of the overlay panel. Pure maths, no UI.</summary>
+/// <summary>Frame measures of the full-monitor overlay, in DIPs.</summary>
+public readonly record struct OverlayFrame(double RailWidth, double ColumnWidth, double Gutter, int CoverColumns);
+
+/// <summary>Size factor and frame maths of the overlay. Pure maths, no UI.</summary>
 public static class OverlayLayout
 {
-    /// <summary>Panel size at 100% DPI and normal size, in device-independent pixels.</summary>
-    public const int Width = 420;
-    public const int Height = 720;
-
-    /// <summary>Gap to the work-area edges at 100% DPI.</summary>
-    public const int Margin = 36;
-
     /// <summary>Scale applied when the panel is "large" (TV distance).</summary>
     public const double LargeFactor = 1.35;
 
@@ -33,21 +29,16 @@ public static class OverlayLayout
         return tvProfile != "" && currentProfile == tvProfile ? LargeFactor : 1.0;
     }
 
-    /// <summary>
-    /// Panel rectangle in physical pixels, docked to the left or right edge of
-    /// <paramref name="work"/>. The margin scales with DPI only; the height is
-    /// clamped so the panel keeps the margin at the top and bottom.
-    /// </summary>
-    public static RectI Place(RectI work, double dpiScale, double sizeFactor, string side)
-    {
-        double scale = dpiScale * sizeFactor;
-        int margin = Round(Margin * dpiScale);
-        int w = Round(Width * scale);
-        int h = Math.Min(Round(Height * scale), work.Height - 2 * margin);
-        int x = side == OverlaySides.Right ? work.Right - margin - w : work.Left + margin;
-        int y = work.Top + margin;
-        return new RectI(x, y, x + w, y + h);
-    }
+    /// <summary>Minimum width of a game cover at normal size, in DIPs.</summary>
+    public const double CoverMinWidth = 150;
 
-    private static int Round(double value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);
+    /// <summary>Rail, content column, gutter and cover columns for a full-monitor overlay of the given width (DIPs).</summary>
+    public static OverlayFrame Frame(double widthDip, double sizeFactor)
+    {
+        var rail = 0.07 * widthDip;
+        var column = (sizeFactor > 1 ? 0.40 : 0.30) * widthDip;
+        var gutter = 48 * sizeFactor;
+        var covers = Math.Clamp((int)((widthDip - rail - 2 * gutter) / (CoverMinWidth * sizeFactor)), 4, 12);
+        return new OverlayFrame(rail, column, gutter, covers);
+    }
 }

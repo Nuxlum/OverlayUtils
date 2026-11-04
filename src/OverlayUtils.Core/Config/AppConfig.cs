@@ -37,7 +37,6 @@ public sealed class AppConfig
     [JsonPropertyName("overlay_size")] public string OverlaySize { get; set; } = OverlaySizes.Auto;
 
     /// <summary>"left" or "right" edge of the work area.</summary>
-    [JsonPropertyName("overlay_side")] public string OverlaySide { get; set; } = OverlaySides.Left;
 
     /// <summary>Output devices, best first (Audio tab order).</summary>
     [JsonPropertyName("audio_output_order")] public List<AudioDeviceRef> AudioOutputOrder { get; set; } = [];
@@ -92,10 +91,4 @@ public static class OverlaySizes
     public const string Normal = "normal";
     public const string Large = "large";
     public const string Auto = "auto";
-}
-
-public static class OverlaySides
-{
-    public const string Left = "left";
-    public const string Right = "right";
 }

@@ -130,13 +130,13 @@ internal sealed partial class OverlayWindow : Window
     /// "Animation effects" is off. Only the content moves (the window stays where the controller put it) and
     /// nothing waits for it, so focus is not delayed. Closing is never animated.
     /// </summary>
-    public void PrepareOpening(string side)
+    public void PrepareOpening()
     {
         Panel.BeginAnimation(OpacityProperty, null);
         Slide.BeginAnimation(TranslateTransform.XProperty, null);
         if (!SystemParameters.ClientAreaAnimation) return;
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        var from = side == OverlaySides.Right ? OpenSlide : -OpenSlide;
+        var from = -OpenSlide;
         Panel.BeginAnimation(OpacityProperty,
             new DoubleAnimation(0, 1, OpenDuration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
         Slide.BeginAnimation(TranslateTransform.XProperty,

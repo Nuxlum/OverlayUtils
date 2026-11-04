@@ -282,10 +282,6 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Settings.Notifications.Desc" xml:space="preserve"><value>Windows notifications when you change monitor profile.</value></data>
   <data name="Settings.PadCombos" xml:space="preserve"><value>Pad combos</value></data>
   <data name="Settings.PadCombos.Desc" xml:space="preserve"><value>Back + D-pad Up / Down switch monitor profiles, Left / Right change the volume, Y mutes the microphone. Back + RB always opens the overlay.</value></data>
-  <data name="Settings.Position.Desc" xml:space="preserve"><value>Side of the screen where the overlay appears.</value></data>
-  <data name="Settings.Position.Label" xml:space="preserve"><value>Position</value></data>
-  <data name="Settings.Position.Left" xml:space="preserve"><value>Left</value></data>
-  <data name="Settings.Position.Right" xml:space="preserve"><value>Right</value></data>
   <data name="Settings.Size.Auto" xml:space="preserve"><value>Auto</value></data>
   <data name="Settings.Size.Desc" xml:space="preserve"><value>Size of the overlay. Auto = large on the TV profile.</value></data>
   <data name="Settings.Size.Label" xml:space="preserve"><value>Size</value></data>

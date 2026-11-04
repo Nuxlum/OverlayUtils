@@ -282,10 +282,6 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Settings.Notifications.Desc" xml:space="preserve"><value>Avvisi di Windows quando cambi profilo monitor.</value></data>
   <data name="Settings.PadCombos" xml:space="preserve"><value>Combo del pad</value></data>
   <data name="Settings.PadCombos.Desc" xml:space="preserve"><value>Back + croce Su / Giù cambiano profilo monitor, Sinistra / Destra il volume, Y silenzia il microfono. Back + RB apre sempre l'overlay.</value></data>
-  <data name="Settings.Position.Desc" xml:space="preserve"><value>Lato dello schermo in cui compare l'overlay.</value></data>
-  <data name="Settings.Position.Label" xml:space="preserve"><value>Posizione</value></data>
-  <data name="Settings.Position.Left" xml:space="preserve"><value>Sinistra</value></data>
-  <data name="Settings.Position.Right" xml:space="preserve"><value>Destra</value></data>
   <data name="Settings.Size.Auto" xml:space="preserve"><value>Auto</value></data>
   <data name="Settings.Size.Desc" xml:space="preserve"><value>Dimensione dell'overlay. Auto = grande con il profilo TV.</value></data>
   <data name="Settings.Size.Label" xml:space="preserve"><value>Dimensione</value></data>
