@@ -78,6 +78,13 @@ public static class MixRules
     public static double Effective(MixLevel channel, MixLevel app) =>
         channel.Muted || app.Muted ? 0.0 : channel.Volume * app.Volume;
 
+    private static Dictionary<string, MixLevel> CopyApps(Dictionary<string, MixLevel> apps)
+    {
+        var copy = new Dictionary<string, MixLevel>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (exe, level) in apps) copy[exe] = level;
+        return copy;
+    }
+
     /// <summary>App level by exe path, case-insensitive; 1.0 unmuted when the app has none.</summary>
     public static MixLevel AppLevel(DeviceMix mix, string exe)
     {
@@ -92,7 +99,7 @@ public static class MixRules
     {
         if (mixes.TryGetValue(deviceId, out var own)) return own;
         if (currentDeviceId is not null && mixes.TryGetValue(currentDeviceId, out var current))
-            return new DeviceMix(new(current.Channels), new(current.Apps, StringComparer.OrdinalIgnoreCase));
+            return new DeviceMix(new(current.Channels), CopyApps(current.Apps));
         return new DeviceMix(DefaultChannels.ToDictionary(c => c.Id, _ => new MixLevel(1.0, false)), []);
     }
 
@@ -121,7 +128,7 @@ public static class MixRules
     /// <summary>A copy of the mix with the preset's channel levels applied; unknown channel ids are ignored.</summary>
     public static DeviceMix ApplyPreset(DeviceMix mix, MixPreset preset, IReadOnlyList<AudioChannel> channels)
     {
-        var result = new DeviceMix(new(mix.Channels), new(mix.Apps, StringComparer.OrdinalIgnoreCase));
+        var result = new DeviceMix(new(mix.Channels), CopyApps(mix.Apps));
         foreach (var (id, level) in preset.Channels)
             if (channels.Any(c => c.Id == id)) result.Channels[id] = level;
         return result;

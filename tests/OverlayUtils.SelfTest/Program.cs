@@ -1443,6 +1443,11 @@ string RepoRoot()
     var presetApplied = MixRules.ApplyPreset(loadedMix, new MixPreset("Q", []), MixRules.DefaultChannels);
     Check(presetApplied.Apps.ContainsKey(@"c:\x\a.exe"), "preset copy keeps app lookups case-insensitive");
 
+    var dupMix = new DeviceMix([], new() { [@"C:\a.exe"] = new MixLevel(0.1, false), [@"c:\A.exe"] = new MixLevel(0.2, true) });
+    var dupCopy = MixRules.MixFor(new Dictionary<string, DeviceMix> { ["A"] = dupMix }, "B", "A");
+    var dupPreset = MixRules.ApplyPreset(dupMix, new MixPreset("Q", []), MixRules.DefaultChannels);
+    Check(dupCopy.Apps.Count == 1 && dupPreset.Apps.Count == 1, "case-variant duplicate app keys collapse to one entry without throwing");
+
     var groups = MixRules.GroupByProgram(new[] { "CHROME.EXE", "chrome.exe", "Chrome.exe", "vlc.exe" }, s => s);
     Check(groups.Count == 2 && groups[0].Sessions.Count == 3 && groups[1].Sessions.Count == 1, "sessions group by exe case-insensitively");
 
