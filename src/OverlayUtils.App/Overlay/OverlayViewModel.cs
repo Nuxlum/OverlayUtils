@@ -3,7 +3,10 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Threading;
+using OverlayUtils.App.Games;
 using OverlayUtils.Core;
+using OverlayUtils.Core.Games;
 using OverlayUtils.Core.Localization;
 using OverlayUtils.Core.Overlay;
 
@@ -36,6 +39,40 @@ internal sealed record RowVm(
 }
 
 /// <summary>
+/// One game of the Games tab. Tiles live as long as the list of games shown does not change, so moving the
+/// selection only flips <see cref="IsSelected"/> and the art arrives later without rebuilding the grid.
+/// </summary>
+internal sealed class TileVm(int index, GameEntry game, string badge) : INotifyPropertyChanged
+{
+    ImageSource? _cover;
+    ImageSource? _icon;
+    bool _isSelected;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public int Index { get; } = index;
+    public GameEntry Game { get; } = game;
+    public string Title => Game.Title;
+    public string Badge { get; } = badge;
+    public ImageSource? Cover { get => _cover; set { _cover = value; Changed(); Changed(nameof(HasArt)); } }
+    public ImageSource? Icon { get => _icon; set { _icon = value; Changed(); Changed(nameof(HasArt)); } }
+    /// <summary>A cover or an icon is shown, so the placeholder glyph is not.</summary>
+    public bool HasArt => _cover is not null || _icon is not null;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected == value) return;
+            _isSelected = value;
+            Changed();
+        }
+    }
+
+    void Changed([CallerMemberName] string name = "") => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+}
+
+/// <summary>
 /// What the overlay window shows, rebuilt from the navigator by <see cref="Refresh"/> after every command.
 /// All text is resolved here (Loc), so the XAML has no keys.
 /// </summary>
@@ -56,6 +93,11 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     string _batteryGlyph = "";
     Brush _accentBrush = Frozen(FallbackAccent);
     double _sizeFactor = 1;
+    IReadOnlyList<TileVm> _tiles = [];
+    string _tilesCulture = "";
+    bool _showTiles;
+    int _selectedTile = -1;
+    CancellationTokenSource? _artLoad;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -71,6 +113,12 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     public IReadOnlyList<RowVm> Rows { get => _rows; private set => Set(ref _rows, value); }
     public string Description { get => _description; private set => Set(ref _description, value); }
     public IReadOnlyList<FooterVm> Footer { get => _footer; private set => Set(ref _footer, value); }
+
+    /// <summary>The Games grid, drawn under the rows while the page has a visible Grid row.</summary>
+    public IReadOnlyList<TileVm> Tiles { get => _tiles; private set => Set(ref _tiles, value); }
+    public bool ShowTiles { get => _showTiles; private set => Set(ref _showTiles, value); }
+    /// <summary>Index of the selected tile, -1 when the grid is not selected.</summary>
+    public int SelectedTile { get => _selectedTile; private set => Set(ref _selectedTile, value); }
 
     /// <summary>Selection, switches, cursor outline. Replaced when the Windows accent is known.</summary>
     public Brush AccentBrush { get => _accentBrush; set => Set(ref _accentBrush, value); }
@@ -119,6 +167,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
             var section = item.Section?.Invoke();
             var value = item.Kind is ItemKind.Choice or ItemKind.Info or ItemKind.Slider or ItemKind.Media or ItemKind.Reorder
                 ? item.Value()
+                : item.Kind == ItemKind.Grid ? (item.Tiles?.Invoke().Count ?? 0).ToString(Loc.Culture)
                 : "";
             var isOn = item.Kind is ItemKind.Toggle or ItemKind.Expander or ItemKind.Slider or ItemKind.Media && item.IsOn();
             var sliderLevel = item.Kind == ItemKind.Slider ? SliderLevel(value) : 0;
@@ -130,8 +179,64 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
                 selected, options, sliderLevel, selected && nav.Holding, item.Child));
         }
         Rows = rows;
+        RefreshTiles(nav, items);
         Description = nav.Description();
         Footer = nav.Footer(pad).Select(h => new FooterVm(h.Keys, h.Label, h.Command)).ToList();
+    }
+
+    void RefreshTiles(OverlayNavigator nav, IReadOnlyList<OverlayItem> items)
+    {
+        var grid = items.FirstOrDefault(i => i.Kind == ItemKind.Grid && i.Visible());
+        ShowTiles = grid is not null;
+        if (grid?.Tiles?.Invoke() is not { } games) return; // kept while hidden: coming back to the tab is instant
+        if (_tilesCulture != Loc.Culture.Name || games.Count != _tiles.Count
+            || !games.Select(g => g.Id).SequenceEqual(_tiles.Select(t => t.Game.Id)))
+        {
+            _tilesCulture = Loc.Culture.Name;
+            Tiles = games.Select((g, i) => new TileVm(i, g, Loc.T("Games.Source." + g.Source))).ToList();
+            LoadArt(_tiles);
+        }
+        var selected = nav.Selected?.Kind == ItemKind.Grid && _tiles.Count > 0 ? nav.SelectedTileIndex : -1;
+        foreach (var tile in _tiles) tile.IsSelected = tile.Index == selected;
+        SelectedTile = selected;
+    }
+
+    /// <summary>Art already decoded is set at once; the rest is decoded on a worker, in grid order.</summary>
+    void LoadArt(IReadOnlyList<TileVm> tiles)
+    {
+        _artLoad?.Cancel();
+        var pending = new List<TileVm>();
+        foreach (var tile in tiles)
+        {
+            if (GameArt.TryCached(tile.Game.ArtPath, tile.Game.IconPath, out var cover, out var icon))
+            {
+                tile.Cover = cover;
+                tile.Icon = icon;
+            }
+            else
+            {
+                pending.Add(tile);
+            }
+        }
+        if (pending.Count == 0) return;
+        var cancel = _artLoad = new CancellationTokenSource();
+        var token = cancel.Token;
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        _ = Task.Run(() =>
+        {
+            foreach (var tile in pending)
+            {
+                if (token.IsCancellationRequested) return;
+                var cover = tile.Game.ArtPath is { } art ? GameArt.Cover(art) : null;
+                var icon = cover is null && tile.Game.IconPath is { } path ? GameArt.Icon(path) : null;
+                if (cover is null && icon is null) continue;
+                dispatcher.BeginInvoke(() =>
+                {
+                    tile.Cover = cover;
+                    tile.Icon = icon;
+                });
+            }
+        }, token);
     }
 
     /// <summary>A Slider's Value is its percent ("45%").</summary>

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
 using OverlayUtils.App.Audio;
+using OverlayUtils.App.Games;
 using OverlayUtils.App.Overlay;
 using OverlayUtils.Core;
 using OverlayUtils.Core.Audio;
@@ -48,6 +49,7 @@ internal sealed class TrayController : IOverlayHost, IDisposable
     private PadService? _pads;
     private AudioService? _audio;
     private MediaSession? _media;
+    private GameService? _games;
     private VolumeIndicator? _indicator; // UI thread; created on first use
     private bool _indicatorShowsMic;     // UI thread
     private System.Drawing.Icon? _currentIcon;
@@ -92,9 +94,14 @@ internal sealed class TrayController : IOverlayHost, IDisposable
     {
         _locator.StartSearch();
         StartAudio();
+        // Read once in the background now, so the first open of the Games tab is not empty; again on every open.
+        _games = new GameService(_config);
+        _games.Changed += () => _overlay?.Invalidate();
+        _games.Refresh();
         try
         {
-            var content = new OverlayContent(_config, _monitors, _locator, this, new AudioServiceView(_audio!), _media);
+            var content = new OverlayContent(_config, _monitors, _locator, this, new AudioServiceView(_audio!), _media,
+                games: _games);
             _overlay = new OverlayController(_app, _config, _monitors, content);
             _overlay.OpenChanged += OnOverlayOpenChanged;
         }
@@ -474,10 +481,14 @@ internal sealed class TrayController : IOverlayHost, IDisposable
         }
     });
 
-    /// <summary>The overlay hid: an open name prompt is cancelled (it would float alone over the game).</summary>
+    /// <summary>
+    /// The overlay opened: the game library is read again (new installs show up). It hid: an open name prompt is
+    /// cancelled (it would float alone over the game).
+    /// </summary>
     private void OnOverlayOpenChanged(bool open)
     {
-        if (!open) _nameDialog?.Dismiss();
+        if (open) _games?.Refresh();
+        else _nameDialog?.Dismiss();
     }
 
     private sealed class WindowOwner(nint handle) : IWin32Window

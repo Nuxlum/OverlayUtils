@@ -457,6 +457,75 @@
                 </DataTemplate.Triggers>
             </DataTemplate>
 
+            <!--
+              Header of the Games grid (the tiles are drawn by TileList under the rows): the filter shown, which a
+              click cycles like Y / Delete, and the number of games.
+            -->
+            <DataTemplate x:Key="GridRow">
+                <Grid Height="34" Margin="0,4,0,2">
+                    <Border HorizontalAlignment="Left" Height="28" Padding="10,0,8,0" Cursor="Hand"
+                            MouseLeftButtonDown="OnFilterMouseDown">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource HoverButton}">
+                                <Setter Property="CornerRadius" Value="14" />
+                                <Setter Property="Background" Value="{StaticResource SegmentBg}" />
+                            </Style>
+                        </Border.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="{Binding Icon}" FontSize="13"
+                                       Foreground="{DynamicResource Accent}" />
+                            <TextBlock Text="{Binding Label}" Margin="8,0,6,0" FontSize="13" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Style="{StaticResource RowChevron}" Text="&#xE70D;" />
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="{Binding Value}" HorizontalAlignment="Right" Margin="0,0,8,0" FontSize="12"
+                               VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
+                </Grid>
+            </DataTemplate>
+
+            <!-- One game: cover (or icon, or a placeholder glyph), source badge, title below; accent outline when selected. -->
+            <DataTemplate x:Key="GameTile">
+                <Grid x:Name="Tile" Margin="4,4,4,8" Background="Transparent" Cursor="Hand"
+                      MouseLeftButtonDown="OnTileMouseDown">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="168" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Border x:Name="Outline" CornerRadius="11" Margin="-3" BorderThickness="2" BorderBrush="Transparent" />
+                    <Border CornerRadius="8" Background="{StaticResource Surface}" />
+                    <TextBlock x:Name="Placeholder" Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Game}"
+                               FontSize="30" Foreground="{StaticResource Subtle}" />
+                    <Image Source="{Binding Icon}" Width="56" Height="56" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <Border CornerRadius="8">
+                        <Border.Background>
+                            <ImageBrush ImageSource="{Binding Cover}" Stretch="UniformToFill" />
+                        </Border.Background>
+                    </Border>
+                    <Border x:Name="HoverShade" CornerRadius="8" Background="{StaticResource Hover}" Visibility="Collapsed" />
+                    <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6" Padding="5,1" CornerRadius="4"
+                            Background="{StaticResource Bg}" Opacity="0.85">
+                        <TextBlock Text="{Binding Badge}" FontSize="10" FontWeight="SemiBold" />
+                    </Border>
+                    <TextBlock x:Name="TileTitle" Grid.Row="1" Text="{Binding Title}" Margin="2,6,2,0" FontSize="12"
+                               TextTrimming="CharacterEllipsis" Foreground="{StaticResource Muted}" />
+                </Grid>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding HasArt}" Value="True">
+                        <Setter TargetName="Placeholder" Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                    <Trigger SourceName="Tile" Property="IsMouseOver" Value="True">
+                        <Setter TargetName="HoverShade" Property="Visibility" Value="Visible" />
+                        <Setter TargetName="TileTitle" Property="Foreground" Value="{StaticResource Text}" />
+                    </Trigger>
+                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                        <Setter TargetName="Outline" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                        <Setter TargetName="TileTitle" Property="Foreground" Value="{StaticResource Text}" />
+                        <Setter TargetName="TileTitle" Property="FontWeight" Value="SemiBold" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
             <local:RowTemplateSelector x:Key="RowTemplates"
                                        Action="{StaticResource ActionRow}"
                                        Segmented="{StaticResource SegmentedRow}"
@@ -466,7 +535,8 @@
                                        Info="{StaticResource InfoRow}"
                                        Slider="{StaticResource SliderRow}"
                                        Media="{StaticResource MediaRow}"
-                                       Reorder="{StaticResource ReorderRow}" />
+                                       Reorder="{StaticResource ReorderRow}"
+                                       Grid="{StaticResource GridRow}" />
         </ResourceDictionary>
     </Window.Resources>
 
@@ -659,8 +729,28 @@
 
             <ScrollViewer x:Name="Scroller" Focusable="False" VerticalScrollBarVisibility="Hidden"
                           HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl x:Name="RowList" ItemsSource="{Binding Rows}" Focusable="False" Margin="14,0,14,8"
-                              ItemTemplateSelector="{StaticResource RowTemplates}" />
+                <StackPanel Margin="14,0,14,8">
+                    <ItemsControl x:Name="RowList" ItemsSource="{Binding Rows}" Focusable="False"
+                                  ItemTemplateSelector="{StaticResource RowTemplates}" />
+                    <ItemsControl x:Name="TileList" ItemsSource="{Binding Tiles}" Focusable="False"
+                                  ItemTemplate="{StaticResource GameTile}">
+                        <ItemsControl.Style>
+                            <Style TargetType="ItemsControl">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ShowTiles}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ItemsControl.Style>
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="3" VerticalAlignment="Top" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </StackPanel>
             </ScrollViewer>
         </DockPanel>
     </Border>

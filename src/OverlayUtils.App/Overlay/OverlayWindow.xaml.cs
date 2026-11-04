@@ -56,6 +56,12 @@ internal sealed partial class OverlayWindow : Window
     /// <summary>A media button was clicked (row, -1 previous / 0 play-pause / +1 next).</summary>
     public event Action<int, int>? MediaClicked;
 
+    /// <summary>The mouse really moved onto a game tile (tile index).</summary>
+    public event Action<int>? TileHovered;
+
+    /// <summary>A game tile was clicked (tile index).</summary>
+    public event Action<int>? TileClicked;
+
     // Last cursor position seen, in screen pixels: hover acts only when the mouse really moves, not when the
     // overlay opens under a still cursor or the list scrolls under it.
     Point? _lastPointer;
@@ -89,7 +95,7 @@ internal sealed partial class OverlayWindow : Window
         if (_vm is null) return;
         if (e.PropertyName == nameof(OverlayViewModel.AccentBrush))
             Resources[AccentKey] = _vm.AccentBrush;
-        else if (e.PropertyName == nameof(OverlayViewModel.Rows))
+        else if (e.PropertyName is nameof(OverlayViewModel.Rows) or nameof(OverlayViewModel.SelectedTile))
             // After the new rows are laid out, so their containers exist.
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, BringSelectedIntoView);
     }
@@ -136,6 +142,12 @@ internal sealed partial class OverlayWindow : Window
 
     void BringSelectedIntoView()
     {
+        if (_vm is { ShowTiles: true, SelectedTile: >= 0 and var tile }
+            && TileList.ItemContainerGenerator.ContainerFromIndex(tile) is FrameworkElement tileContainer)
+        {
+            tileContainer.BringIntoView();
+            return;
+        }
         var row = _vm?.Rows.FirstOrDefault(r => r.IsSelected);
         if (row is not null && RowList.ItemContainerGenerator.ContainerFromItem(row) is FrameworkElement container)
             container.BringIntoView();
@@ -246,6 +258,11 @@ internal sealed partial class OverlayWindow : Window
         var p = PointToScreen(e.GetPosition(this));
         if (_lastPointer == p) return;
         _lastPointer = p;
+        if (TileOf(e.OriginalSource as DependencyObject) is { } tile)
+        {
+            Raise(() => TileHovered?.Invoke(tile.Index), "tile hover");
+            return;
+        }
         if (RowOf(e.OriginalSource as DependencyObject) is { } row)
             Raise(() => RowHovered?.Invoke(row.Index), "hover");
     }
@@ -338,6 +355,25 @@ internal sealed partial class OverlayWindow : Window
         Issue(command);
     }
 
+    void OnTileMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not TileVm tile) return;
+        e.Handled = true;
+        if (e.ClickCount > 1) return; // a double-click must not start the game twice
+        Raise(() => TileClicked?.Invoke(tile.Index), "tile click");
+    }
+
+    /// <summary>The filter pill of the Games grid: same as Y / Delete.</summary>
+    void OnFilterMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        if (e.ClickCount > 1) return;
+        Issue(OverlayCommand.Remove);
+    }
+
+    static TileVm? TileOf(DependencyObject? node) =>
+        (Ancestor(node, n => (n as FrameworkElement)?.DataContext is TileVm) as FrameworkElement)?.DataContext as TileVm;
+
     static RowVm? RowOf(DependencyObject? node) =>
         (Ancestor(node, n => (n as FrameworkElement)?.DataContext is RowVm) as FrameworkElement)?.DataContext as RowVm;
 
@@ -379,6 +415,7 @@ internal sealed class RowTemplateSelector : DataTemplateSelector
     public DataTemplate? Slider { get; set; }
     public DataTemplate? Media { get; set; }
     public DataTemplate? Reorder { get; set; }
+    public DataTemplate? Grid { get; set; }
 
     public override DataTemplate? SelectTemplate(object item, DependencyObject container) =>
         (item as RowVm)?.Kind switch
@@ -392,6 +429,7 @@ internal sealed class RowTemplateSelector : DataTemplateSelector
             ItemKind.Slider => Slider,
             ItemKind.Media => Media,
             ItemKind.Reorder => Reorder,
+            ItemKind.Grid => Grid,
             _ => null,
         };
 }

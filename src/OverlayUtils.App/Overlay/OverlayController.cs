@@ -65,6 +65,8 @@ internal sealed class OverlayController : IDisposable
         _window.StepClicked += (index, direction) => { if (_open) Apply(_navigator.ClickStep(index, direction)); };
         _window.LevelClicked += (index, fraction) => { if (_open) Apply(_navigator.ClickLevel(index, fraction)); };
         _window.MediaClicked += (index, button) => { if (_open) Apply(_navigator.ClickMedia(index, button)); };
+        _window.TileHovered += index => { if (_open && _navigator.HoverTile(index)) Render(); };
+        _window.TileClicked += index => { if (_open) Apply(_navigator.ClickTile(index)); };
         _window.Closing += OnClosing;
 
         _hwnd = new WindowInteropHelper(_window).EnsureHandle(); // the window applies its chrome and backdrop here
