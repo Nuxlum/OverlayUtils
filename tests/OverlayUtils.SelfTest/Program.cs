@@ -2050,6 +2050,15 @@ string RepoRoot()
     Check(epic.Count == 1 && epic[0].Id == "epic:Fort" && epic[0].Title == "Fortnite & Friends"
         && epic[0].LaunchTarget == "com.epicgames.launcher://apps/Fort?action=launch&silent=true", "Epic game read, DLC/apps/garbage skipped");
     Check(epic[0].InstallDir == @"D:\Epic Games\Fort", "Epic InstallLocation is the install folder");
+    Item("e.item", """{"DisplayName":"Slash","AppName":"Slash","MainGameAppName":"Slash","InstallLocation":"D:\\Epic\\Game\\","AppCategories":["games"]}""");
+    Item("f.item", """{"DisplayName":"Root","AppName":"Root","MainGameAppName":"Root","InstallLocation":"D:\\","AppCategories":["games"]}""");
+    var epic2 = EpicLibrary.Read(reg).ToDictionary(g => g.Id);
+    Check(epic2["epic:Slash"].InstallDir == @"D:\Epic\Game", "Epic install folder: trailing separator trimmed");
+    Check(epic2["epic:Root"].InstallDir is null, "Epic install folder at a drive root: null");
+    Check(GamePaths.Full(@"E:\") is null && GamePaths.Full("") is null && GamePaths.Full(null) is null, "GamePaths.Full: drive roots and empty give null");
+    Check(GamePaths.Full(Path.GetDirectoryName(@"D:\game.exe")) is null, "an exe at a drive root has no install folder");
+    Check(GamePaths.Full(@"\\srv\share") is null && GamePaths.Full(@"\\srv\share\g\") == @"\\srv\share\g", "GamePaths.Full: share root null, share folder trimmed");
+    Item("e.item", "{}"); Item("f.item", "{}");
     Check(EpicLibrary.Read(new FakeRegistry()).Count == 0, "no Epic: empty");
 
     // GOG: games from GOG's registry entries.

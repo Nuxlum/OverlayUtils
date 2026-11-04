@@ -24,7 +24,11 @@ static class GamePaths
     public static string? Full(string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return null;
-        try { return Path.GetFullPath(path.Trim()); }
+        try
+        {
+            var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path.Trim()));
+            return full.Length <= (Path.GetPathRoot(full)?.Length ?? 0) ? null : full; // a drive / share root is not an install folder
+        }
         catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException) { return null; }
     }
 }
