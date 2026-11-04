@@ -31,10 +31,12 @@ was rejected: it covers the middle of the screen and wastes both sides.
      hints, at the bottom of the column.
    - **Stage** (the rest): the status corner at the top right; a context area
      at the bottom that shows what is useful for the selected row (see 4).
-2. **Backdrop**: the game shows through, blurred, with a dark gradient: dark
-   behind the rail and column (about 94% → 86%), lighter towards the right
-   edge (about 50% → 30%), so text is always readable and the stage
-   "breathes". Games uses a top-to-bottom gradient instead (see 5).
+2. **Backdrop**: the game shows through as frosted glass (a blurred,
+   colour-boosted screenshot taken at open, see "How it is built"), with a
+   dark gradient: dark behind the rail and column (about 88% → 70%),
+   lighter towards the right edge (about 35% → 20%), so text is always
+   readable and the stage "breathes". Games uses a top-to-bottom gradient
+   instead (see 5).
 3. **Home page** (new, first page, where the overlay opens): shortcut tiles
    in a 2-column grid inside the column; wide tiles span both columns.
    In this order:
@@ -184,9 +186,9 @@ was rejected: it covers the middle of the screen and wastes both sides.
   shown even if its source page is hidden (it is just a shortcut).
 - **Covering the taskbar:** the window takes the whole monitor (monitor
   bounds, not the work area), so the taskbar is under the backdrop too.
-- **Fallback without blur** (Windows 10, Transparency effects off, or if the
-  backdrop spike fails): a near-opaque dark backdrop (game not visible);
-  everything else the same.
+- **Fallback without the frosted image** (capture failed or black): the
+  plain dark #080A10 background; everything else the same. Works the same
+  on Windows 10 and with Transparency effects off.
 - **Icons**: Segoe Fluent Icons / MDL2 glyphs as now (the mockups' emoji are
   stand-ins).
 - **Settings and Info pages** use the same frame: column with the rows,
@@ -199,15 +201,24 @@ was rejected: it covers the middle of the screen and wastes both sides.
 - **Window**: the existing `OverlayWindow`, resized to the monitor instead
   of 420x720. `OverlayLayout.Place` returns the monitor rectangle; the
   column width and type scale come from the size factor.
-- **Backdrop**: DWM's system backdrop (as `WindowEffects.TryApplyAcrylic`
-  does today) blurs the game; WPF draws the gradient and the Games tint on
-  top with partial alpha. **Risk to check first** (a throwaway spike before
-  the rest): that the DWM transient backdrop on a full-monitor, topmost,
-  non-layered window looks right (blur strength, no flicker on show/hide,
-  works over borderless-fullscreen games) and that `AllowsTransparency` is
-  *not* needed (layered full-screen WPF windows are slow). If the system
-  backdrop cannot do it, fall back as in "Calls I made"; do not ship a
-  layered full-screen window.
+- **Backdrop (decided after two spikes, owner-approved 2026-11-04):** the
+  DWM acrylic backdrop was rejected (fixed, far too strong blur, grey wash,
+  flicker on show). Instead a **frosted screenshot**: when the overlay
+  opens, the monitor is captured once (GDI BitBlt, kept in memory only,
+  never saved), processed on a worker and shown as the window's own
+  background. Pipeline and the owner's chosen values: 1/4 downscale (4x4
+  average) → 3-pass box blur with radius 32/4 = 8 at quarter scale →
+  saturation 1.3 (`luma + (c - luma) * 1.3`) and brightness x1.08 → shown
+  stretched with high-quality scaling; on top, a white frost at opacity
+  0.07, a fine static grain (128 px tiled grey noise) at 0.05, then the
+  dark gradient (#080A10 at alpha E0 / B3 / 59 / 33 at 0 / 0.38 / 0.72 /
+  1). The window appears at once with an opaque #080A10 background and the
+  UI; the frosted image fades in (150 ms) when ready (measured: capture
+  ~25 ms, processing ~20 ms at 2560x1440). The window is opaque and not
+  layered. Text on the stage (status, cards) sits on dark glass cards,
+  since the right side can be bright. If the capture fails or comes back
+  black (exclusive fullscreen, protected content), the plain #080A10
+  background stays.
 - **Exclusive-fullscreen games** behave as today (a topmost window over
   them makes Windows leave exclusive mode or not show; no new handling).
 

@@ -176,7 +176,8 @@
   - Window events: `RailClicked(int visibleIndex)`, `SettingsClicked()`, `BackdropClicked()`.
 
 - [ ] **Step 1:** Controller: `Show` takes `MonitorForWindow(_prev)` (or `ForCursor`), sizes the window to the monitor bounds, sets `_vm.Frame = OverlayLayout.Frame(bounds.Width / dpi, sizeFactor)` and `_content.GameColumns = frame.CoverColumns`; `Relayout` does the same on the window's monitor. Remove `PrepareOpening(side)`'s side parameter. Drop `ApplyChrome`'s rounded corners/border for this window (keep tool-window + dark mode).
-- [ ] **Step 2:** XAML: root `Grid` = backdrop layer (gradient from Task 1 values, or the solid fallback when `TryApplyAcrylic` returns false) + three columns bound to `Frame` (rail, column, stage). Rail: one glyph button per `RailItems`, accent bar on the current one, gear at the bottom. Column: eyebrow (accent, uppercase, small), page title (large), rows (existing templates, restyled, scaled by `SizeFactor`), footer at the bottom. Stage: status corner top-right (output device, battery, clock in light weight) and a context host at the bottom (Task 9 fills it; for now it shows `Description`). The old tab strip, header and description line go.
+- [ ] **Step 1b (frosted backdrop, from Task 14):** no DWM backdrop for this window (do not call `TryApplyAcrylic`; window background opaque `#080A10`). In `Show`, before the window is shown, `ScreenCapture.Capture(bounds)` on the UI thread (~25 ms; must run while our window is hidden); then `Task.Run(() => Frost.Process(...))` with `FrostSettings.FromConfig(cfg)`; back on the UI thread (if still open) set the backdrop `Image.Source` (`BitmapSource.Create`, Bgr32, frozen; `Stretch=Fill`, `BitmapScalingMode=HighQuality`) and fade it in 150 ms (instant when motion is off). Layers, bottom to top: image, white frost rectangle at `FrostSettings.FrostOpacity`, grain (128x128 tiled grey noise generated once, `Random(12345)`, `TileMode=Tile`, absolute viewport, `NearestNeighbor`) at `FrostSettings.GrainOpacity`, gradient with `FrostSettings.GradientAlphas`. Keep the last capture while open; when the Appearance settings change (`ConfigStore.Changed`), re-process from it so the sliders preview live. Drop the capture on hide. Capture null → plain background.
+- [ ] **Step 2:** XAML: root `Grid` = backdrop layers (Step 1b) + three columns bound to `Frame` (rail, column, stage). Rail: one glyph button per `RailItems`, accent bar on the current one, gear at the bottom. Column: eyebrow (accent, uppercase, small), page title (large), rows (existing templates, restyled, scaled by `SizeFactor`), footer at the bottom. Stage: status corner top-right (output device, battery, clock in light weight) and a context host at the bottom (Task 9 fills it; for now it shows `Description`). The old tab strip, header and description line go.
 - [ ] **Step 3:** Mouse: rail click → `ClickTab`, gear → `Handle(Settings)`, click on the backdrop element itself (not on rail/column/cards; check `e.OriginalSource == BackdropElement`) → `Hide()`.
 - [ ] **Step 4:** Strings for the gear tooltip if one is shown (`Overlay.Rail.Settings`). Build: 0 warnings; self-test passes.
 - [ ] **Step 5:** Commit `Overlay: full-screen frame`.
@@ -259,3 +260,34 @@
 - [ ] **Step 1:** PORTING: new section "Overlay redesign" with the done items and the manual test list from the spec's Testing section (desk + TV, each page, Games tint/lift, backdrop click closes, Animation effects off, Transparency effects off, borderless and exclusive-fullscreen game behind, current game for Steam / Epic / manual app, battery wireless vs wired, monitor switch from the Screen tile while open).
 - [ ] **Step 2:** WORKLOG: decisions (full-screen Focus layout, Home, side setting dropped, LT/RT unchanged, Settings gear outside the cycle, backdrop spike result from Task 1) and a dated session line with the self-test count. ARCHITECTURE: overlay section (frame, Home, current game, install folders). README.txt (EN + IT): Home page and the removed side option.
 - [ ] **Step 3:** Build + self-test. Commit `Overlay redesign docs`.
+
+### Task 14: Frosted backdrop core and Appearance settings (runs after Task 6, before Task 7)
+
+Added after the backdrop spikes (owner decision 2026-11-04, see spec "How it is built"): the DWM backdrop is replaced by a frosted screenshot, and the owner asked for sliders under an **Appearance** section in Settings.
+
+**Files:**
+- Create: `src/OverlayUtils.Core/Overlay/Frost.cs`, `src/OverlayUtils.Core/Platform/ScreenCapture.cs`
+- Modify: `src/OverlayUtils.Core/Interop/Native.cs` (GDI: `GetDC`, `ReleaseDC`, `CreateCompatibleDC`, `DeleteDC`, `CreateDIBSection`, `SelectObject`, `DeleteObject`, `BitBlt`, `BITMAPINFOHEADER`), `AppConfig.cs`, `ConfigStore.cs` (clamp on load), `OverlayContent.cs` (Settings), both `Strings*.resx`
+- Test: self-test, new section "Frost"
+
+**Interfaces:**
+- Produces:
+  - Config (percent ints, JSON names): `overlay_blur` (default 50), `overlay_frost` (default 35), `overlay_dim` (default 50); `ConfigStore.Load` clamps each to 0..100.
+  - `public sealed record FrostSettings(int BlurRadius, double Saturation, double Brightness, double FrostOpacity, double GrainOpacity, IReadOnlyList<byte> GradientAlphas)`; `static FrostSettings FrostSettings.FromConfig(AppConfig c)`: `BlurRadius = round(c.OverlayBlur / 100.0 * 64)`; `Saturation = 1.3`; `Brightness = 1.08`; `FrostOpacity = c.OverlayFrost / 100.0 * 0.20`; `GrainOpacity = 0.05`; `GradientAlphas` = `{0xE0, 0xB3, 0x59, 0x33}` each multiplied by `dim = 0.5 + c.OverlayDim / 100.0` and clamped to 255.
+  - `public sealed record FrostImage(byte[] Bgr32, int Width, int Height)`; `static FrostImage? Frost.Process(byte[] bgra, int width, int height, int stride, FrostSettings s)`: 4x4 average downscale (`Width = width / 4`, `Height = height / 4`; null when either is 0), then 3 box-blur passes per axis with radius `s.BlurRadius / 4` (edge-clamped), then per pixel `c' = clamp((luma + (c - luma) * Saturation) * Brightness)`, `luma = 0.2126R + 0.7152G + 0.0722B`; alpha byte 255.
+  - `public sealed record CapturedScreen(byte[] Bgra, int Width, int Height, int Stride)`; `static CapturedScreen? ScreenCapture.Capture(RectI bounds)` (GDI BitBlt SRCCOPY of the screen DC into a 32bpp top-down DIB section; every handle released in `finally`; any failure → null; memory only, never written to disk).
+  - Settings: the Size row's section becomes `Overlay.Section.Appearance` ("Appearance" / "Aspetto"); after it three `Slider` rows: `Settings.Blur` ("Blur" / "Sfocatura"), `Settings.Frost` ("Frost" / "Brina"), `Settings.Darkness` ("Darkness" / "Oscurità"), each with a `.Desc` string ("How blurred the game behind the overlay is." / "Quanto è sfocato il gioco dietro l'overlay."; "How milky the frosted glass looks." / "Quanto è lattiginoso il vetro smerigliato."; "How dark the background is behind the text." / "Quanto è scuro lo sfondo dietro il testo."). `Value` = "{n}%", `IsOn` false, `Step(±1)` = ±5 clamped 0..100, `SetLevel(f)` = round(f * 100), `Toggle` (A) resets to the default, `ActionLabel` = `Overlay.Footer.Reset` ("Reset" / "Ripristina"). All writes through `ConfigStore.Update`.
+
+- [ ] **Step 1: failing checks**
+  - `FromConfig(new AppConfig())` → `BlurRadius == 32`, `Math.Abs(FrostOpacity - 0.07) < 1e-9`, `GradientAlphas` equals `{0xE0, 0xB3, 0x59, 0x33}`; `OverlayDim = 100` → first alpha `255` (clamped); `OverlayBlur = 0` → `BlurRadius == 0`.
+  - A config JSON with `"overlay_blur": 400, "overlay_frost": -3` loads as `100` and `0`.
+  - `Frost.Process` on an 8x8 uniform grey (128,128,128) image with defaults → 2x2, every pixel grey (R == G == B) and `== clamp(128 * 1.08)` within ±1.
+  - On a 16x4 image, left half pure red, right half pure blue, `BlurRadius = 0`, `Saturation = 1`, `Brightness = 1` → 4x1, pixel 0 red (R 255, B 0), pixel 3 blue.
+  - Same image with `BlurRadius = 16` → pixels 1 and 2 both have R > 0 and B > 0 (mixed).
+  - A muted colour (R 150, G 120, B 120), `Saturation = 1.3`, no blur → R - G larger than 30 (boosted).
+  - `Process` on a 3x3 image → null.
+  - Settings: rows labelled `Loc.T("Settings.Blur")`, `"Settings.Frost"`, `"Settings.Darkness"` exist, are `Slider`, and the Size row's `Section()` is `Loc.T("Overlay.Section.Appearance")`; `Step(1)` on Blur moves `overlay_blur` 50 → 55; `SetLevel(0.2)` → 20; `Toggle()` → back to 50; `Step(1)` at 100 stays 100.
+- [ ] **Step 2:** Run. Expected: FAIL (types/keys missing).
+- [ ] **Step 3:** Implement. `ScreenCapture` is not unit-tested (needs a screen); keep it small, never throwing.
+- [ ] **Step 4:** Build + self-test. Expected: 0 warnings, all pass.
+- [ ] **Step 5:** Commit `Overlay: frosted backdrop core, Appearance settings`.
