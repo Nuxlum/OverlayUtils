@@ -31,6 +31,10 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
 
 Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Dialog.Legacy.Done" xml:space="preserve"><value>La vecchia AppUtili è stata rimossa.</value></data>
+  <data name="Channel.chat" xml:space="preserve"><value>Chat</value></data>
+  <data name="Channel.game" xml:space="preserve"><value>Gioco</value></data>
+  <data name="Channel.media" xml:space="preserve"><value>Media</value></data>
+  <data name="Channel.other" xml:space="preserve"><value>Altro</value></data>
   <data name="Icon.bolt" xml:space="preserve"><value>Fulmine</value></data>
   <data name="Icon.browser" xml:space="preserve"><value>Browser</value></data>
   <data name="Icon.chat" xml:space="preserve"><value>Chat</value></data>

@@ -31,6 +31,10 @@ Windows will ask for administrator permission once.</value></data>
 
 Windows will ask for administrator permission once.</value></data>
   <data name="Dialog.Legacy.Done" xml:space="preserve"><value>The old AppUtili has been removed.</value></data>
+  <data name="Channel.chat" xml:space="preserve"><value>Chat</value></data>
+  <data name="Channel.game" xml:space="preserve"><value>Game</value></data>
+  <data name="Channel.media" xml:space="preserve"><value>Media</value></data>
+  <data name="Channel.other" xml:space="preserve"><value>Other</value></data>
   <data name="Icon.bolt" xml:space="preserve"><value>Bolt</value></data>
   <data name="Icon.browser" xml:space="preserve"><value>Browser</value></data>
   <data name="Icon.chat" xml:space="preserve"><value>Chat</value></data>

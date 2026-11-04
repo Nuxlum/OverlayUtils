@@ -1551,6 +1551,32 @@ string RepoRoot()
     Check(Glyphs.ChannelIconNames.Count == 16 && MixRules.DefaultChannels.All(c => Glyphs.ChannelIconNames.Contains(c.Icon)),
         "16 channel icons incl. the defaults");
     Check(Glyphs.ChannelIcon("bogus") == Glyphs.ChannelIcon("other"), "unknown icon falls back to other");
+
+    // Default channel names follow the language while they keep the stored English default.
+    Loc.SetLanguage("it");
+    store.Update(c => c.AudioPrograms[discord] = "other");
+    var itKeys = content.Audio();
+    Check(itKeys.First(r => r.Key == "ch.other").Label() == "Altro" && itKeys.First(r => r.Key == "ch.game").Label() == "Gioco",
+        "Italian: default channel names on the Audio tab");
+    var itChannels = SettingsRow("Settings.Audio.Channels").SubPage!();
+    Check(itChannels.First(r => r.Key == "other").Label() == "Altro" && itChannels.First(r => r.Key == "media").Label() == "Media",
+        "Italian: default channel names on the Channels page");
+    Check(SettingsRow("Settings.Audio.Programs").SubPage!().First(r => r.Key == "prog." + discord).Value() == "Altro",
+        "Italian: Programs shows the localized channel");
+    var itRename = itChannels.First(r => r.Key == "channels.rename");
+    for (var i = 0; i < 8 && itRename.Value() != "Altro"; i++) itRename.Step!(1);
+    host.NextName = "Sottofondo";
+    itRename.Toggle!();
+    Check(host.Calls.Last() == "AskName:Altro", "Italian: Rename suggests the localized name");
+    Check(SettingsRow("Settings.Audio.Channels").SubPage!().First(r => r.Key == "other").Label() == "Sottofondo"
+        && content.Audio().First(r => r.Key == "ch.other").Label() == "Sottofondo", "a renamed default shows its stored name");
+    content.Mix.AddChannel("Other");
+    Check(SettingsRow("Settings.Audio.Channels").SubPage!().First(r => r.Key == "c1").Label() == "Other",
+        "a custom channel named like a default keeps its stored name");
+    content.Mix.DeleteChannel("c1");
+    content.Mix.RenameChannel("other", "Other");
+    Loc.SetLanguage("en");
+    Check(content.Audio().First(r => r.Key == "ch.other").Label() == "Other", "English: default names as stored");
 }
 
 // --- Mouse entry points -----------------------------------------------------

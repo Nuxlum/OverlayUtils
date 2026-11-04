@@ -277,7 +277,7 @@ public sealed class OverlayContent
             {
                 Kind = ItemKind.Slider, Icon = Glyphs.ChannelIcon(channel.Icon), Key = "ch." + id,
                 Section = first ? () => Loc.T("Overlay.Section.Channels") : null,
-                Label = () => channel.Name,
+                Label = () => ChannelName(channel),
                 Description = () => Loc.T("Overlay.Audio.Channel.Desc"),
                 Value = () => Percent(Mix.ChannelLevel(id).Volume),
                 IsOn = () => Mix.ChannelLevel(id).Muted,
@@ -338,6 +338,15 @@ public sealed class OverlayContent
         }
     }
 
+    /// <summary>
+    /// Display name of a channel: a default channel still carrying its stored English default name ("Other")
+    /// shows the localized name; a renamed or custom channel shows what the user typed.
+    /// </summary>
+    public static string ChannelName(AudioChannel channel) =>
+        MixRules.DefaultChannels.FirstOrDefault(d => d.Id == channel.Id) is { } standard && channel.Name == standard.Name
+            ? Loc.T("Channel." + channel.Id)
+            : channel.Name;
+
     /// <summary>The preset Left/Right picked, else the first.</summary>
     string PresetPick()
     {
@@ -377,7 +386,7 @@ public sealed class OverlayContent
             return new OverlayItem
             {
                 Kind = ItemKind.Reorder, Key = id, Icon = Glyphs.ChannelIcon(channel.Icon),
-                Label = () => channel.Name,
+                Label = () => ChannelName(channel),
                 Value = () => Loc.T("Icon." + channel.Icon),
                 Description = () => Loc.T(custom ? "Settings.Audio.Channel.CustomDesc" : "Settings.Audio.Channel.Desc"),
                 Step = direction => Mix.CycleIcon(id, direction),
@@ -400,7 +409,7 @@ public sealed class OverlayContent
             Kind = ItemKind.Choice, Icon = Glyphs.Rename, Key = "channels.rename",
             Label = () => Loc.T("Settings.Audio.Rename"),
             Description = () => Loc.T("Settings.Audio.Rename.Desc"),
-            Value = () => RenamePick()?.Name ?? "",
+            Value = () => RenamePick() is { } pick ? ChannelName(pick) : "",
             Step = direction =>
             {
                 var channels = Mix.Channels;
@@ -410,7 +419,7 @@ public sealed class OverlayContent
             Toggle = () =>
             {
                 if (RenamePick() is not { } channel) return;
-                _host.AskName(channel.Name, name => Mix.RenameChannel(channel.Id, name));
+                _host.AskName(ChannelName(channel), name => Mix.RenameChannel(channel.Id, name));
             },
         });
         return rows;
@@ -457,7 +466,7 @@ public sealed class OverlayContent
                     Kind = ItemKind.Choice, Key = "prog." + exe, Icon = Glyphs.ChannelIcon(channel?.Icon),
                     Label = () => program.Name,
                     Description = () => Loc.T("Settings.Audio.Program.Desc", exe),
-                    Value = () => Mix.Channels.FirstOrDefault(c => c.Id == Mix.ChannelOf(exe))?.Name ?? "",
+                    Value = () => Mix.Channels.FirstOrDefault(c => c.Id == Mix.ChannelOf(exe)) is { } current ? ChannelName(current) : "",
                     Step = direction => Mix.CycleProgram(exe, direction),
                 };
             }).ToList();
