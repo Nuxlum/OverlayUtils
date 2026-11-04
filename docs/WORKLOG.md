@@ -108,6 +108,14 @@ The stage checklist lives in `PORTING.md`.
 ## Backlog
 
 - [ ] CI: GitHub Actions on windows-latest running build + self-test
+- [ ] Branding (last stage, before going public): "OverlayUtils" and the repo
+  description are placeholders. Candidates checked 2026-11-04 (web search, not
+  a formal USPTO/EUIPO check): CouchPilot (crowded, same niche), OmniWrench
+  (Ratchet & Clank item, trademark worry), Omnitool (no live trademark, very
+  crowded), Omnideck (live trademark + Omnifinity VR treadmill), Omnidock
+  (Bardex application possibly covering software). Untested: OmniPad. A rename
+  touches exe names, %APPDATA%/Program Files folders (migrate settings), Run
+  key, certificate subject (re-enable full mode), README, repo name.
 - [ ] First-run setup for friends: guide a new user through full mode and
   connecting Discord without reading docs. After stage 7 (Discord).
 - [ ] Research: a driver-free way to keep pad input away from the game
