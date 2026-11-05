@@ -12,13 +12,13 @@ using OverlayUtils.Core.Overlay;
 namespace OverlayUtils.App.Overlay;
 
 /// <summary>
-/// The overlay panel. It only draws <see cref="OverlayViewModel"/> and turns keyboard and mouse input into
-/// <see cref="CommandIssued"/> / <see cref="RowClicked"/>; the controller owns the navigator, size and placement.
+/// The full-screen overlay. It only draws <see cref="OverlayViewModel"/> (and the backdrop it is handed) and turns
+/// keyboard and mouse input into <see cref="CommandIssued"/> / <see cref="RowClicked"/> and the other events; the
+/// controller owns the navigator, size, placement and the backdrop capture.
 /// </summary>
 internal sealed partial class OverlayWindow : Window
 {
     const string AccentKey = "Accent";
-    const string PanelBgKey = "PanelBg";
     static readonly Duration OpenDuration = TimeSpan.FromMilliseconds(150);
     const double OpenSlide = 24; // DIPs
 
@@ -28,12 +28,7 @@ internal sealed partial class OverlayWindow : Window
     {
         InitializeComponent();
         Resources[AccentKey] = new SolidColorBrush(OverlayViewModel.FallbackAccent);
-        Resources[PanelBgKey] = FindResource("Bg");
-        SourceInitialized += (_, _) =>
-        {
-            WindowEffects.ApplyChrome(this);
-            RefreshBackdrop();
-        };
+        SourceInitialized += (_, _) => WindowEffects.ApplyChrome(this);
         Scroller.ScrollChanged += (_, _) => UpdateArtRange();
     }
 
@@ -45,8 +40,14 @@ internal sealed partial class OverlayWindow : Window
     /// <summary>The mouse really moved onto a row (navigator index).</summary>
     public event Action<int>? RowHovered;
 
-    /// <summary>A tab header was clicked (index into the visible tabs).</summary>
-    public event Action<int>? TabClicked;
+    /// <summary>A rail icon was clicked (<see cref="RailVm.VisibleIndex"/>, index into the visible tabs).</summary>
+    public event Action<int>? RailClicked;
+
+    /// <summary>The Settings gear of the rail was clicked.</summary>
+    public event Action? SettingsClicked;
+
+    /// <summary>The bare backdrop was clicked (not the rail, the column or a stage card).</summary>
+    public event Action? BackdropClicked;
 
     /// <summary>A picker arrow (row, -1/+1) was clicked, or the wheel turned over the volume bar.</summary>
     public event Action<int, int>? StepClicked;
@@ -99,45 +100,24 @@ internal sealed partial class OverlayWindow : Window
         else if (e.PropertyName is nameof(OverlayViewModel.Rows) or nameof(OverlayViewModel.SelectedTile))
             // After the new rows are laid out, so their containers exist.
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, BringSelectedIntoView);
-        else if (e.PropertyName is nameof(OverlayViewModel.Tiles) or nameof(OverlayViewModel.ShowTiles))
+        else if (e.PropertyName is nameof(OverlayViewModel.Tiles) or nameof(OverlayViewModel.ShowTiles)
+                 or nameof(OverlayViewModel.TileColumns))
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, UpdateArtRange);
     }
 
     /// <summary>
-    /// Acrylic with a translucent panel where Windows allows it, else the solid palette. The controller calls it
-    /// after every show: DWM keeps the acrylic only if it is set while the window is visible.
-    /// </summary>
-    public void RefreshBackdrop()
-    {
-        try
-        {
-            if (WindowEffects.TryApplyAcrylic(this))
-            {
-                Resources[PanelBgKey] = FindResource("AcrylicBg");
-                return;
-            }
-            SetResourceReference(BackgroundProperty, "Bg");
-            Resources[PanelBgKey] = FindResource("Bg");
-        }
-        catch (Exception e)
-        {
-            Log.Error("Overlay backdrop", e);
-        }
-    }
-
-    /// <summary>
-    /// Call right before Show: the panel slides in from its side of the screen and fades in, unless Windows
-    /// "Animation effects" is off. Only the content moves (the window stays where the controller put it) and
-    /// nothing waits for it, so focus is not delayed. Closing is never animated.
+    /// Call right before Show: the frame (rail, column, stage) slides in from the left and fades in, unless Windows
+    /// "Animation effects" is off. Only the frame moves (the window and the backdrop stay put) and nothing waits for
+    /// it, so focus is not delayed. Closing is never animated.
     /// </summary>
     public void PrepareOpening()
     {
-        Panel.BeginAnimation(OpacityProperty, null);
+        FrameRoot.BeginAnimation(OpacityProperty, null);
         Slide.BeginAnimation(TranslateTransform.XProperty, null);
         if (!SystemParameters.ClientAreaAnimation) return;
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
         var from = -OpenSlide;
-        Panel.BeginAnimation(OpacityProperty,
+        FrameRoot.BeginAnimation(OpacityProperty,
             new DoubleAnimation(0, 1, OpenDuration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
         Slide.BeginAnimation(TranslateTransform.XProperty,
             new DoubleAnimation(from, 0, OpenDuration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
@@ -154,7 +134,7 @@ internal sealed partial class OverlayWindow : Window
             var top = TileList.TranslatePoint(new Point(0, 0), Scroller).Y; // negative once scrolled past the grid top
             var fromRow = Math.Max(0, (int)Math.Floor(-top / rowHeight) - 1);
             var toRow = (int)Math.Ceiling((Scroller.ViewportHeight - top) / rowHeight) + 1;
-            const int columns = OverlayViewModel.TileColumns;
+            var columns = vm.TileColumns;
             vm.ShowArt(fromRow * columns, Math.Min(vm.Tiles.Count - 1, (toRow + 1) * columns - 1));
         }
         catch (Exception ex)
@@ -240,7 +220,24 @@ internal sealed partial class OverlayWindow : Window
     void OnGearMouseDown(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
-        Issue(OverlayCommand.Settings);
+        if (e.ClickCount > 1) return; // a double-click would open Settings and go straight back
+        Raise(() => SettingsClicked?.Invoke(), "gear click");
+    }
+
+    void OnRailMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not RailVm item) return;
+        e.Handled = true;
+        if (e.ClickCount > 1) return;
+        Raise(() => RailClicked?.Invoke(item.VisibleIndex), "rail click");
+    }
+
+    /// <summary>Only a press on the bare backdrop closes: never one that started on the frame or a card.</summary>
+    void OnBackdropMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!Backdrop.IsSurface(e.OriginalSource)) return;
+        e.Handled = true;
+        Raise(() => BackdropClicked?.Invoke(), "backdrop click");
     }
 
     void OnBackMouseDown(object sender, MouseButtonEventArgs e)
@@ -288,15 +285,6 @@ internal sealed partial class OverlayWindow : Window
         }
         if (RowOf(e.OriginalSource as DependencyObject) is { } row)
             Raise(() => RowHovered?.Invoke(row.Index), "hover");
-    }
-
-    void OnTabMouseDown(object sender, MouseButtonEventArgs e)
-    {
-        if ((sender as FrameworkElement)?.DataContext is not TabVm tab || _vm is null) return;
-        e.Handled = true;
-        if (e.ClickCount > 1) return;
-        var index = _vm.Tabs.ToList().IndexOf(tab);
-        if (index >= 0) Raise(() => TabClicked?.Invoke(index), "tab click");
     }
 
     void OnStepMouseDown(object sender, MouseButtonEventArgs e)

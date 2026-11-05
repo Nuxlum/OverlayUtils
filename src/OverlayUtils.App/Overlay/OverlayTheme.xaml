@@ -8,8 +8,6 @@
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
     <SolidColorBrush x:Key="Bg" Color="#202020" />
-    <!-- Panel background over the acrylic backdrop: Bg at about 70 %, so text keeps its contrast over bright games. -->
-    <SolidColorBrush x:Key="AcrylicBg" Color="#B3202020" />
     <SolidColorBrush x:Key="Surface" Color="#2D2D2D" />
     <SolidColorBrush x:Key="Line" Color="#3E3E3E" />
     <SolidColorBrush x:Key="Text" Color="#FFFFFF" />
@@ -18,15 +16,45 @@
     <SolidColorBrush x:Key="Danger" Color="#DC4646" />
     <SolidColorBrush x:Key="SegmentBg" Color="#1A1A1A" />
     <SolidColorBrush x:Key="SegmentActive" Color="#444444" />
-    <!-- Mouse over a clickable element (button, arrow, option, tab, footer hint). -->
+    <!-- Mouse over a clickable element (button, arrow, option, rail icon, footer hint). -->
     <SolidColorBrush x:Key="Hover" Color="#26FFFFFF" />
+
+    <!-- Full-screen frame. FrameBg is the window's opaque background and the colour of the backdrop gradient. -->
+    <SolidColorBrush x:Key="FrameBg" Color="#080A10" />
+    <!-- White frost over the screenshot; its opacity comes from the Appearance settings. -->
+    <SolidColorBrush x:Key="FrostTint" Color="#FFFFFF" />
+    <!-- Hairline on the right edge of the rail. -->
+    <SolidColorBrush x:Key="RailLine" Color="#0FFFFFFF" />
+    <!-- Cards inside the column (Info panels, media card, game tiles): light glass over the dark side. -->
+    <SolidColorBrush x:Key="CardBg" Color="#11FFFFFF" />
+    <SolidColorBrush x:Key="CardLine" Color="#12FFFFFF" />
+    <!-- Dark glass under text on the stage (status corner, context card), which can sit over a bright game. -->
+    <SolidColorBrush x:Key="GlassBg" Color="#8C0A0C12" />
+    <SolidColorBrush x:Key="GlassLine" Color="#14FFFFFF" />
+    <!-- Fades the selected row's tint from left to right (opacity mask). -->
+    <LinearGradientBrush x:Key="TintFade" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF000000" Offset="0" />
+        <GradientStop Color="#4D000000" Offset="1" />
+    </LinearGradientBrush>
 
     <FontFamily x:Key="TextFont">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="DisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
     <!-- Selection tint: the accent at low opacity over the row (Python OV_SELECTED on a blue accent). -->
-    <sys:Double x:Key="TintOpacity">0.16</sys:Double>
+    <sys:Double x:Key="TintOpacity">0.20</sys:Double>
+
+    <!-- Type ramp of the frame, in DIPs at size factor 1 (the frame scales them with the size setting). -->
+    <sys:Double x:Key="EyebrowSize">12</sys:Double>
+    <sys:Double x:Key="PageTitleSize">34</sys:Double>
+    <sys:Double x:Key="RailGlyphSize">20</sys:Double>
+    <sys:Double x:Key="RailButtonSize">52</sys:Double>
+    <sys:Double x:Key="ClockSize">30</sys:Double>
+    <sys:Double x:Key="StatusSize">14</sys:Double>
+    <sys:Double x:Key="ContextSize">14</sys:Double>
+    <sys:Double x:Key="RowHeight">44</sys:Double>
+    <sys:Double x:Key="RowLabelSize">15</sys:Double>
+    <sys:Double x:Key="RowGlyphSize">17</sys:Double>
 
     <Style x:Key="Icon" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
@@ -51,10 +79,11 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
-    <!-- Thin separator line between header, list and description. -->
-    <Style x:Key="Separator" TargetType="Rectangle">
-        <Setter Property="Height" Value="1" />
-        <Setter Property="Margin" Value="14,0" />
-        <Setter Property="Fill" Value="{StaticResource Line}" />
+    <!-- Dark glass card on the stage. -->
+    <Style x:Key="GlassCard" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource GlassBg}" />
+        <Setter Property="BorderBrush" Value="{StaticResource GlassLine}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="14" />
     </Style>
 </ResourceDictionary>

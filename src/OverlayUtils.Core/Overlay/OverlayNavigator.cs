@@ -61,6 +61,9 @@ public sealed class OverlayNavigator
     /// <summary>Title of the sub-page (the label of the row that opened it).</summary>
     public string SubTitle => _subItem?.Label() ?? "";
 
+    /// <summary>The page a sub-page was opened from (meaningful while <see cref="Page"/> is Sub).</summary>
+    public OverlayPage SubOrigin => _subOrigin;
+
     public IReadOnlyList<OverlayTab> VisibleTabs =>
         _tabs.Where(t => t.Id == ControlsTabId || !_hidden.Contains(t.Id)).ToList();
 

@@ -44,13 +44,16 @@ internal sealed class OverlayController : IDisposable
     int _renderQueued;
     bool _padConnected;
     int? _battery;
-
-    /// <summary>Pad battery percent; drawn by the full-screen frame (Task 7).</summary>
-    public int? BatteryPercent { get; private set; }
     nint _prev;            // foreground app when the overlay opened; kept after hiding for the action that follows
     bool _hadFocus;
     RectI _placement;
     bool _disposed;
+
+    // Frosted backdrop: the monitor captured at open, kept while open so the Appearance sliders can re-process it.
+    CapturedScreen? _capture;
+    int _frostVersion;      // bumped on every new processing and on hide; a stale result is dropped
+    int _frostBlur = -1;    // blur radius of the image shown (or being made), -1 when none
+    bool _fadePending;      // no image shown yet since the open
 
     public OverlayController(Application app, ConfigStore config, MonitorProfiles monitors, OverlayContent content)
     {
@@ -64,7 +67,9 @@ internal sealed class OverlayController : IDisposable
         _window.CommandIssued += OnCommand;
         _window.RowClicked += OnRowClicked;
         _window.RowHovered += index => { if (_open && _navigator.Hover(index)) Render(); };
-        _window.TabClicked += index => { if (_open) Apply(_navigator.ClickTab(index)); };
+        _window.RailClicked += index => { if (_open) Apply(_navigator.ClickTab(index)); };
+        _window.SettingsClicked += () => OnCommand(OverlayCommand.Settings);
+        _window.BackdropClicked += () => Hide();
         _window.StepClicked += (index, direction) => { if (_open) Apply(_navigator.ClickStep(index, direction)); };
         _window.LevelClicked += (index, fraction) => { if (_open) Apply(_navigator.ClickLevel(index, fraction)); };
         _window.MediaClicked += (index, button) => { if (_open) Apply(_navigator.ClickMedia(index, button)); };
@@ -91,6 +96,9 @@ internal sealed class OverlayController : IDisposable
     }
 
     public bool IsOpen => _open;
+
+    /// <summary>Pad battery percent (UI thread), shown in the status corner when SDL reports one.</summary>
+    public int? BatteryPercent { get; private set; }
 
     /// <summary>Raised on the UI thread when the overlay opens (true) or hides (false).</summary>
     public event Action<bool>? OpenChanged;
@@ -166,14 +174,17 @@ internal sealed class OverlayController : IDisposable
         {
             var cfg = _config.Current;
             _prev = WindowFocus.ForegroundApp();
-            var (work, dpiScale) = _prev != 0 ? DisplayArea.MonitorForWindow(_prev) : DisplayArea.MonitorForCursor();
+            var (bounds, dpiScale) = _prev != 0 ? DisplayArea.MonitorForWindow(_prev) : DisplayArea.MonitorForCursor();
+
+            // While our window is still hidden, so the screenshot is of the game (about 25 ms, memory only).
+            CaptureBackdrop(cfg, bounds);
 
             _content.ResetTransient();
             RunCancel(_navigator.Reset(cfg.HiddenTabs));
             UpdateAccent();
 
             // Placed while still hidden, so a DPI change on the target monitor happens before the first frame.
-            Layout(cfg, work, dpiScale);
+            Layout(cfg, bounds, dpiScale);
             Render();
 
             _window.PrepareOpening();
@@ -185,7 +196,8 @@ internal sealed class OverlayController : IDisposable
             WindowFocus.Force(_hwnd);
             _window.Activate();
             _window.Focus();
-            _window.RefreshBackdrop();
+            // Dark at once; the frosted image fades in when the worker has it.
+            ProcessBackdrop(FrostSettings.FromConfig(cfg));
 
             _hadFocus = false;
             _focusTimer.Start();
@@ -217,6 +229,7 @@ internal sealed class OverlayController : IDisposable
             // A picked-up list entry must not stay moved but unsaved: put it back now.
             if (_navigator.Holding) RunCancel(_navigator.Reset(_config.Current.HiddenTabs));
             _window.Hide();
+            DropBackdrop();
         }
         catch (Exception e)
         {
@@ -224,27 +237,33 @@ internal sealed class OverlayController : IDisposable
         }
     }
 
-    /// <summary>Size factor and placement for the current settings on the given monitor, applied to the window.</summary>
-    void Layout(AppConfig cfg, RectI work, double dpiScale)
+    /// <summary>
+    /// Size factor, frame (rail, column, cover columns) and placement for the current settings on the given monitor
+    /// (full bounds, physical pixels), applied to the window.
+    /// </summary>
+    void Layout(AppConfig cfg, RectI bounds, double dpiScale)
     {
         var sizeFactor = OverlayLayout.SizeFactor(cfg.OverlaySize, _monitors.Current, _monitors.ForRole(MonitorRole.Tv));
+        var frame = OverlayLayout.Frame(bounds.Width / dpiScale, sizeFactor);
         _vm.SizeFactor = sizeFactor;
-        _placement = work; // full monitor; the frame inside it is rebuilt in a later task
+        _vm.Frame = frame;
+        _content.GameColumns = frame.CoverColumns; // the navigator's grid moves follow the columns drawn
+        _placement = bounds; // the whole monitor, taskbar included
         _window.Width = _placement.Width / dpiScale;
         _window.Height = _placement.Height / dpiScale;
         Place();
     }
 
     /// <summary>
-    /// Re-applies size and side while open (Settings rows, or a monitor profile switch that changed the size factor
-    /// or the display layout), on the monitor the panel is on now.
+    /// Re-applies size and frame while open (Settings rows, or a monitor profile switch that changed the size factor
+    /// or the display layout), on the monitor the window is on now.
     /// </summary>
     void Relayout(AppConfig cfg)
     {
         try
         {
-            var (work, dpiScale) = DisplayArea.MonitorForWindow(_hwnd);
-            Layout(cfg, work, dpiScale);
+            var (bounds, dpiScale) = DisplayArea.MonitorForWindow(_hwnd);
+            Layout(cfg, bounds, dpiScale);
         }
         catch (Exception e)
         {
@@ -263,9 +282,10 @@ internal sealed class OverlayController : IDisposable
 
     nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
     {
-        // WPF resizes to its suggested rectangle on a DPI change; put the panel back on the Place result after.
+        // WPF resizes to its suggested rectangle on a DPI change; lay the frame out again for the new DPI (its width
+        // in DIPs changed) and put the window back on the whole monitor.
         if (msg == Native.WM_DPICHANGED)
-            _app.Dispatcher.BeginInvoke(DispatcherPriority.Send, Place);
+            _app.Dispatcher.BeginInvoke(DispatcherPriority.Send, () => Relayout(_config.Current));
         return 0;
     }
 
@@ -342,9 +362,8 @@ internal sealed class OverlayController : IDisposable
         {
             // Always: a row that became hidden must not stay selected until the next clock tick.
             RunCancel(_navigator.Refresh());
-            var profile = _monitors.List().Count > 0 ? _monitors.Current : "";
-            (byte, byte, byte)? color = profile.Length > 0 ? _monitors.Style(profile).Color : null;
-            _vm.Refresh(_navigator, DateTime.Now.ToString("HH:mm"), color, profile, _padConnected, _battery);
+            _vm.Refresh(_navigator, DateTime.Now.ToString("HH:mm"), _content.OutputDevice, _padConnected, _battery,
+                BatteryPercent);
         }
         catch (Exception e)
         {
@@ -363,7 +382,8 @@ internal sealed class OverlayController : IDisposable
     void OnConfigChanged(AppConfig config) => OnUi(() =>
     {
         if (!_open) return;
-        Relayout(config); // overlay size, side or monitor profile may have changed
+        Relayout(config); // overlay size or monitor profile may have changed
+        UpdateBackdrop(config); // the Appearance sliders preview live
         RunCancel(_navigator.SetHiddenTabs(config.HiddenTabs)); // a tab hidden or shown in Settings follows at once
         Render();
     });
@@ -375,20 +395,100 @@ internal sealed class OverlayController : IDisposable
 
     void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
     {
-        // The accent and "Transparency effects" changes both arrive as General (ImmersiveColorSet).
+        // An accent change arrives as General (ImmersiveColorSet).
         if (e.Category is not (UserPreferenceCategory.General or UserPreferenceCategory.Color)) return;
         OnUi(() =>
         {
             try
             {
                 UpdateAccent();
-                _window.RefreshBackdrop();
             }
             catch (Exception ex)
             {
                 Log.Error("Overlay preference change", ex);
             }
         });
+    }
+
+    // --- frosted backdrop ------------------------------------------------------
+
+    /// <summary>
+    /// Takes the screenshot for this open (UI thread, before the window shows) and resets the backdrop to the plain
+    /// background with the current frost, grain and gradient. A failed capture leaves the plain background.
+    /// </summary>
+    void CaptureBackdrop(AppConfig cfg, RectI bounds)
+    {
+        _frostVersion++;
+        _frostBlur = -1;
+        _capture = null;
+        _fadePending = true;
+        try
+        {
+            _window.Backdrop.Clear();
+            _window.Backdrop.Apply(FrostSettings.FromConfig(cfg));
+            _capture = ScreenCapture.Capture(bounds);
+        }
+        catch (Exception e)
+        {
+            Log.Error("Overlay backdrop capture", e);
+        }
+    }
+
+    /// <summary>
+    /// Blurs the kept capture on a worker and shows it when done, if the overlay is still open and nothing newer was
+    /// asked meanwhile. A black capture (exclusive fullscreen, protected content) is not shown.
+    /// </summary>
+    void ProcessBackdrop(FrostSettings settings)
+    {
+        if (_capture is not { } capture) return;
+        var version = ++_frostVersion;
+        _frostBlur = settings.BlurRadius;
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                if (Frost.LooksBlack(capture.Bgra, capture.Width, capture.Height, capture.Stride)) return;
+                if (Frost.Process(capture.Bgra, capture.Width, capture.Height, capture.Stride, settings) is not { } image) return;
+                var bitmap = FrostedBackdrop.ToBitmap(image);
+                _app.Dispatcher.BeginInvoke(() =>
+                {
+                    if (!_open || version != _frostVersion) return;
+                    // Only the first image of an open fades in; a re-processed one replaces it at once.
+                    var fade = _fadePending && SystemParameters.ClientAreaAnimation;
+                    _fadePending = false;
+                    try { _window.Backdrop.ShowImage(bitmap, fade); }
+                    catch (Exception e) { Log.Error("Overlay backdrop show", e); }
+                });
+            }
+            catch (Exception e)
+            {
+                Log.Error("Overlay backdrop", e);
+            }
+        });
+    }
+
+    /// <summary>Settings changed while open: frost, grain and darkness at once; a new blur re-processes the capture.</summary>
+    void UpdateBackdrop(AppConfig config)
+    {
+        try
+        {
+            var settings = FrostSettings.FromConfig(config);
+            _window.Backdrop.Apply(settings);
+            if (_capture is not null && settings.BlurRadius != _frostBlur) ProcessBackdrop(settings);
+        }
+        catch (Exception e)
+        {
+            Log.Error("Overlay backdrop update", e);
+        }
+    }
+
+    /// <summary>On hide: the capture and the image are released, a result still on its way is dropped.</summary>
+    void DropBackdrop()
+    {
+        _frostVersion++;
+        _frostBlur = -1;
+        _capture = null;
+        _window.Backdrop.Clear();
     }
 
     void UpdateAccent()

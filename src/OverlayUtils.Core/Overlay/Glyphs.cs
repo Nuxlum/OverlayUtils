@@ -21,6 +21,8 @@ public static class Glyphs
     public const string Link = "";
     public const string ChevronLeft = "";
     public const string ChevronRight = "";
+    /// <summary>Controls page in the overlay rail (lightning bolt).</summary>
+    public const string Controls = "";
     public const string Settings = "";
     public const string Add = "";
     public const string Rename = "";

@@ -399,8 +399,11 @@ public sealed class OverlayContent
         ];
     }
 
+    /// <summary>Name of the default output device, empty when there is none (the overlay status corner).</summary>
+    public string OutputDevice => _audio.Default(AudioFlow.Output)?.Name ?? "";
+
     /// <summary>Python _audio_icon without Sonar: headphones by name, else a speaker.</summary>
-    static string OutputIcon(string? name)
+    public static string OutputIcon(string? name)
     {
         var lower = (name ?? "").ToLowerInvariant();
         return new[] { "headphone", "headset", "cuffie", "auricolar" }.Any(lower.Contains) ? Glyphs.Headphone : Glyphs.Speaker;

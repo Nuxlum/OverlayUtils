@@ -78,6 +78,22 @@ public static class Frost
         return new FrostImage(output, qw, qh);
     }
 
+    /// <summary>
+    /// True when every sampled pixel (every 8th, both ways) is near black: a capture of exclusive-fullscreen or
+    /// protected content, which would only show as a grey frost. Also true for an empty or inconsistent buffer.
+    /// </summary>
+    public static bool LooksBlack(byte[] bgra, int width, int height, int stride, int threshold = 6)
+    {
+        if (width <= 0 || height <= 0 || stride < width * 4 || bgra.Length < (height - 1) * stride + width * 4) return true;
+        for (int y = 0; y < height; y += 8)
+            for (int x = 0; x < width; x += 8)
+            {
+                int i = y * stride + x * 4;
+                if (bgra[i] > threshold || bgra[i + 1] > threshold || bgra[i + 2] > threshold) return false;
+            }
+        return true;
+    }
+
     static byte To8(float v) => (byte)Math.Clamp((int)(v + 0.5f), 0, 255);
 
     /// <summary>One edge-clamped box-blur pass from <paramref name="a"/> into <paramref name="dst"/>, along rows or columns.</summary>

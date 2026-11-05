@@ -12,7 +12,11 @@ using OverlayUtils.Core.Overlay;
 
 namespace OverlayUtils.App.Overlay;
 
-internal sealed record TabVm(string Title, bool IsCurrent);
+/// <summary>
+/// One page icon of the rail. <see cref="VisibleIndex"/> is the index into the navigator's visible tabs (what a
+/// click passes to ClickTab); <see cref="IsCurrent"/> is lit only while that tab's page is shown (not on Settings).
+/// </summary>
+internal sealed record RailVm(string Glyph, string Title, bool IsCurrent, int VisibleIndex);
 
 internal sealed record OptionVm(int Index, string Label, bool IsCursor, bool IsActive, bool IsPending);
 
@@ -82,11 +86,16 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     public static readonly Color FallbackAccent = Color.FromRgb(0x4C, 0xC2, 0xFF);
 
     string _clock = "";
-    string _profileName = "";
-    Brush? _profileBrush;
-    IReadOnlyList<TabVm> _tabs = [];
+    IReadOnlyList<RailVm> _railItems = [];
+    bool _settingsCurrent;
+    string _settingsTitle = "";
+    string _eyebrow = AppPaths.AppName;
     string _pageTitle = "";
     bool _isOnPage;
+    OverlayFrame _frame = OverlayLayout.Frame(1920, 1);
+    string _outputDevice = "";
+    string _outputGlyph = "";
+    string _batteryText = "";
     IReadOnlyList<RowVm> _rows = [];
     string _description = "";
     IReadOnlyList<FooterVm> _footer = [];
@@ -101,54 +110,108 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     readonly HashSet<TileVm> _withArt = [];         // tiles that hold their art now
     readonly HashSet<TileVm> _requested = [];       // tiles whose art a worker is decoding
 
-    /// <summary>Columns of the Games grid (the window's UniformGrid).</summary>
-    public const int TileColumns = 3;
-    /// <summary>Tiles kept with their art beyond the requested range (four rows on each side).</summary>
-    const int ArtKeep = 4 * TileColumns;
+    /// <summary>Rows of tiles kept with their art beyond the requested range, on each side.</summary>
+    const int ArtKeepRows = 4;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public string Title => AppPaths.AppName;
+    /// <summary>Clock of the status corner ("21:34").</summary>
     public string Clock { get => _clock; private set => Set(ref _clock, value); }
-    /// <summary>Pad battery level glyph, empty when no pad reports one.</summary>
+    /// <summary>Pad battery level glyph, empty when no pad reports one (wired).</summary>
     public string BatteryGlyph { get => _batteryGlyph; private set => Set(ref _batteryGlyph, value); }
-    public string ProfileName { get => _profileName; private set => Set(ref _profileName, value); }
-    public Brush? ProfileBrush { get => _profileBrush; private set => Set(ref _profileBrush, value); }
-    public IReadOnlyList<TabVm> Tabs { get => _tabs; private set => Set(ref _tabs, value); }
+    /// <summary>Pad battery as a percentage ("84%"), empty when SDL reports none.</summary>
+    public string BatteryText { get => _batteryText; private set => Set(ref _batteryText, value); }
+    /// <summary>Name of the default output device in the status corner, empty when there is none.</summary>
+    public string OutputDevice { get => _outputDevice; private set => Set(ref _outputDevice, value); }
+    /// <summary>Speaker or headphones glyph of <see cref="OutputDevice"/>, empty when there is none.</summary>
+    public string OutputGlyph { get => _outputGlyph; private set => Set(ref _outputGlyph, value); }
+
+    /// <summary>One icon per visible tab, in LT / RT order. The Settings gear is separate.</summary>
+    public IReadOnlyList<RailVm> RailItems { get => _railItems; private set => Set(ref _railItems, value); }
+    /// <summary>The gear is lit: Settings, Info, or a sub-page opened from them.</summary>
+    public bool SettingsCurrent { get => _settingsCurrent; private set => Set(ref _settingsCurrent, value); }
+    /// <summary>Tooltip of the gear.</summary>
+    public string SettingsTitle { get => _settingsTitle; private set => Set(ref _settingsTitle, value); }
+
+    /// <summary>Small accent line above the page title (drawn upper case). Not touched by <see cref="Refresh"/>.</summary>
+    public string Eyebrow { get => _eyebrow; set => Set(ref _eyebrow, value); }
+    /// <summary>Title of the page shown: the tab, Settings, Info or the sub-page.</summary>
     public string PageTitle { get => _pageTitle; private set => Set(ref _pageTitle, value); }
+    /// <summary>Settings, Info or a sub-page: the title gets a back chevron (click = B).</summary>
     public bool IsOnPage { get => _isOnPage; private set => Set(ref _isOnPage, value); }
+
+    /// <summary>Rail, column, gutter and cover columns of the monitor the overlay is on (DIPs); set by the controller.</summary>
+    public OverlayFrame Frame
+    {
+        get => _frame;
+        set
+        {
+            if (_frame == value) return;
+            _frame = value;
+            foreach (var name in new[] { nameof(Frame), nameof(RailWidth), nameof(ColumnWidth), nameof(ColumnPadding),
+                         nameof(StagePadding), nameof(TileColumns) })
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+    }
+    public GridLength RailWidth => new(_frame.RailWidth);
+    public GridLength ColumnWidth => new(_frame.ColumnWidth);
+    /// <summary>Inside the column: the gutter at the top and left, half of it on the right, two thirds at the bottom.</summary>
+    public Thickness ColumnPadding => new(_frame.Gutter, _frame.Gutter, _frame.Gutter / 2, _frame.Gutter * 2 / 3);
+    /// <summary>Inside the stage: status corner and context card keep the gutter from the screen edges.</summary>
+    public Thickness StagePadding => new(_frame.Gutter);
+    /// <summary>Columns of the Games grid (the frame's cover columns).</summary>
+    public int TileColumns => Math.Max(1, _frame.CoverColumns);
+    /// <summary>The page shows the Games grid: the column takes the stage too (no context card).</summary>
+    public bool IsWide => _showTiles;
     public IReadOnlyList<RowVm> Rows { get => _rows; private set => Set(ref _rows, value); }
     public string Description { get => _description; private set => Set(ref _description, value); }
     public IReadOnlyList<FooterVm> Footer { get => _footer; private set => Set(ref _footer, value); }
 
     /// <summary>The Games grid, drawn under the rows while the page has a visible Grid row.</summary>
     public IReadOnlyList<TileVm> Tiles { get => _tiles; private set => Set(ref _tiles, value); }
-    public bool ShowTiles { get => _showTiles; private set => Set(ref _showTiles, value); }
+    public bool ShowTiles
+    {
+        get => _showTiles;
+        private set
+        {
+            if (_showTiles == value) return;
+            Set(ref _showTiles, value);
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsWide)));
+        }
+    }
     /// <summary>Index of the selected tile, -1 when the grid is not selected.</summary>
     public int SelectedTile { get => _selectedTile; private set => Set(ref _selectedTile, value); }
 
     /// <summary>Selection, switches, cursor outline. Replaced when the Windows accent is known.</summary>
     public Brush AccentBrush { get => _accentBrush; set => Set(ref _accentBrush, value); }
 
-    /// <summary>Scale of the whole panel (Large size); set by the controller.</summary>
+    /// <summary>Scale of the frame's content (Large size); set by the controller.</summary>
     public double SizeFactor { get => _sizeFactor; set => Set(ref _sizeFactor, value); }
 
-    public void Refresh(OverlayNavigator nav, string clock, (byte R, byte G, byte B)? profileColor, string profileName,
-        bool pad = false, int? battery = null)
+    public void Refresh(OverlayNavigator nav, string clock, string outputDevice, bool pad = false, int? battery = null,
+        int? batteryPercent = null)
     {
         Clock = clock;
         BatteryGlyph = battery is { } level ? Glyphs.Battery[Math.Clamp(level, 0, 3)] : "";
-        ProfileName = profileName;
-        ProfileBrush = profileColor is { } c ? Frozen(Color.FromRgb(c.R, c.G, c.B)) : null;
+        BatteryText = batteryPercent is { } percent ? Loc.T("Overlay.Status.Battery", percent) : "";
+        OutputDevice = outputDevice;
+        OutputGlyph = outputDevice.Length > 0 ? OverlayContent.OutputIcon(outputDevice) : "";
 
+        var settings = nav.Page is OverlayPage.Settings or OverlayPage.Info
+            || nav.Page == OverlayPage.Sub && nav.SubOrigin != OverlayPage.Tabs;
+        SettingsCurrent = settings;
+        SettingsTitle = Loc.T("Overlay.Rail.Settings");
         var current = nav.CurrentTab.Id;
-        Tabs = nav.VisibleTabs.Select(t => new TabVm(t.Title(), t.Id == current)).ToList();
+        var rail = nav.VisibleTabs
+            .Select((t, i) => new RailVm(RailGlyph(t.Id), t.Title(), !settings && t.Id == current, i))
+            .ToList();
+        if (!rail.SequenceEqual(_railItems)) RailItems = rail; // most commands only move the selection
         PageTitle = nav.Page switch
         {
             OverlayPage.Settings => Loc.T("Overlay.Page.Settings"),
             OverlayPage.Info => Loc.T("Overlay.Page.Info"),
             OverlayPage.Sub => nav.SubTitle,
-            _ => "",
+            _ => nav.CurrentTab.Title(),
         };
         IsOnPage = nav.Page != OverlayPage.Tabs;
 
@@ -191,6 +254,16 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         Footer = nav.Footer(pad).Select(h => new FooterVm(h.Keys, h.Label, h.Command)).ToList();
     }
 
+    /// <summary>Rail icon of a tab.</summary>
+    static string RailGlyph(string tabId) => tabId switch
+    {
+        OverlayContent.HomeTabId => Glyphs.Home,
+        OverlayContent.ControlsTabId => Glyphs.Controls,
+        OverlayContent.AudioTabId => Glyphs.Volume,
+        OverlayContent.GamesTabId => Glyphs.Game,
+        _ => Glyphs.List,
+    };
+
     void RefreshTiles(OverlayNavigator nav, IReadOnlyList<OverlayItem> items)
     {
         var grid = items.FirstOrDefault(i => i.Kind == ItemKind.Grid && i.Visible());
@@ -215,11 +288,12 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     /// <summary>
     /// The tiles from <paramref name="first"/> to <paramref name="last"/> are on screen or next to it (window, UI
     /// thread). Their art is set at once when decoded already, else decoded on a worker; tiles further than
-    /// <see cref="ArtKeep"/> away drop theirs, so a big library holds only a few rows of images.
+    /// <see cref="ArtKeepRows"/> rows away drop theirs, so a big library holds only a few rows of images.
     /// </summary>
     public void ShowArt(int first, int last)
     {
-        foreach (var tile in _withArt.Where(t => t.Index < first - ArtKeep || t.Index > last + ArtKeep).ToList())
+        var keep = ArtKeepRows * TileColumns;
+        foreach (var tile in _withArt.Where(t => t.Index < first - keep || t.Index > last + keep).ToList())
         {
             tile.Cover = null;
             tile.Icon = null;

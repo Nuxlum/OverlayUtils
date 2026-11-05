@@ -1,7 +1,9 @@
 <!--
-  The overlay panel (Python _Overlay.render). 420x720 is only the design size: the controller sets the real size
-  and position, and SizeFactor scales the content. Sizes are Python's, in DIPs at 96 dpi. Nothing here is
-  focusable: the window takes every key in PreviewKeyDown and turns it into an OverlayCommand.
+  The full-screen overlay (Python _Overlay.render, redesigned): the frosted backdrop, then the frame in three
+  columns sized by OverlayViewModel.Frame: rail (page icons, gear), column (eyebrow, title, rows, footer) and stage
+  (status corner, context card). The controller sizes the window to the monitor; SizeFactor scales the content of
+  each zone. Row sizes are Python's, in DIPs at 96 dpi, slightly enlarged. Nothing here is focusable: the window
+  takes every key in PreviewKeyDown and turns it into an OverlayCommand.
 -->
 <Window x:Class="OverlayUtils.App.Overlay.OverlayWindow" x:ClassModifier="internal"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -9,7 +11,7 @@
         xmlns:local="clr-namespace:OverlayUtils.App.Overlay"
         xmlns:core="clr-namespace:OverlayUtils.Core.Overlay;assembly=OverlayUtils.Core"
         WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" ShowActivated="True"
-        Width="420" Height="720" Background="{DynamicResource Bg}"
+        Width="1280" Height="720" Background="{DynamicResource FrameBg}"
         FontFamily="{DynamicResource TextFont}" Foreground="{DynamicResource Text}"
         UseLayoutRounding="True" KeyboardNavigation.TabNavigation="None"
         KeyboardNavigation.DirectionalNavigation="None" KeyboardNavigation.ControlTabNavigation="None"
@@ -23,6 +25,9 @@
                 <ResourceDictionary Source="OverlayTheme.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
+            <local:UpperCaseConverter x:Key="Upper" />
+            <local:ScaleConverter x:Key="Scale" />
+
             <!-- Shown only on the selected row (tint, accent bar). -->
             <Style x:Key="SelectedOnly" TargetType="FrameworkElement">
                 <Setter Property="Visibility" Value="Collapsed" />
@@ -35,10 +40,11 @@
             <Style x:Key="Tint" TargetType="Border" BasedOn="{StaticResource SelectedOnly}">
                 <Setter Property="Background" Value="{DynamicResource Accent}" />
                 <Setter Property="Opacity" Value="{StaticResource TintOpacity}" />
+                <Setter Property="OpacityMask" Value="{StaticResource TintFade}" />
             </Style>
             <Style x:Key="AccentBar" TargetType="Rectangle" BasedOn="{StaticResource SelectedOnly}">
                 <Setter Property="Width" Value="3" />
-                <Setter Property="Height" Value="16" />
+                <Setter Property="Height" Value="22" />
                 <Setter Property="RadiusX" Value="1.5" />
                 <Setter Property="RadiusY" Value="1.5" />
                 <Setter Property="HorizontalAlignment" Value="Left" />
@@ -98,8 +104,8 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="ContentControl">
                             <StackPanel>
-                                <TextBlock Text="{Binding Section}" Margin="12,8,0,0" Height="20" FontSize="11"
-                                           FontWeight="SemiBold" Foreground="{StaticResource Muted}">
+                                <TextBlock Text="{Binding Section}" Margin="12,14,0,2" Height="20" FontSize="11"
+                                           FontWeight="SemiBold" Foreground="{StaticResource Subtle}">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Style.Triggers>
@@ -110,10 +116,10 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                                <Grid Height="40" Margin="0,0,0,2" Background="Transparent" Cursor="Hand"
-                                      MouseLeftButtonDown="OnRowMouseDown">
-                                    <Border Style="{StaticResource HoverTint}" CornerRadius="6" />
-                                    <Border Style="{StaticResource Tint}" CornerRadius="6" />
+                                <Grid Height="{StaticResource RowHeight}" Margin="0,0,0,2" Background="Transparent"
+                                      Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
+                                    <Border Style="{StaticResource HoverTint}" CornerRadius="8" />
+                                    <Border Style="{StaticResource Tint}" CornerRadius="8" />
                                     <Rectangle Style="{StaticResource AccentBar}" />
                                     <Grid x:Name="RowContent">
                                         <Grid.ColumnDefinitions>
@@ -122,8 +128,9 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock x:Name="RowGlyph" Style="{StaticResource RowIcon}" Text="{Binding Icon}"
-                                                   FontSize="16" Margin="2,0,0,0" />
-                                        <TextBlock x:Name="RowLabel" Grid.Column="1" Text="{Binding Label}" FontSize="14"
+                                                   FontSize="{StaticResource RowGlyphSize}" Margin="2,0,0,0" />
+                                        <TextBlock x:Name="RowLabel" Grid.Column="1" Text="{Binding Label}"
+                                                   FontSize="{StaticResource RowLabelSize}"
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                    Margin="0,0,10,0" />
                                         <ContentPresenter Grid.Column="2" Margin="0,0,10,0" VerticalAlignment="Center" />
@@ -133,8 +140,8 @@
                             <ControlTemplate.Triggers>
                                 <DataTrigger Binding="{Binding Child}" Value="True">
                                     <Setter TargetName="RowContent" Property="Margin" Value="24,0,0,0" />
-                                    <Setter TargetName="RowGlyph" Property="FontSize" Value="14" />
-                                    <Setter TargetName="RowLabel" Property="FontSize" Value="13" />
+                                    <Setter TargetName="RowGlyph" Property="FontSize" Value="15" />
+                                    <Setter TargetName="RowLabel" Property="FontSize" Value="14" />
                                     <Setter TargetName="RowLabel" Property="Foreground" Value="{StaticResource Muted}" />
                                 </DataTrigger>
                                 <MultiDataTrigger>
@@ -277,8 +284,9 @@
 
             <!-- Info page panel header (Python _render_info): a card with a chevron that turns down when open. -->
             <DataTemplate x:Key="ExpanderRow">
-                <Grid Height="38" Margin="0,6,0,0" Background="Transparent" Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
-                    <Border CornerRadius="8" Background="{StaticResource Surface}" />
+                <Grid Height="40" Margin="0,6,0,0" Background="Transparent" Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
+                    <Border CornerRadius="8" Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardLine}"
+                            BorderThickness="1" />
                     <Border Style="{StaticResource HoverTint}" CornerRadius="8" />
                     <Border Style="{StaticResource Tint}" CornerRadius="8" />
                     <Rectangle Style="{StaticResource AccentBar}" />
@@ -366,8 +374,8 @@
             -->
             <DataTemplate x:Key="MediaRow">
                 <StackPanel>
-                    <TextBlock Text="{Binding Section}" Margin="12,8,0,0" Height="20" FontSize="11"
-                               FontWeight="SemiBold" Foreground="{StaticResource Muted}">
+                    <TextBlock Text="{Binding Section}" Margin="12,14,0,2" Height="20" FontSize="11"
+                               FontWeight="SemiBold" Foreground="{StaticResource Subtle}">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>
@@ -379,9 +387,10 @@
                         </TextBlock.Style>
                     </TextBlock>
                     <Grid Height="64" Margin="2,2,2,4" Background="Transparent" Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
-                        <Border x:Name="Outline" CornerRadius="10" Margin="-2" BorderThickness="2"
+                        <Border x:Name="Outline" CornerRadius="12" Margin="-2" BorderThickness="2"
                                 BorderBrush="Transparent" />
-                        <Border CornerRadius="8" Background="{StaticResource Surface}" />
+                        <Border CornerRadius="10" Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardLine}"
+                                BorderThickness="1" />
                         <Grid Margin="12,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="40" />
@@ -486,14 +495,16 @@
 
             <!-- One game: cover (or icon, or a placeholder glyph), source badge, title below; accent outline when selected. -->
             <DataTemplate x:Key="GameTile">
-                <Grid x:Name="Tile" Margin="4,4,4,8" Background="Transparent" Cursor="Hand"
+                <Grid x:Name="Tile" Margin="6,6,6,10" Background="Transparent" Cursor="Hand"
                       MouseLeftButtonDown="OnTileMouseDown">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="168" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
+                    <!-- Covers are 2:3: the cover row takes its height from the cell width. -->
+                    <Border Height="{Binding ActualWidth, ElementName=Tile, Converter={StaticResource Scale}, ConverterParameter=1.5}" />
                     <Border x:Name="Outline" CornerRadius="11" Margin="-3" BorderThickness="2" BorderBrush="Transparent" />
-                    <Border CornerRadius="8" Background="{StaticResource Surface}" />
+                    <Border CornerRadius="8" Background="{StaticResource CardBg}" />
                     <TextBlock x:Name="Placeholder" Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Game}"
                                FontSize="30" Foreground="{StaticResource Subtle}" />
                     <Image Source="{Binding Icon}" Width="56" Height="56" RenderOptions.BitmapScalingMode="HighQuality" />
@@ -504,7 +515,7 @@
                     </Border>
                     <Border x:Name="HoverShade" CornerRadius="8" Background="{StaticResource Hover}" Visibility="Collapsed" />
                     <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6" Padding="5,1" CornerRadius="4"
-                            Background="{StaticResource Bg}" Opacity="0.85">
+                            Background="{StaticResource FrameBg}" Opacity="0.85">
                         <TextBlock Text="{Binding Badge}" FontSize="10" FontWeight="SemiBold" />
                     </Border>
                     <TextBlock x:Name="TileTitle" Grid.Row="1" Text="{Binding Title}" Margin="2,6,2,0" FontSize="12"
@@ -540,218 +551,314 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <!-- Panel: its background is Bg, or AcrylicBg over the backdrop; it slides and fades in on open. -->
-    <Border x:Name="Panel" Background="{DynamicResource PanelBg}">
-        <Border.RenderTransform>
-            <TranslateTransform x:Name="Slide" />
-        </Border.RenderTransform>
-        <DockPanel>
-            <DockPanel.LayoutTransform>
-                <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
-            </DockPanel.LayoutTransform>
+    <Grid>
+        <!-- Bottom layer: the frosted screenshot. A click on it (outside rail, column and stage cards) closes. -->
+        <local:FrostedBackdrop x:Name="Backdrop" MouseLeftButtonDown="OnBackdropMouseDown" />
 
-            <!-- Header (Python _render_header): app name, then gear, monitor profile and clock from the right. -->
-            <StackPanel DockPanel.Dock="Top">
-                <Grid Height="28" Margin="20,14,18,10">
-                    <TextBlock Text="{Binding Title}" FontFamily="{StaticResource DisplayFont}" FontSize="20"
-                               FontWeight="SemiBold" VerticalAlignment="Center" />
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Border Width="24" Height="24" CornerRadius="12" VerticalAlignment="Center" Cursor="Hand"
-                                MouseLeftButtonDown="OnGearMouseDown">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Background" Value="Transparent" />
-                                    <Style.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Background" Value="{StaticResource Hover}" />
-                                        </Trigger>
-                                        <DataTrigger Binding="{Binding IsOnPage}" Value="True">
-                                            <Setter Property="Background" Value="{StaticResource Surface}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                            <TextBlock Text="{x:Static core:Glyphs.Settings}" FontSize="15">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
-                                        <Setter Property="Foreground" Value="{StaticResource Muted}" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsOnPage}" Value="True">
-                                                <Setter Property="Foreground" Value="{DynamicResource Accent}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </Border>
-                        <Border Height="24" CornerRadius="12" Margin="8,0,0,0" Padding="10,0,7,0"
-                                VerticalAlignment="Center" Background="{StaticResource Surface}">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ProfileName}" Value="">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                            <StackPanel Orientation="Horizontal">
-                                <Ellipse Width="8" Height="8" Fill="{Binding ProfileBrush}" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding ProfileName}" Margin="5,0,0,0" MaxWidth="110" FontSize="12"
-                                           FontWeight="SemiBold" VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
-                        </Border>
-                        <TextBlock Text="{Binding BatteryGlyph}" Margin="10,0,0,0" FontSize="14"
-                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding Clock}" Margin="10,0,0,0" FontSize="14" FontWeight="SemiBold"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
-                </Grid>
+        <!-- The frame: it slides and fades in on open (the backdrop does not move). No background of its own, so
+             the stage's empty space is the backdrop's. -->
+        <Grid x:Name="FrameRoot">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="Slide" />
+            </Grid.RenderTransform>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="{Binding RailWidth}" />
+                <ColumnDefinition Width="{Binding ColumnWidth}" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-                <!-- Tab strip, or on Settings/Info the page title with the back chevron. -->
-                <Grid Height="34">
-                    <ItemsControl ItemsSource="{Binding Tabs}" Focusable="False" Margin="18,0,0,0">
-                        <ItemsControl.Style>
-                            <Style TargetType="ItemsControl">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsOnPage}" Value="True">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </ItemsControl.Style>
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
+            <!-- Rail: one icon per visible tab (LT / RT order), centred; the Settings gear at the bottom. -->
+            <Border x:Name="Rail" Background="Transparent" BorderBrush="{StaticResource RailLine}" BorderThickness="0,0,1,0">
+                <Grid>
+                    <Grid.LayoutTransform>
+                        <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
+                    </Grid.LayoutTransform>
+                    <ItemsControl ItemsSource="{Binding RailItems}" Focusable="False" VerticalAlignment="Center"
+                                  HorizontalAlignment="Center">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Grid x:Name="Tab" Margin="0,0,18,0" Background="Transparent" Cursor="Hand"
-                                      MouseLeftButtonDown="OnTabMouseDown">
-                                    <TextBlock x:Name="TabText" Text="{Binding Title}" Height="28" Padding="0,5,0,0"
-                                               FontSize="14" FontWeight="SemiBold" VerticalAlignment="Top"
-                                               Foreground="{StaticResource Subtle}" />
-                                    <Rectangle x:Name="Underline" Height="3" RadiusX="1.5" RadiusY="1.5"
-                                               Margin="0,26,0,0" VerticalAlignment="Top" Visibility="Collapsed"
-                                               Fill="{DynamicResource Accent}" />
+                                <Grid x:Name="RailButton" Width="{StaticResource RailButtonSize}"
+                                      Height="{StaticResource RailButtonSize}" Margin="0,7" Background="Transparent"
+                                      Cursor="Hand" ToolTip="{Binding Title}" MouseLeftButtonDown="OnRailMouseDown">
+                                    <Border x:Name="HoverBg" CornerRadius="14" Background="{StaticResource Hover}"
+                                            Visibility="Collapsed" />
+                                    <Border x:Name="Lit" CornerRadius="14" Background="{DynamicResource Accent}"
+                                            Opacity="{StaticResource TintOpacity}" Visibility="Collapsed" />
+                                    <Rectangle x:Name="Bar" Width="3" Height="24" RadiusX="1.5" RadiusY="1.5"
+                                               HorizontalAlignment="Left" Fill="{DynamicResource Accent}"
+                                               Visibility="Collapsed" />
+                                    <TextBlock x:Name="RailGlyph" Style="{StaticResource Icon}" Text="{Binding Glyph}"
+                                               FontSize="{StaticResource RailGlyphSize}" Opacity="0.5" />
                                 </Grid>
                                 <DataTemplate.Triggers>
-                                    <Trigger SourceName="Tab" Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource Muted}" />
+                                    <Trigger SourceName="RailButton" Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="HoverBg" Property="Visibility" Value="Visible" />
+                                        <Setter TargetName="RailGlyph" Property="Opacity" Value="0.85" />
                                     </Trigger>
                                     <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                                        <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource Text}" />
-                                        <Setter TargetName="Underline" Property="Visibility" Value="Visible" />
+                                        <Setter TargetName="Lit" Property="Visibility" Value="Visible" />
+                                        <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+                                        <Setter TargetName="RailGlyph" Property="Opacity" Value="1" />
                                     </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <Grid Margin="14,0" Background="Transparent" Cursor="Hand" MouseLeftButtonDown="OnBackMouseDown">
-                        <Grid.Style>
-                            <Style TargetType="Grid">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsOnPage}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
-                        <StackPanel Orientation="Horizontal" Height="28" VerticalAlignment="Top">
-                            <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.ChevronLeft}"
-                                       FontSize="11" Width="20" Foreground="{StaticResource Muted}" />
-                            <TextBlock Text="{Binding PageTitle}" Margin="4,0,0,0" FontSize="15" FontWeight="SemiBold"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
+                    <Grid x:Name="Gear" Width="{StaticResource RailButtonSize}" Height="{StaticResource RailButtonSize}"
+                          Margin="0,0,0,28" VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                          Background="Transparent" Cursor="Hand" ToolTip="{Binding SettingsTitle}"
+                          MouseLeftButtonDown="OnGearMouseDown">
+                        <Border x:Name="GearHover" CornerRadius="14" Background="{StaticResource Hover}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMouseOver, ElementName=Gear}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                        </Border>
+                        <Border CornerRadius="14" Background="{DynamicResource Accent}" Opacity="{StaticResource TintOpacity}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SettingsCurrent}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                        </Border>
+                        <Rectangle Width="3" Height="24" RadiusX="1.5" RadiusY="1.5" HorizontalAlignment="Left"
+                                   Fill="{DynamicResource Accent}">
+                            <Rectangle.Style>
+                                <Style TargetType="Rectangle">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SettingsCurrent}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Rectangle.Style>
+                        </Rectangle>
+                        <TextBlock Text="{x:Static core:Glyphs.Settings}" FontSize="{StaticResource RailGlyphSize}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                                    <Setter Property="Opacity" Value="0.5" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMouseOver, ElementName=Gear}" Value="True">
+                                            <Setter Property="Opacity" Value="0.85" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding SettingsCurrent}" Value="True">
+                                            <Setter Property="Opacity" Value="1" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </Grid>
                 </Grid>
-                <Rectangle Style="{StaticResource Separator}" Margin="14,0,14,4" />
-            </StackPanel>
+            </Border>
 
             <!--
-              Footer (Python _render_footer), pinned to the bottom on every tab and page. The Viewbox only shrinks it
-              when a language's labels are wider than the panel.
+              Column: eyebrow, page title, rows, footer at the bottom. On the Games grid it takes the stage too
+              (the covers need the width). Transparent, so a click in it never reaches the backdrop.
             -->
-            <Viewbox DockPanel.Dock="Bottom" Height="20" Margin="20,0,14,14" HorizontalAlignment="Left"
-                     Stretch="Uniform" StretchDirection="DownOnly">
-                <ItemsControl ItemsSource="{Binding Footer}" Focusable="False">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel x:Name="Hint" Orientation="Horizontal" Height="20" Margin="0,0,12,0"
-                                        Background="Transparent" MouseLeftButtonDown="OnFooterMouseDown">
-                                <Border Style="{StaticResource Keycap}" Padding="5,0">
-                                    <TextBlock Style="{StaticResource KeycapText}" Text="{Binding Keys}" />
-                                </Border>
-                                <TextBlock x:Name="HintLabel" Text="{Binding Label}" Margin="5,0,0,0" FontSize="12"
-                                           VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
-                            </StackPanel>
-                            <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding IsClickable}" Value="True">
-                                    <Setter TargetName="Hint" Property="Cursor" Value="Hand" />
-                                </DataTrigger>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsClickable}" Value="True" />
-                                        <Condition Binding="{Binding IsMouseOver, ElementName=Hint}" Value="True" />
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter TargetName="HintLabel" Property="Foreground" Value="{StaticResource Text}" />
-                                </MultiDataTrigger>
-                            </DataTemplate.Triggers>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </Viewbox>
-
-            <!-- Description of the selected row (Python _render_description): two lines, hidden when empty. -->
-            <StackPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
-                <StackPanel.Style>
-                    <Style TargetType="StackPanel">
+            <Border x:Name="Column" Grid.Column="1" Background="Transparent" Padding="{Binding ColumnPadding}">
+                <Border.Style>
+                    <Style TargetType="Border">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding Description}" Value="">
-                                <Setter Property="Visibility" Value="Collapsed" />
+                            <DataTrigger Binding="{Binding IsWide}" Value="True">
+                                <Setter Property="Grid.ColumnSpan" Value="2" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
-                </StackPanel.Style>
-                <Rectangle Style="{StaticResource Separator}" />
-                <TextBlock Text="{Binding Description}" Margin="20,9,20,2" Height="34" FontSize="12" LineHeight="17"
-                           LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
-                           Foreground="{StaticResource Muted}" />
-            </StackPanel>
+                </Border.Style>
+                <DockPanel>
+                    <DockPanel.LayoutTransform>
+                        <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
+                    </DockPanel.LayoutTransform>
 
-            <ScrollViewer x:Name="Scroller" Focusable="False" VerticalScrollBarVisibility="Hidden"
-                          HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Margin="14,0,14,8">
-                    <ItemsControl x:Name="RowList" ItemsSource="{Binding Rows}" Focusable="False"
-                                  ItemTemplateSelector="{StaticResource RowTemplates}" />
-                    <ItemsControl x:Name="TileList" ItemsSource="{Binding Tiles}" Focusable="False"
-                                  ItemTemplate="{StaticResource GameTile}">
-                        <ItemsControl.Style>
-                            <Style TargetType="ItemsControl">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ShowTiles}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </ItemsControl.Style>
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <UniformGrid Columns="3" VerticalAlignment="Top" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                    </ItemsControl>
-                </StackPanel>
-            </ScrollViewer>
-        </DockPanel>
-    </Border>
+                    <StackPanel DockPanel.Dock="Top" Margin="12,0,0,10">
+                        <TextBlock Text="{Binding Eyebrow, Converter={StaticResource Upper}}" FontSize="{StaticResource EyebrowSize}"
+                                   FontWeight="SemiBold" Foreground="{DynamicResource Accent}" TextTrimming="CharacterEllipsis" />
+                        <!-- On Settings, Info and sub-pages a back chevron precedes the title; a click on it is B. -->
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <Border Style="{StaticResource HoverButton}" Width="32" Height="32" Margin="-8,0,4,0"
+                                    VerticalAlignment="Center" MouseLeftButtonDown="OnBackMouseDown">
+                                <Border.Visibility>
+                                    <Binding Path="IsOnPage">
+                                        <Binding.Converter>
+                                            <BooleanToVisibilityConverter />
+                                        </Binding.Converter>
+                                    </Binding>
+                                </Border.Visibility>
+                                <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.ChevronLeft}"
+                                           FontSize="16" Foreground="{StaticResource Muted}" />
+                            </Border>
+                            <TextBlock Text="{Binding PageTitle}" FontFamily="{StaticResource DisplayFont}"
+                                       FontSize="{StaticResource PageTitleSize}" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!--
+                      Footer (Python _render_footer), pinned to the bottom on every page. The Viewbox only shrinks it
+                      when a language's labels are wider than the column.
+                    -->
+                    <Viewbox DockPanel.Dock="Bottom" Height="22" Margin="12,12,0,0" HorizontalAlignment="Left"
+                             Stretch="Uniform" StretchDirection="DownOnly">
+                        <ItemsControl ItemsSource="{Binding Footer}" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel x:Name="Hint" Orientation="Horizontal" Height="22" Margin="0,0,16,0"
+                                                Background="Transparent" MouseLeftButtonDown="OnFooterMouseDown">
+                                        <Border Style="{StaticResource Keycap}" Padding="5,0">
+                                            <TextBlock Style="{StaticResource KeycapText}" Text="{Binding Keys}" />
+                                        </Border>
+                                        <TextBlock x:Name="HintLabel" Text="{Binding Label}" Margin="6,0,0,0" FontSize="12.5"
+                                                   VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
+                                    </StackPanel>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding IsClickable}" Value="True">
+                                            <Setter TargetName="Hint" Property="Cursor" Value="Hand" />
+                                        </DataTrigger>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsClickable}" Value="True" />
+                                                <Condition Binding="{Binding IsMouseOver, ElementName=Hint}" Value="True" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter TargetName="HintLabel" Property="Foreground" Value="{StaticResource Text}" />
+                                        </MultiDataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Viewbox>
+
+                    <ScrollViewer x:Name="Scroller" Focusable="False" VerticalScrollBarVisibility="Hidden"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="0,0,0,8">
+                            <ItemsControl x:Name="RowList" ItemsSource="{Binding Rows}" Focusable="False"
+                                          ItemTemplateSelector="{StaticResource RowTemplates}" />
+                            <ItemsControl x:Name="TileList" ItemsSource="{Binding Tiles}" Focusable="False"
+                                          ItemTemplate="{StaticResource GameTile}">
+                                <ItemsControl.Style>
+                                    <Style TargetType="ItemsControl">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowTiles}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ItemsControl.Style>
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="{Binding TileColumns}"
+                                                     VerticalAlignment="Top" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <!-- Stage: status corner at the top right, context card at the bottom. Only the cards take the mouse. -->
+            <Grid x:Name="Stage" Grid.Column="2" Margin="{Binding StagePadding}">
+                <Border x:Name="StatusCorner" Style="{StaticResource GlassCard}" Padding="18,6,18,8"
+                        HorizontalAlignment="Right" VerticalAlignment="Top">
+                    <Border.LayoutTransform>
+                        <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
+                    </Border.LayoutTransform>
+                    <StackPanel Orientation="Horizontal">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,18,0" VerticalAlignment="Center">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding OutputDevice}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Style="{StaticResource Icon}" Text="{Binding OutputGlyph}"
+                                       FontSize="{StaticResource StatusSize}" Foreground="{StaticResource Muted}" />
+                            <TextBlock Text="{Binding OutputDevice}" Margin="8,0,0,0" MaxWidth="240"
+                                       FontSize="{StaticResource StatusSize}" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,18,0" VerticalAlignment="Center">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding BatteryGlyph}" Value="" />
+                                                <Condition Binding="{Binding BatteryText}" Value="" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Style="{StaticResource Icon}" Text="{Binding BatteryGlyph}"
+                                       FontSize="{StaticResource StatusSize}" Foreground="{StaticResource Muted}" />
+                            <TextBlock Text="{Binding BatteryText}" Margin="6,0,0,0" FontSize="{StaticResource StatusSize}"
+                                       VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding BatteryText}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                        <TextBlock Text="{Binding Clock}" FontFamily="{StaticResource DisplayFont}"
+                                   FontSize="{StaticResource ClockSize}" FontWeight="Light" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+
+                <!--
+                  Context of the selected row. For now the default card: the row's description. Hidden on the
+                  Games grid (the column takes the stage) and when there is nothing to say.
+                -->
+                <ContentControl x:Name="ContextHost" Focusable="False" HorizontalAlignment="Left"
+                                VerticalAlignment="Bottom">
+                    <ContentControl.Style>
+                        <Style TargetType="ContentControl">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Description}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsWide}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ContentControl.Style>
+                    <Border Style="{StaticResource GlassCard}" MaxWidth="460" Padding="20,16">
+                        <Border.LayoutTransform>
+                            <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
+                        </Border.LayoutTransform>
+                        <TextBlock Text="{Binding Description}" FontSize="{StaticResource ContextSize}" LineHeight="21"
+                                   TextWrapping="Wrap" Foreground="{StaticResource Muted}" />
+                    </Border>
+                </ContentControl>
+            </Grid>
+        </Grid>
+    </Grid>
 </Window>

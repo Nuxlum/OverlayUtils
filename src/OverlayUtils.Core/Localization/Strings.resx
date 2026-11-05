@@ -197,6 +197,7 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Overlay.Power.Restart" xml:space="preserve"><value>Restart</value></data>
   <data name="Overlay.Power.ShutDown" xml:space="preserve"><value>Shut down</value></data>
   <data name="Overlay.Power.Sleep" xml:space="preserve"><value>Sleep</value></data>
+  <data name="Overlay.Rail.Settings" xml:space="preserve"><value>Settings</value></data>
   <data name="Overlay.Section.Audio" xml:space="preserve"><value>Audio</value></data>
   <data name="Overlay.Section.Channels" xml:space="preserve"><value>Channels</value></data>
   <data name="Overlay.Section.Devices" xml:space="preserve"><value>Devices</value></data>
@@ -223,6 +224,7 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Overlay.Section.Windows" xml:space="preserve"><value>Windows</value></data>
   <data name="Overlay.ShowDesktop.Desc" xml:space="preserve"><value>Minimises all windows (Win+D).</value></data>
   <data name="Overlay.ShowDesktop.Label" xml:space="preserve"><value>Show desktop</value></data>
+  <data name="Overlay.Status.Battery" xml:space="preserve"><value>{0}%</value></data>
   <data name="Overlay.Tab.Audio" xml:space="preserve"><value>Audio</value></data>
   <data name="Overlay.Tab.Controls" xml:space="preserve"><value>Controls</value></data>
   <data name="Overlay.Tab.Home" xml:space="preserve"><value>Home</value></data>

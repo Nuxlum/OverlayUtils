@@ -911,6 +911,7 @@ string RepoRoot()
     Check(nav.Selected == sub, "SubRow selected in Settings");
     Check(nav.Handle(OverlayCommand.A).Effect == NavEffect.Redraw && nav.Page == OverlayPage.Sub, "A opens the sub-page");
     Check(nav.SubTitle == "SubRow" && nav.Items.Count == 3, "sub-page title and items");
+    Check(nav.SubOrigin == OverlayPage.Settings, "sub-page remembers it was opened from Settings");
     nav.Handle(OverlayCommand.B);
     Check(nav.Page == OverlayPage.Settings && nav.Selected == sub, "B returns to Settings at the same row");
 
@@ -2445,6 +2446,14 @@ string RepoRoot()
     var muted = Frost.Process(Img(4, 4, (_, _) => (150, 120, 120)), 4, 4, 16, flat with { Saturation = 1.3 });
     Check(muted != null && muted.Bgr32[2] - muted.Bgr32[1] > 30, "saturation boosts a muted colour");
     Check(Frost.Process(Img(3, 3, (_, _) => (1, 2, 3)), 3, 3, 12, def) is null, "3x3 is too small");
+
+    // Black capture (exclusive fullscreen, protected content): the plain background stays.
+    Check(Frost.LooksBlack(Img(64, 64, (_, _) => (0, 0, 0)), 64, 64, 256), "an all-black capture looks black");
+    Check(Frost.LooksBlack(Img(64, 64, (_, _) => (3, 2, 4)), 64, 64, 256), "near-black noise looks black");
+    Check(!Frost.LooksBlack(Img(64, 64, (x, y) => x == 32 && y == 32 ? ((byte)200, (byte)200, (byte)200) : ((byte)0, (byte)0, (byte)0)), 64, 64, 256),
+        "one bright sampled pixel is not black");
+    Check(!Frost.LooksBlack(Img(64, 64, (_, _) => (20, 22, 30)), 64, 64, 256), "a dark scene is not black");
+    Check(Frost.LooksBlack([], 0, 0, 0), "an empty capture looks black");
 
     // Settings rows.
     var store = new ConfigStore(Path.Combine(temp, "frostrows", "config.json"));
