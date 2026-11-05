@@ -190,6 +190,31 @@ The stage checklist lives in `PORTING.md`.
   selection only flips `IsSelected` and art decoded on a worker arrives
   without rebuilding the grid.
 
+- 2026-11-04 - **Overlay redesign: full-screen "Focus" layout** (rail,
+  column, stage) replaces the 420x720 side panel; spec in
+  `docs/superpowers/specs/`. The overlay side setting is removed (the rail is
+  always on the left); an old `overlay_side` is kept in `Extra`.
+- 2026-11-05 - **Home page** of shortcut tiles, each the same item as its row.
+  LT / RT unchanged (switch pages), LB / RB stay previous / next track; the
+  Settings gear is outside the LT / RT cycle.
+- 2026-11-04 - **DWM acrylic rejected after a spike** (far too blurry, grey
+  wash, flicker on show). Instead a **frosted screenshot**: GDI capture kept
+  in memory only, never saved; 1/4 downscale, box blur, saturation 1.3, frost
+  0.07, grain 0.05, dark gradient (owner-picked values). Measured capture
+  ~25 ms, processing ~20 ms at 2560x1440.
+- 2026-11-05 - **Appearance sliders** Blur / Frost / Darkness (`overlay_blur`,
+  `overlay_frost`, `overlay_dim`), preview live.
+- 2026-11-05 - **Monitor-profile pill removed from the header**; the active
+  profile still shows on the Screen row / tile. If missed, re-add a small chip
+  to the status corner.
+- 2026-11-05 - **Current game** in the Home eyebrow: foreground exe matched
+  to library install folders (`GameEntry.InstallDir`), session play time;
+  other pages keep the app name. Pad battery shown as a percent.
+- 2026-11-05 - **Motion deviations, pending owner sign-off:** selection
+  highlight drawn behind the list (no text tint); close fades the frame but
+  not the backdrop (the window is opaque); page change is 90 ms out then
+  140 ms in (switch to overlapped cross-slide if LT / RT feels slow).
+
 ## Open questions
 
 - Signing: stay self-signed, or get a CA-issued certificate (Azure Artifact
@@ -199,6 +224,11 @@ The stage checklist lives in `PORTING.md`.
   now that the app is no longer elevated? (Test in stage 1.)
 - SteelSeries GG shortcuts use Italian-layout scan codes (`SCAN_*` in Python):
   make them configurable when porting stage 4?
+
+- Overlay redesign: owner checkpoint on the TV and at the desk (see PORTING,
+  "Testing on Windows (overlay redesign)"), including the motion deviations.
+- Exclusive-fullscreen games may capture black; the overlay then falls back to
+  the plain dark background. Check what actually happens.
 
 ## Backlog
 
@@ -221,6 +251,10 @@ The stage checklist lives in `PORTING.md`.
 
 ## Session log
 
+- 2026-11-05 - Overlay redesign written in 13 tasks (full-screen Focus layout,
+  Home, stage context, Games page, frosted backdrop and Appearance sliders,
+  current game, motion), docs. Builds with 0 warnings, self-test 1375/1375;
+  owner test list in PORTING still to do.
 - 2026-11-04 - Stage 7 dropped (Discord, see Decisions); migration skips
   Discord files, config drops `spotify_*` / `discord_*` keys. Self-test
   1263/1263.

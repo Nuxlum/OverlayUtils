@@ -100,6 +100,39 @@ on the dev PC. No game has been launched from the overlay yet.
 - [ ] Delete `reference/python/`
 - [ ] Consider a CA-issued signing certificate (removes the "trust this certificate" step)
 
+## Overlay redesign  `[~]`
+
+Spec: `docs/superpowers/specs/2026-11-04-overlay-redesign-design.md`.
+
+- [x] Full-screen Focus frame: rail, column, stage; side setting removed
+- [x] Home page of shortcut tiles (same items as their rows)
+- [x] Stage context: description card, monitor picture, mixer, album art
+- [x] Games page: hero, source pills, cover shelf with lift, art tint
+- [x] Frosted screenshot backdrop; Appearance sliders Blur / Frost / Darkness
+- [x] Status corner with pad battery percent; current game in Home's eyebrow
+- [x] Motion (gliding highlight, open / close, page change)
+- [ ] Owner test list below (TV and desk)
+
+## Testing on Windows (overlay redesign)
+
+On the TV and at the desk:
+1. Open and close feel: no lag, the pad never waits for an animation.
+2. Each page (Home, Controls, Audio, Games, Settings, Info): layout, stage
+   context, tiles behave like their rows. LT / RT feel instant.
+3. Games: the cover lifts and the backdrop tints on selection; source pills
+   and X cycle the filter.
+4. Appearance sliders (Settings) preview live on the backdrop.
+5. A click on the backdrop closes the overlay (on mouse-up); a click on the
+   gaps between the filter pills does not.
+6. Windows Animation effects off: things just appear. Transparency effects
+   off: no change (the backdrop is our own image).
+7. A borderless game behind: frosted game image. An exclusive-fullscreen game:
+   it may capture black and fall back to dark; note what happens.
+8. Current game in Home's eyebrow for a Steam game, an Epic game and a manual
+   app; nothing for the desktop or a launcher.
+9. Battery as a percent on a wireless pad, nothing on a wired one.
+10. Switch monitor from the Screen tile while the overlay is open.
+
 ## Testing on Windows (stage 1)
 
 1. `scripts\certificate.ps1` once (no admin), then `scripts\build.ps1`.

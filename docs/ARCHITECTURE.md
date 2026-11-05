@@ -128,29 +128,74 @@ The tray icon decides open or close on the mouse press: the press makes the
 taskbar foreground and the focus watcher hides the overlay before the release,
 so a toggle on the release would open it again.
 
-### Placement and size
+### Frame (full screen)
 
-The window opens on the monitor of the foreground window (`DisplayArea`, cursor
-as fallback), at the chosen side of its work area. `OverlayLayout.SizeFactor`
-maps `overlay_size` (Auto looks at the active monitor profile) to a factor;
-`Place` returns the physical rectangle clamped to the work area. The content
-scales by the factor and scrolls when clamped. The XAML size is only the
-initial one. The window is per-monitor DPI aware and follows `WM_DPICHANGED`.
-When a setting changes while it is open (size, side, monitor profile) the
-controller recomputes the factor and placement on the monitor the panel is on
-and moves it.
+The window covers the whole monitor (monitor bounds, taskbar included) and is
+opaque, not layered. Three zones: the **rail** on the left (one icon per page,
+Settings as a gear at the bottom, outside the LT / RT page cycle), the
+**column** (eyebrow, page title, rows, footer hints) and the **stage** on the
+right (status corner: output device, pad battery as a percent, clock; and the
+context card). `OverlayLayout.SizeFactor` maps `overlay_size` (Auto looks at
+the active monitor profile) to a factor; `Place` returns the monitor rectangle
+and the column width scales with the factor. Per-monitor DPI aware, follows
+`WM_DPICHANGED`. The window opens on the monitor of the foreground window
+(`DisplayArea`, cursor as fallback). When a setting changes while it is open
+(size, Appearance sliders, monitor profile) the controller recomputes layout
+and, for the sliders, re-processes the backdrop. The old left / right side
+setting is gone; an old `overlay_side` just lands in `Extra`.
+
+`OverlayNavigator` still owns selection and commands. **Home** is a tab whose
+rows are the same `OverlayItem`s as the Controls / Audio rows they mirror
+(Volume, Now playing, Microphone, Screen, Close window, Steam Big Picture),
+drawn as tiles in a 2-column grid with wide tiles; an item that is not visible
+is left out. **Stage context** per selected row: the description card by
+default, the Desk / TV monitor picture, the audio mixer bars, large album art.
+The **Games page** uses column and stage together: hero, source filter pills
+(X cycles), cover shelf with lift on the selected cover, and a backdrop tint
+from the selected art's dominant colour (taken when the cover is decoded).
+
+### Frosted backdrop
+
+On open the monitor is captured once (GDI `BitBlt`, in memory only, never
+saved) on a worker. The window shows at once with opaque #080A10 and the UI;
+`Frost` (Core, from `overlay_blur` / `overlay_frost` / `overlay_dim`) is
+processed off the UI thread (1/4 downscale, 3-pass box blur, saturation 1.3,
+brightness x1.08) and the image fades in over 150 ms when ready (measured at
+2560x1440: capture ~25 ms, processing ~20 ms). Layers on top: white frost,
+static grain, dark gradient. The UI thread only receives the finished bitmap.
+Capture failed or black (exclusive fullscreen, protected content) keeps the
+plain dark background. The Appearance sliders preview live. A click on the
+backdrop (not on the rail, column, stage cards or pill gaps) closes the
+overlay on mouse-up.
+
+### Current game
+
+On open, in `Task.Run`, the foreground window's exe path
+(`QueryFullProcessImageName`, limited rights, read-only: no injection, no
+hooks) is matched against the install folders of the games library
+(`CurrentGame`; longest folder wins, case-insensitive). `GameEntry.InstallDir`
+is filled per source: Steam `installdir` under its library folder, Epic
+`InstallLocation`, GOG `path`, Xbox `InstalledPath`, emulator and manual-app
+exe folders. A match shows "<Title> - <time running>" in Home's eyebrow
+(session time from the process start); any failure shows the app name.
+
+### Motion
+
+Under 250 ms, all skipped when Windows Animation effects is off
+(`SystemParameters.ClientAreaAnimation`). One highlight glides between
+rows / tiles (drawn behind the list), open slides rail and column in, a page
+change fades out in 90 ms then in over 140 ms, and a new command completes
+the running animation at once. Closing fades the frame, not the backdrop.
 
 ### Look
 
-- Backdrop: acrylic on Windows 11 build 22621 or newer; older builds (Windows 10,
-  11 21H2) get a solid background. It is re-applied on every show, because DWM
-  drops it otherwise. Rounded corners and border colour (as in Python) go
-  through DWM too.
 - Accent: read from the Windows accent palette (`AccentPalette`). It tries the
   light variant (palette entry 1), then the lightest entry (entry 0), each
   needing a contrast of at least 4.5:1 against the panel (#202020), else
   #4CC2FF. The selection must always be visible.
-- Transparency effects off in Windows -> solid; animation effects off -> no slide.
+- Animation effects off in Windows -> no motion. Transparency effects do not
+  matter any more (the backdrop is our own image, not DWM acrylic, which was
+  tried and rejected).
 
 ### Hotkey
 
@@ -330,7 +375,8 @@ Stage 5. Readers and rules in Core (`Games/`), Xbox and the service in App.
   `discord_*` (dropped features; the Discord client secret goes with them),
   removed on load by `ConfigStore.DropRemovedFeatures`;
 - overlay keys: `overlay_size` (`normal` / `large` / `auto`; auto picks by the
-  active monitor profile) and `overlay_side` (`left` / `right`);
+  active monitor profile) `overlay_blur` / `overlay_frost` / `overlay_dim` (Appearance sliders,
+  0-100, defaults 50 / 35 / 50);
 - `Update(change)` saves atomically (temp file + move) and raises `Changed`;
 - a corrupt file is backed up as `config.json.bad` and defaults are used.
 

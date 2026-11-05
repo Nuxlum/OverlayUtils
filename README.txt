@@ -28,8 +28,13 @@ The mouse works as well as the pad: the row under the pointer is selected,
 and tabs, arrows, options, switches, the volume bar (click, drag or wheel),
 the media buttons and the hints at the bottom can all be clicked. Right
 click goes back.
-Settings has size, side of the screen, language and the full mode switch
-(see below), so you can enable full mode from the overlay as well.
+The overlay covers the whole screen. It opens on Home, a page of shortcut
+tiles (volume, now playing, microphone, screen, close window, Steam Big
+Picture) that work like the rows they mirror; when a game is in front, Home
+shows its name and how long it has been running. The game shows behind as
+frosted glass. Settings has size, Appearance sliders (Blur, Frost, Darkness),
+language and the full mode switch (see below), so you can enable full mode
+from the overlay as well.
 
 With a gamepad (Xbox, 8BitDo, DualShock 4, DualSense, Switch Pro, or
 Moonlight's virtual pad): Back+RB opens and closes the overlay. Inside,
@@ -144,8 +149,14 @@ Il mouse funziona bene quanto il pad: la riga sotto il puntatore viene
 selezionata, e si possono cliccare schede, frecce, opzioni, interruttori,
 la barra del volume (clic, trascinamento o rotella), i tasti multimediali e
 i suggerimenti in basso. Il tasto destro torna indietro.
-Le Impostazioni hanno dimensione, lato dello schermo, lingua e l'interruttore
-della modalità completa (vedi sotto): si può attivare anche dall'overlay.
+L'overlay copre tutto lo schermo. Si apre su Home, una pagina di riquadri
+scorciatoia (volume, in riproduzione, microfono, schermo, chiudi finestra,
+Steam Big Picture) che funzionano come le righe che replicano; se un gioco è
+in primo piano, Home ne mostra il nome e da quanto è in esecuzione. Il gioco
+resta visibile dietro come vetro smerigliato. Le Impostazioni hanno
+dimensione, cursori Aspetto (Sfocatura, Smerigliatura, Oscurità), lingua e
+l'interruttore della modalità completa (vedi sotto): si può attivare anche
+dall'overlay.
 
 Con un controller (Xbox, 8BitDo, DualShock 4, DualSense, Switch Pro, o il pad
 virtuale di Moonlight): Back+RB apre e chiude l'overlay. Dentro, croce o stick
