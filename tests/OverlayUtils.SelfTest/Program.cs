@@ -2204,6 +2204,9 @@ string RepoRoot()
     Check(content.Home().Select(i => i.Key).SequenceEqual(
         ["audio.volume", "audio.media", "audio.input", "controls.monitor", "controls.closewindow", "controls.bigpicture"]),
         "Home items in order");
+    var pool = new[] { "b", "x", "a" }.Select(k => new OverlayItem { Kind = ItemKind.Action, Key = k, Label = () => k }).ToList();
+    Check(OverlayContent.PickInOrder(pool, ["a", "gone", "b"]).Select(i => i.Key).SequenceEqual(["a", "b"]),
+        "a Home key missing from the pool is skipped, the rest keep their order");
 
     var nav = Nav();
     Check(nav.CurrentTab.Id == "Home" && nav.Selected?.Key == "audio.volume", "overlay opens on Home, Volume selected");
@@ -2436,6 +2439,22 @@ string RepoRoot()
     Check(CurrentGame.Match(@"C:\Games\Foo\x.exe", [Game("n", null), Game("e", "")]) is null, "missing folders are skipped");
     Check(CurrentGame.Match(@"C:\Games\Foo", [a]) is null, "the folder itself is not a file inside it");
     Check(CurrentGame.Match("", [a]) is null && CurrentGame.Match(@"C:\Games\Foo\x.exe", []) is null, "empty exe / no games");
+    // System and library folders never name a game: a Steam shortcut to explorer.exe or cmd.exe has its folder.
+    var excluded = new ExcludedFolders(Trees: [@"C:\Windows"], Exact: [@"C:\Program Files", @"C:\Program Files (x86)", @"C:\Steam", @"C:\Steam\steamapps\common"]);
+    Check(CurrentGame.Match(@"C:\Windows\explorer.exe", [Game("w", @"C:\Windows")], excluded) is null, "the Windows folder never matches");
+    Check(CurrentGame.Match(@"C:\Windows\System32\Taskmgr.exe", [Game("s", @"C:\Windows\System32")], excluded) is null, "a folder under Windows never matches");
+    Check(CurrentGame.Match(@"c:\program files\Tool\t.exe", [Game("p", @"C:\Program Files")], excluded) is null, "a Program Files root never matches");
+    Check(CurrentGame.Match(@"C:\Program Files\Game\bin\g.exe", [Game("g", @"C:\Program Files\Game")], excluded)?.Id == "g", "a game inside Program Files still matches");
+    Check(CurrentGame.Match(@"C:\Steam\steam.exe", [Game("st", @"C:\Steam")], excluded) is null
+        && CurrentGame.Match(@"C:\Steam\steamapps\common\Foo\f.exe", [Game("c", @"C:\Steam\steamapps\common")], excluded) is null,
+        "the Steam root and its common folder never match");
+    Check(CurrentGame.Match(@"D:\Lib\steamapps\common\Foo\f.exe", [Game("d", @"D:\Lib\steamapps\common")], excluded) is null,
+        "any Steam library's common folder never matches");
+    Check(CurrentGame.Match(@"C:\Steam\steamapps\common\Foo\f.exe", [Game("c", @"C:\Steam\steamapps\common"), Game("f", @"C:\Steam\steamapps\common\Foo")], excluded)?.Id == "f",
+        "a game inside the common folder still matches");
+    Check(ExcludedFolders.ForThisPc(@"C:\Steam").Exact.Contains(@"C:\Steam\steamapps\common", StringComparer.OrdinalIgnoreCase)
+        && ExcludedFolders.ForThisPc(null).Trees.Contains(Environment.GetFolderPath(Environment.SpecialFolder.Windows)),
+        "default exclusions: the Windows tree, the Steam root and its common folder");
     Check(CurrentGame.PlayTime(TimeSpan.FromSeconds(20)) == "0 min", "under a minute");
     Check(CurrentGame.PlayTime(TimeSpan.FromMinutes(72)) == "1 h 12 min", "hours and minutes");
     Check(CurrentGame.PlayTime(TimeSpan.FromMinutes(59)) == "59 min", "59 minutes stay in minutes");

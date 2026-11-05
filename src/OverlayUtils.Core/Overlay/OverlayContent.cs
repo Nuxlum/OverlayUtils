@@ -248,8 +248,12 @@ public sealed class OverlayContent
     public IReadOnlyList<OverlayItem> Home()
     {
         var pool = Audio().Concat(Controls()).ToList();
-        return HomeKeys.Select(key => pool.First(i => i.Key == key)).ToList();
+        return PickInOrder(pool, HomeKeys);
     }
+
+    /// <summary>The items of <paramref name="pool"/> with these keys, in key order; a key no item has is skipped.</summary>
+    internal static IReadOnlyList<OverlayItem> PickInOrder(IReadOnlyList<OverlayItem> pool, IEnumerable<string> keys) =>
+        keys.Select(key => pool.FirstOrDefault(i => i.Key == key)).OfType<OverlayItem>().ToList();
 
     // --- Controls -------------------------------------------------------------
 

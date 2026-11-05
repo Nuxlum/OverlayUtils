@@ -18,10 +18,13 @@ public static class SteamLibrary
     static readonly string[] HeaderNames = ["library_header.jpg", "header.jpg"];
     static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".webp"];
 
+    /// <summary>The Steam folder from the registry, or null when Steam is not installed.</summary>
+    public static string? Root(IRegistryView registry) =>
+        registry.GetString(RegistryHive.CurrentUser, SteamKey, "SteamPath") is { Length: > 0 } root && Directory.Exists(root) ? root : null;
+
     public static IReadOnlyList<GameEntry> Read(IRegistryView registry)
     {
-        var root = registry.GetString(RegistryHive.CurrentUser, SteamKey, "SteamPath");
-        if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) return [];
+        if (Root(registry) is not { } root) return [];
         var games = new List<GameEntry>();
         try
         {
