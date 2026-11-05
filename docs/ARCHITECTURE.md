@@ -90,9 +90,9 @@ covered by the self-test.
 
 | Core (`Overlay/`, `Platform/`) | App (`Overlay/`) |
 |---|---|
-| `OverlayContent`: tabs and rows (Controls, Settings, Info) | `OverlayController`: open / close, focus, placement, runs effects |
-| `OverlayNavigator`: selection, pages, expanders, Power confirm | `OverlayWindow` + `OverlayViewModel`: drawing, key and mouse input |
-| `OverlayLayout`: size factor and `Place` (physical px, clamped) | `OverlayTheme.xaml`, `WindowEffects`: acrylic, border, rounded corners |
+| `OverlayContent`: tabs and rows (Home, Controls, Audio, Games, Settings, Info) | `OverlayController`: open / close, focus, placement, runs effects |
+| `OverlayNavigator`: selection, pages (incl. Home tiles and Games), expanders, Power confirm | `OverlayWindow` + `OverlayViewModel`: drawing, key and mouse input |
+| `OverlayLayout`: size factor and `Place` (monitor rectangle) | `OverlayTheme.xaml`: full-screen frame, frosted backdrop, motion; `WindowEffects`: tool window, dark mode, square corners |
 | `IOverlayHost` (implemented by `TrayController`) | |
 | `WindowFocus`, `DisplayArea`, `PowerActions`, `ShellOpen`, `AccentPalette` | |
 
@@ -176,7 +176,7 @@ hooks) is matched against the install folders of the games library
 (`CurrentGame`; longest folder wins, case-insensitive). `GameEntry.InstallDir`
 is filled per source: Steam `installdir` under its library folder, Epic
 `InstallLocation`, GOG `path`, Xbox `InstalledPath`, emulator and manual-app
-exe folders. A match shows "<Title> - <time running>" in Home's eyebrow
+exe folders. A match shows "<Title> · <time running>" in Home's eyebrow
 (session time from the process start); any failure shows the app name.
 
 ### Motion
