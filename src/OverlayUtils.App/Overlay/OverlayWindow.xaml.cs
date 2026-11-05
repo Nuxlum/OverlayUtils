@@ -20,8 +20,6 @@ namespace OverlayUtils.App.Overlay;
 internal sealed partial class OverlayWindow : Window
 {
     const string AccentKey = "Accent";
-    static readonly Duration OpenDuration = TimeSpan.FromMilliseconds(150);
-    const double OpenSlide = 24; // DIPs
 
     OverlayViewModel? _vm;
 
@@ -31,6 +29,9 @@ internal sealed partial class OverlayWindow : Window
         Resources[AccentKey] = new SolidColorBrush(OverlayViewModel.FallbackAccent);
         SourceInitialized += (_, _) => WindowEffects.ApplyChrome(this);
         Scroller.ScrollChanged += (_, _) => UpdateArtRange();
+        ListArea.SizeChanged += (_, _) => QueueHighlight();
+        _contextFront = ContextA;
+        _rowTintMask = TryFindResource("TintFade") as Brush;
     }
 
     public event Action<OverlayCommand>? CommandIssued;
@@ -68,6 +69,11 @@ internal sealed partial class OverlayWindow : Window
     /// <summary>A source pill of the Games page was clicked (null: All).</summary>
     public event Action<GameSource?>? FilterClicked;
 
+    /// <summary>The old page has slid out (<see cref="AnimatePage"/>): draw the new one now.</summary>
+    public event Action? PageLeft;
+
+    bool _backdropPressed; // the left button went down on the bare backdrop and the mouse is captured
+
     // Last cursor position seen, in screen pixels: hover acts only when the mouse really moves, not when the
     // overlay opens under a still cursor or the list scrolls under it.
     Point? _lastPointer;
@@ -94,6 +100,7 @@ internal sealed partial class OverlayWindow : Window
         DataContext = vm;
         Resources[AccentKey] = vm.AccentBrush;
         vm.PropertyChanged += OnViewModelChanged;
+        ShowContext(vm.Context);
     }
 
     void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
@@ -102,10 +109,15 @@ internal sealed partial class OverlayWindow : Window
         if (e.PropertyName == nameof(OverlayViewModel.AccentBrush))
             Resources[AccentKey] = _vm.AccentBrush;
         else if (e.PropertyName is nameof(OverlayViewModel.Rows) or nameof(OverlayViewModel.SelectedTile))
+        {
             // After the new rows are laid out, so their containers exist.
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, BringSelectedIntoView);
+            if (e.PropertyName == nameof(OverlayViewModel.Rows)) QueueHighlight();
+        }
+        else if (e.PropertyName == nameof(OverlayViewModel.Context))
+            ShowContext(_vm.Context);
         else if (e.PropertyName == nameof(OverlayViewModel.Ambient))
-            Backdrop.ShowTint(_vm.Ambient);
+            Backdrop.ShowTint(_vm.Ambient, MotionEnabled && IsVisible);
         else if (e.PropertyName is nameof(OverlayViewModel.Tiles) or nameof(OverlayViewModel.ShowTiles)
                  or nameof(OverlayViewModel.TileColumns))
         {
@@ -115,24 +127,6 @@ internal sealed partial class OverlayWindow : Window
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, BringSelectedIntoView);
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, UpdateArtRange);
         }
-    }
-
-    /// <summary>
-    /// Call right before Show: the frame (rail, column, stage) slides in from the left and fades in, unless Windows
-    /// "Animation effects" is off. Only the frame moves (the window and the backdrop stay put) and nothing waits for
-    /// it, so focus is not delayed. Closing is never animated.
-    /// </summary>
-    public void PrepareOpening()
-    {
-        FrameRoot.BeginAnimation(OpacityProperty, null);
-        Slide.BeginAnimation(TranslateTransform.XProperty, null);
-        if (!SystemParameters.ClientAreaAnimation) return;
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        var from = -OpenSlide;
-        FrameRoot.BeginAnimation(OpacityProperty,
-            new DoubleAnimation(0, 1, OpenDuration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
-        Slide.BeginAnimation(TranslateTransform.XProperty,
-            new DoubleAnimation(from, 0, OpenDuration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
     }
 
     /// <summary>Asks for the art of the grid rows in view, plus one row above and below.</summary>
@@ -169,6 +163,387 @@ internal sealed partial class OverlayWindow : Window
         var list = _vm is { ShowHomeTiles: true } ? HomeTileList : RowList;
         if (row is not null && list.ItemContainerGenerator.ContainerFromItem(row) is FrameworkElement container)
             container.BringIntoView();
+    }
+
+    // --- Motion ---------------------------------------------------------------
+    //
+    // Every animation is short (<= 220 ms), runs on Opacity / RenderTransform (the highlight also on its own size)
+    // and never holds input back: each one first sets the property to its final value and animates from the value
+    // shown towards it (FillBehavior.Stop), so the state is always current, a new change simply starts from where the
+    // old one is, and clearing an animation can never leave anything half-faded. Without MotionEnabled every value
+    // is set directly.
+
+    static readonly IEasingFunction EaseOut = Frozen(new CubicEase { EasingMode = EasingMode.EaseOut });
+    static readonly IEasingFunction EaseIn = Frozen(new CubicEase { EasingMode = EasingMode.EaseIn });
+    const double OpenShift = 40;                                            // DIPs, rail and column on open / close
+    static readonly TimeSpan OpenStagger = TimeSpan.FromMilliseconds(30);   // column after rail
+    static readonly TimeSpan OpenLength = TimeSpan.FromMilliseconds(190);   // each; with the stagger 220 in all
+    static readonly Duration BackdropIn = TimeSpan.FromMilliseconds(180);
+    static readonly Duration CloseLength = TimeSpan.FromMilliseconds(120);
+    const double PageShift = 24;                                            // DIPs, page change
+    static readonly Duration PageOut = TimeSpan.FromMilliseconds(90);
+    static readonly Duration PageIn = TimeSpan.FromMilliseconds(140);
+    static readonly Duration HighlightGlide = TimeSpan.FromMilliseconds(140);
+    internal static readonly Duration LiftLength = TimeSpan.FromMilliseconds(120);
+    static readonly Duration ContextFade = TimeSpan.FromMilliseconds(150);
+
+    // Open: built once and frozen (no allocation per open). The keyframes hold the start value through the stagger.
+    static readonly AnimationTimeline BackdropFadeIn =
+        Frozen(new DoubleAnimation(0, 1, BackdropIn) { EasingFunction = EaseOut, FillBehavior = FillBehavior.Stop });
+    static readonly AnimationTimeline RailFadeIn = OpenFrames(0, 1, TimeSpan.Zero);
+    static readonly AnimationTimeline RailSlideIn = OpenFrames(-OpenShift, 0, TimeSpan.Zero);
+    static readonly AnimationTimeline ColumnFadeIn = OpenFrames(0, 1, OpenStagger);
+    static readonly AnimationTimeline ColumnSlideIn = OpenFrames(-OpenShift, 0, OpenStagger);
+
+    /// <summary>False when Windows "Animation effects" is off; read at each open (<see cref="BeginOpen"/>).</summary>
+    public bool MotionEnabled { get; private set; }
+
+    bool _closing;          // the close fade runs; the window hides when it ends
+    int _closeVersion;      // a close fade that ends after a re-open does nothing
+    int _leaveDirection;    // direction of the page change while the old page slides out, 0 otherwise
+    int _pageVersion;
+    bool _jumpHighlight = true;  // the next placement snaps (open, page change) instead of gliding
+    bool _highlightQueued;
+    bool _highlightShown;
+    Rect _highlightTarget;
+    readonly Brush? _rowTintMask;
+    ContentControl _contextFront;  // the context host shown (the other one is fading out or empty)
+    int _contextVersion;
+
+    static T Frozen<T>(T freezable) where T : Freezable
+    {
+        freezable.Freeze();
+        return freezable;
+    }
+
+    static AnimationTimeline OpenFrames(double from, double to, TimeSpan delay)
+    {
+        var frames = new DoubleAnimationUsingKeyFrames { Duration = delay + OpenLength, FillBehavior = FillBehavior.Stop };
+        frames.KeyFrames.Add(new DiscreteDoubleKeyFrame(from, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+        if (delay > TimeSpan.Zero) frames.KeyFrames.Add(new DiscreteDoubleKeyFrame(from, KeyTime.FromTimeSpan(delay)));
+        frames.KeyFrames.Add(new EasingDoubleKeyFrame(to, KeyTime.FromTimeSpan(delay + OpenLength), EaseOut));
+        return Frozen(frames);
+    }
+
+    /// <summary>
+    /// Sets <paramref name="property"/> to <paramref name="to"/> (its base value, so the state is final at once) and,
+    /// with a <paramref name="duration"/>, animates there from the value shown now. <paramref name="done"/> runs when
+    /// that animation ends, or at once when nothing animates; callers check a version, since a replaced animation
+    /// still completes.
+    /// </summary>
+    internal static void MoveTo<T>(T target, DependencyProperty property, double to, Duration? duration,
+        IEasingFunction? ease = null, Action? done = null) where T : DependencyObject, IAnimatable
+    {
+        var from = (double)target.GetValue(property);
+        target.BeginAnimation(property, null);
+        target.SetValue(property, to);
+        if (duration is not { } length || double.IsNaN(from) || Math.Abs(from - to) < 0.01)
+        {
+            done?.Invoke();
+            return;
+        }
+        var clock = new DoubleAnimation(from, to, length) { EasingFunction = ease ?? EaseOut, FillBehavior = FillBehavior.Stop }
+            .CreateClock();
+        if (done is not null) clock.Completed += (_, _) => done();
+        target.ApplyAnimationClock(property, clock);
+    }
+
+    /// <summary>
+    /// Start of an open, before anything is drawn: reads <see cref="MotionEnabled"/>. When the close fade of the last
+    /// open still runs, it is dropped and the frame is back at once; returns true then (the window never hid and
+    /// still shows that open's backdrop).
+    /// </summary>
+    public bool BeginOpen()
+    {
+        MotionEnabled = SystemParameters.ClientAreaAnimation;
+        var resumed = _closing && IsVisible;
+        ResetMotion();
+        return resumed;
+    }
+
+    /// <summary>
+    /// Call right before Show: the backdrop fades in (180 ms), the rail and then the column slide in from the left
+    /// and fade in (the stage fades with the column), 220 ms in all; not when <paramref name="resumed"/> (the frame
+    /// is on screen already) or without motion. Nothing waits for it, so focus and input are not delayed.
+    /// </summary>
+    public void PrepareOpening(bool resumed)
+    {
+        _jumpHighlight = true;
+        QueueHighlight();
+        if (!MotionEnabled || resumed) return;
+        Backdrop.BeginAnimation(OpacityProperty, BackdropFadeIn);
+        Rail.BeginAnimation(OpacityProperty, RailFadeIn);
+        RailSlide.BeginAnimation(TranslateTransform.XProperty, RailSlideIn);
+        Column.BeginAnimation(OpacityProperty, ColumnFadeIn);
+        ColumnSlide.BeginAnimation(TranslateTransform.XProperty, ColumnSlideIn);
+        Stage.BeginAnimation(OpacityProperty, ColumnFadeIn);
+    }
+
+    /// <summary>
+    /// Closes: the window stops taking the mouse at once (the controller already ignores commands and gave the
+    /// focus back); the rail, column and stage go back out to the left and fade (120 ms), then the window hides.
+    /// Without motion it hides at once. The backdrop stays as it is until the window hides: the window is opaque,
+    /// so fading it would show the dark window background, not the game.
+    /// </summary>
+    public void BeginClose()
+    {
+        EndDrag();
+        ReleaseBackdropPress();
+        if (!MotionEnabled || !IsVisible)
+        {
+            HideNow();
+            return;
+        }
+        FrameRoot.IsHitTestVisible = false;
+        Backdrop.IsHitTestVisible = false;
+        _leaveDirection = 0;
+        _pageVersion++; // a page still sliding out is not drawn
+        _closing = true;
+        var version = ++_closeVersion;
+        MoveTo(Rail, OpacityProperty, 0, CloseLength, EaseIn);
+        MoveTo(RailSlide, TranslateTransform.XProperty, -OpenShift, CloseLength, EaseIn);
+        MoveTo(ColumnSlide, TranslateTransform.XProperty, -OpenShift, CloseLength, EaseIn);
+        MoveTo(Stage, OpacityProperty, 0, CloseLength, EaseIn);
+        MoveTo(Column, OpacityProperty, 0, CloseLength, EaseIn, () =>
+        {
+            if (version != _closeVersion || !_closing) return; // re-opened (or closed for good) meanwhile
+            try { HideNow(); }
+            catch (Exception ex) { Log.Error("Overlay hide", ex); }
+        });
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        // Destroyed at exit: a close fade or page slide that ends later must not touch the window.
+        _closing = false;
+        _closeVersion++;
+        _pageVersion++;
+        base.OnClosed(e);
+    }
+
+    /// <summary>Hides now and puts every animated value back to rest (closed: nothing animates).</summary>
+    public void HideNow()
+    {
+        _closing = false;
+        _closeVersion++;
+        try { Hide(); }
+        finally
+        {
+            ResetMotion();
+            Backdrop.Clear();
+        }
+    }
+
+    /// <summary>Every animation dropped, every animated value at rest, input back on.</summary>
+    void ResetMotion()
+    {
+        _closing = false;
+        _closeVersion++;
+        _leaveDirection = 0;
+        _pageVersion++;
+        MoveTo(Backdrop, OpacityProperty, 1, null);
+        MoveTo(Rail, OpacityProperty, 1, null);
+        MoveTo(RailSlide, TranslateTransform.XProperty, 0, null);
+        MoveTo(Column, OpacityProperty, 1, null);
+        MoveTo(ColumnSlide, TranslateTransform.XProperty, 0, null);
+        MoveTo(Stage, OpacityProperty, 1, null);
+        MoveTo(PageHost, OpacityProperty, 1, null);
+        MoveTo(PageSlide, TranslateTransform.XProperty, 0, null);
+        FrameRoot.IsHitTestVisible = true;
+        Backdrop.IsHitTestVisible = true;
+        PageHost.IsHitTestVisible = true;
+        _contextVersion++;
+        var back = ReferenceEquals(_contextFront, ContextA) ? ContextB : ContextA;
+        MoveTo(_contextFront, OpacityProperty, 1, null);
+        MoveTo(back, OpacityProperty, 0, null);
+        back.Content = null;
+        _jumpHighlight = true;
+        PlaceHighlight(_highlightTarget, snap: true);
+    }
+
+    /// <summary>
+    /// A page change, before the new page is drawn. With motion and a direction (-1: LT or a rail icon above, +1: RT
+    /// or below) the old page slides 24 DIP away from the side pressed and fades out (90 ms) and true is returned:
+    /// draw the new page on <see cref="PageLeft"/> or at the next render, whichever comes first (input never waits for
+    /// the slide). Otherwise false: draw it now. A change while the old page is still leaving returns false too, so
+    /// pressing LT / RT quickly shows each page at once. The highlight jumps to the new page (no glide across pages).
+    /// </summary>
+    public bool AnimatePage(int direction)
+    {
+        _jumpHighlight = true;
+        if (_leaveDirection != 0)
+        {
+            if (direction != 0) _leaveDirection = Math.Sign(direction);
+            return false;
+        }
+        if (!MotionEnabled || direction == 0 || _closing || !IsVisible) return false;
+        _leaveDirection = Math.Sign(direction);
+        var version = ++_pageVersion;
+        PageHost.IsHitTestVisible = false; // the old rows must not take a click meant for the new page
+        MoveTo(PageSlide, TranslateTransform.XProperty, -PageShift * _leaveDirection, PageOut);
+        MoveTo(PageHost, OpacityProperty, 0, PageOut, done: () =>
+            // Posted: the end may come at once (nothing to fade), inside the render that started it.
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (version != _pageVersion || _leaveDirection == 0) return;
+                try { PageLeft?.Invoke(); }
+                catch (Exception ex) { Log.Error("Overlay page change", ex); }
+            }));
+        return true;
+    }
+
+    /// <summary>
+    /// Call after every refresh of the page: when the old page was sliding out, the new one (drawn now) comes in from
+    /// 24 DIP on the side of the command and fades in (140 ms).
+    /// </summary>
+    public void PageDrawn()
+    {
+        if (_leaveDirection == 0) return;
+        var direction = _leaveDirection;
+        _leaveDirection = 0;
+        _pageVersion++;
+        PageHost.IsHitTestVisible = true;
+        _jumpHighlight = true;
+        MoveTo(PageSlide, TranslateTransform.XProperty, PageShift * direction, null);
+        MoveTo(PageHost, OpacityProperty, 0, null);
+        MoveTo(PageSlide, TranslateTransform.XProperty, 0, PageIn);
+        MoveTo(PageHost, OpacityProperty, 1, PageIn);
+    }
+
+    /// <summary>Places the highlight after the next layout (coalesced: one placement per burst of changes).</summary>
+    void QueueHighlight()
+    {
+        if (_highlightQueued) return;
+        _highlightQueued = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+        {
+            _highlightQueued = false;
+            UpdateHighlight();
+        });
+    }
+
+    /// <summary>
+    /// Moves the one highlight onto the selected row or Home tile (its <see cref="HighlightAnchor"/> border), gliding
+    /// 140 ms from where it is; it snaps after an open or a page change, and hides when the selection has no anchor
+    /// (the Games shelf, which lifts its covers instead).
+    /// </summary>
+    void UpdateHighlight()
+    {
+        try
+        {
+            if (SelectedAnchor() is not { } anchor)
+            {
+                Highlight.Visibility = Visibility.Collapsed;
+                _highlightShown = false;
+                return;
+            }
+            var bounds = anchor.TransformToVisual(HighlightLayer).TransformBounds(new Rect(anchor.RenderSize));
+            StyleHighlight(HighlightAnchor.GetKind(anchor), (anchor as Border)?.CornerRadius ?? default);
+            var snap = _jumpHighlight || !_highlightShown || !MotionEnabled;
+            _jumpHighlight = false;
+            Highlight.Visibility = Visibility.Visible;
+            _highlightShown = true;
+            if (!snap && bounds == _highlightTarget) return; // already there or on its way
+            PlaceHighlight(bounds, snap);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Overlay highlight", ex);
+        }
+    }
+
+    void PlaceHighlight(Rect bounds, bool snap)
+    {
+        _highlightTarget = bounds;
+        if (bounds.IsEmpty) return;
+        Duration? glide = snap ? null : HighlightGlide;
+        MoveTo(HighlightMove, TranslateTransform.XProperty, bounds.X, glide);
+        MoveTo(HighlightMove, TranslateTransform.YProperty, bounds.Y, glide);
+        MoveTo(Highlight, WidthProperty, bounds.Width, glide);
+        MoveTo(Highlight, HeightProperty, bounds.Height, glide);
+    }
+
+    /// <summary>The anchor border in the selected row's or tile's template, if it is laid out and shown.</summary>
+    FrameworkElement? SelectedAnchor()
+    {
+        // No IsVisible test: while the window is hidden new containers are not laid out (no size, so no anchor), and
+        // showing it places the highlight again.
+        if (_vm is null) return null;
+        RowVm? selected = null;
+        foreach (var row in _vm.Rows)
+            if (row.IsSelected) { selected = row; break; }
+        if (selected is null) return null;
+        var list = _vm.ShowHomeTiles ? HomeTileList : RowList;
+        return list.ItemContainerGenerator.ContainerFromItem(selected) is DependencyObject container ? FindAnchor(container) : null;
+    }
+
+    static FrameworkElement? FindAnchor(DependencyObject node)
+    {
+        if (node is FrameworkElement element && HighlightAnchor.GetKind(element) != HighlightKind.None)
+            return element.Visibility == Visibility.Visible && element.ActualWidth > 0 && element.ActualHeight > 0 ? element : null;
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
+            if (FindAnchor(VisualTreeHelper.GetChild(node, i)) is { } found) return found;
+        return null;
+    }
+
+    /// <summary>The highlight's look for the anchor: Row = fading tint and accent bar, Outline, Tile = tint, outline, glow.</summary>
+    void StyleHighlight(HighlightKind kind, CornerRadius corner)
+    {
+        var row = kind == HighlightKind.Row;
+        var tile = kind == HighlightKind.Tile;
+        HighlightTint.Visibility = row || tile ? Visibility.Visible : Visibility.Collapsed;
+        HighlightTint.OpacityMask = row ? _rowTintMask : null;
+        HighlightTint.CornerRadius = corner;
+        HighlightOutline.Visibility = kind is HighlightKind.Outline or HighlightKind.Tile ? Visibility.Visible : Visibility.Collapsed;
+        HighlightOutline.CornerRadius = corner;
+        HighlightGlow.Visibility = tile ? Visibility.Visible : Visibility.Collapsed;
+        HighlightGlow.CornerRadius = new CornerRadius(corner.TopLeft + 3, corner.TopRight + 3, corner.BottomRight + 3, corner.BottomLeft + 3);
+        HighlightBar.Visibility = row ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// The stage card for <paramref name="context"/>. The same card with new values (same kind and title, e.g. the
+    /// volume moving) updates in place; another card cross-fades with the old one (150 ms) on the second host, which
+    /// takes the mouse from then on. A change during a fade starts from the opacities shown.
+    /// </summary>
+    void ShowContext(ContextVm? context)
+    {
+        try
+        {
+            var front = _contextFront;
+            var back = ReferenceEquals(front, ContextA) ? ContextB : ContextA;
+            var shown = front.Content as ContextVm;
+            if (context is not null && shown is not null && shown.Kind == context.Kind && shown.Title == context.Title)
+            {
+                front.Content = context;
+                return;
+            }
+            var version = ++_contextVersion;
+            if (context is null || shown is null || !MotionEnabled || !IsVisible)
+            {
+                // No card before or after (the host collapses or appears), or no motion: at once, no second host.
+                front.Content = context;
+                back.Content = null;
+                MoveTo(front, OpacityProperty, 1, null);
+                MoveTo(back, OpacityProperty, 0, null);
+                return;
+            }
+            back.Content = context;
+            back.IsHitTestVisible = true;
+            front.IsHitTestVisible = false;
+            Panel.SetZIndex(back, 1);
+            Panel.SetZIndex(front, 0);
+            _contextFront = back;
+            MoveTo(back, OpacityProperty, 1, ContextFade);
+            MoveTo(front, OpacityProperty, 0, ContextFade, done: () =>
+            {
+                if (version == _contextVersion) front.Content = null; // gone: let its card (and art) go
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Overlay stage context", ex);
+        }
     }
 
     // --- Keyboard -------------------------------------------------------------
@@ -247,12 +622,34 @@ internal sealed partial class OverlayWindow : Window
         Raise(() => RailClicked?.Invoke(item.VisibleIndex), "rail click");
     }
 
-    /// <summary>Only a press on the bare backdrop closes: never one that started on the frame or a card.</summary>
+    /// <summary>
+    /// A press on the bare backdrop (never one that started on the frame or a card) captures the mouse; the release
+    /// closes, if it is over the bare backdrop too. Closing on the press would hand the release to the game.
+    /// </summary>
     void OnBackdropMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (!Backdrop.IsSurface(e.OriginalSource)) return;
         e.Handled = true;
-        Raise(() => BackdropClicked?.Invoke(), "backdrop click");
+        _backdropPressed = Backdrop.CaptureMouse();
+    }
+
+    void OnBackdropMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_backdropPressed) return;
+        e.Handled = true;
+        _backdropPressed = false;
+        Backdrop.ReleaseMouseCapture();
+        if (Backdrop.IsSurface(InputHitTest(e.GetPosition(this))))
+            Raise(() => BackdropClicked?.Invoke(), "backdrop click");
+    }
+
+    void OnBackdropLostCapture(object sender, MouseEventArgs e) => _backdropPressed = false;
+
+    void ReleaseBackdropPress()
+    {
+        if (!_backdropPressed) return;
+        _backdropPressed = false;
+        Backdrop.ReleaseMouseCapture();
     }
 
     void OnBackMouseDown(object sender, MouseButtonEventArgs e)
@@ -343,6 +740,7 @@ internal sealed partial class OverlayWindow : Window
     void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         if (!IsVisible) EndDrag();
+        else QueueHighlight(); // laid out for real only now: place the highlight on the selected row
     }
 
     void DragTo(Point inWindow)
@@ -560,5 +958,64 @@ internal sealed class TilePanel : Panel
             y += line + Gap;
         }
         return final;
+    }
+}
+
+/// <summary>How the selection highlight is drawn over an anchor (see <see cref="HighlightAnchor"/>).</summary>
+internal enum HighlightKind
+{
+    None,
+    /// <summary>Accent tint fading to the right, accent bar on the left (rows).</summary>
+    Row,
+    /// <summary>Accent outline only (the media card).</summary>
+    Outline,
+    /// <summary>Accent tint, outline and glow (Home tiles).</summary>
+    Tile,
+}
+
+/// <summary>
+/// Marks the element of a row or tile template whose bounds (and CornerRadius, for a Border) the one selection
+/// highlight takes when that row or tile is selected.
+/// </summary>
+internal static class HighlightAnchor
+{
+    public static readonly DependencyProperty KindProperty = DependencyProperty.RegisterAttached("Kind",
+        typeof(HighlightKind), typeof(HighlightAnchor), new PropertyMetadata(HighlightKind.None));
+
+    public static HighlightKind GetKind(DependencyObject element) => (HighlightKind)element.GetValue(KindProperty);
+    public static void SetKind(DependencyObject element, HighlightKind value) => element.SetValue(KindProperty, value);
+}
+
+/// <summary>
+/// The lift of the selected Games cover: scale 1 to CoverLift (theme) in 120 ms and back, on the element's own
+/// ScaleTransform (a frozen or shared one is replaced first, so no two covers ever share it). Set at once while the
+/// element is not shown yet or without motion.
+/// </summary>
+internal static class CoverLift
+{
+    public static readonly DependencyProperty IsLiftedProperty = DependencyProperty.RegisterAttached("IsLifted",
+        typeof(bool), typeof(CoverLift), new PropertyMetadata(false, OnIsLiftedChanged));
+
+    public static bool GetIsLifted(DependencyObject element) => (bool)element.GetValue(IsLiftedProperty);
+    public static void SetIsLifted(DependencyObject element, bool value) => element.SetValue(IsLiftedProperty, value);
+
+    static void OnIsLiftedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not FrameworkElement element) return;
+        try
+        {
+            if (element.RenderTransform is not ScaleTransform scale || scale.IsFrozen)
+                element.RenderTransform = scale = new ScaleTransform();
+            var to = (bool)e.NewValue ? element.TryFindResource("CoverLift") as double? ?? 1.1 : 1.0;
+            Duration? length = element.IsVisible && Window.GetWindow(element) is OverlayWindow { MotionEnabled: true }
+                ? OverlayWindow.LiftLength
+                : null;
+            OverlayWindow.MoveTo(scale, ScaleTransform.ScaleXProperty, to, length);
+            OverlayWindow.MoveTo(scale, ScaleTransform.ScaleYProperty, to, length);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Overlay cover lift", ex);
+        }
     }
 }

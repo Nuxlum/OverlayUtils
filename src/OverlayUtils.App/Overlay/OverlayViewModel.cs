@@ -280,7 +280,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         }
     }
     /// <summary>The page is a tiles tab (Home): <see cref="Rows"/> are drawn as shortcut tiles, without sections.</summary>
-    public bool ShowHomeTiles { get => _showHomeTiles; private set => Set(ref _showHomeTiles, value); }
+    public bool ShowHomeTiles => _showHomeTiles;
     /// <summary>Index of the selected tile, -1 when the grid is not selected.</summary>
     public int SelectedTile { get => _selectedTile; private set => Set(ref _selectedTile, value); }
     /// <summary>The selected game, drawn large in the Games hero (null when no tile is selected).</summary>
@@ -301,15 +301,12 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     /// <summary>Scale of the frame's content (Large size); set by the controller.</summary>
     public double SizeFactor { get => _sizeFactor; set => Set(ref _sizeFactor, value); }
 
-    public void Refresh(OverlayNavigator nav, string clock, string outputDevice, bool pad = false, int? battery = null,
-        int? batteryPercent = null)
+    /// <summary>
+    /// Only the rail (lit page icon, gear): while the old page slides out, the rail already shows where the command
+    /// went; the page itself is refreshed when it comes in.
+    /// </summary>
+    public void RefreshRail(OverlayNavigator nav)
     {
-        Clock = clock;
-        BatteryGlyph = battery is { } level ? Glyphs.Battery[Math.Clamp(level, 0, 3)] : "";
-        BatteryText = batteryPercent is { } percent ? Loc.T("Overlay.Status.Battery", percent) : "";
-        OutputDevice = outputDevice;
-        OutputGlyph = outputDevice.Length > 0 ? OverlayContent.OutputIcon(outputDevice) : "";
-
         var settings = nav.Page is OverlayPage.Settings or OverlayPage.Info
             || nav.Page == OverlayPage.Sub && nav.SubOrigin != OverlayPage.Tabs;
         SettingsCurrent = settings;
@@ -319,6 +316,18 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
             .Select((t, i) => new RailVm(RailGlyph(t.Id), t.Title(), !settings && t.Id == current, i))
             .ToList();
         if (!rail.SequenceEqual(_railItems)) RailItems = rail; // most commands only move the selection
+    }
+
+    public void Refresh(OverlayNavigator nav, string clock, string outputDevice, bool pad = false, int? battery = null,
+        int? batteryPercent = null)
+    {
+        Clock = clock;
+        BatteryGlyph = battery is { } level ? Glyphs.Battery[Math.Clamp(level, 0, 3)] : "";
+        BatteryText = batteryPercent is { } percent ? Loc.T("Overlay.Status.Battery", percent) : "";
+        OutputDevice = outputDevice;
+        OutputGlyph = outputDevice.Length > 0 ? OverlayContent.OutputIcon(outputDevice) : "";
+
+        RefreshRail(nav);
         PageTitle = nav.Page switch
         {
             OverlayPage.Settings => Loc.T("Overlay.Page.Settings"),
@@ -373,12 +382,24 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
                 Art = item.Kind == ItemKind.Media ? art : null,
             });
         }
-        ShowHomeTiles = tiles;
-        Rows = rows;
+        SetRows(rows, tiles);
         RefreshTiles(nav, items, pad);
         Description = nav.Description();
         Context = BuildContext(nav, items, rows, outputDevice, art);
         Footer = nav.Footer(pad).Select(h => new FooterVm(h.Keys, h.Label, h.Command)).ToList();
+    }
+
+    /// <summary>
+    /// Rows and the Home-tiles flag in one step: both fields first, then the notifications, so the list that shows
+    /// them (RowList or HomeTileList) generates its containers once, for the new rows, on a Home / tab switch.
+    /// </summary>
+    void SetRows(IReadOnlyList<RowVm> rows, bool homeTiles)
+    {
+        var tilesChanged = _showHomeTiles != homeTiles;
+        _showHomeTiles = homeTiles;
+        _rows = rows;
+        if (tilesChanged) PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ShowHomeTiles)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Rows)));
     }
 
     /// <summary>The album art from <see cref="Sources"/>; a failure only loses the art.</summary>

@@ -73,29 +73,12 @@
                 </Setter>
             </Style>
 
-            <!-- Shown only on the selected row (tint, accent bar). -->
-            <Style x:Key="SelectedOnly" TargetType="FrameworkElement">
-                <Setter Property="Visibility" Value="Collapsed" />
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                        <Setter Property="Visibility" Value="Visible" />
-                    </DataTrigger>
-                </Style.Triggers>
-            </Style>
-            <Style x:Key="Tint" TargetType="Border" BasedOn="{StaticResource SelectedOnly}">
-                <Setter Property="Background" Value="{DynamicResource Accent}" />
-                <Setter Property="Opacity" Value="{StaticResource TintOpacity}" />
-                <Setter Property="OpacityMask" Value="{StaticResource TintFade}" />
-            </Style>
-            <Style x:Key="AccentBar" TargetType="Rectangle" BasedOn="{StaticResource SelectedOnly}">
-                <Setter Property="Width" Value="3" />
-                <Setter Property="Height" Value="22" />
-                <Setter Property="RadiusX" Value="1.5" />
-                <Setter Property="RadiusY" Value="1.5" />
-                <Setter Property="HorizontalAlignment" Value="Left" />
-                <Setter Property="VerticalAlignment" Value="Center" />
-                <Setter Property="Fill" Value="{DynamicResource Accent}" />
-            </Style>
+            <!--
+              The selection is drawn by one highlight behind the lists (HighlightLayer) that glides to the selected
+              row or tile. Each template marks where it goes with an empty Border carrying local:HighlightAnchor.Kind
+              (its bounds and CornerRadius): Row = tint fading to the right plus the accent bar, Outline = the accent
+              outline only, Tile = tint, outline and glow.
+            -->
             <Style x:Key="RowIcon" TargetType="TextBlock" BasedOn="{StaticResource Icon}">
                 <Setter Property="Foreground" Value="{StaticResource Text}" />
                 <Style.Triggers>
@@ -164,8 +147,7 @@
                                 <Grid Height="{StaticResource RowHeight}" Margin="0,0,0,2" Background="Transparent"
                                       Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
                                     <Border Style="{StaticResource HoverTint}" CornerRadius="8" />
-                                    <Border Style="{StaticResource Tint}" CornerRadius="8" />
-                                    <Rectangle Style="{StaticResource AccentBar}" />
+                                    <Border local:HighlightAnchor.Kind="Row" CornerRadius="8" />
                                     <Grid x:Name="RowContent">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="46" />
@@ -342,8 +324,7 @@
                     <Border CornerRadius="8" Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardLine}"
                             BorderThickness="1" />
                     <Border Style="{StaticResource HoverTint}" CornerRadius="8" />
-                    <Border Style="{StaticResource Tint}" CornerRadius="8" />
-                    <Rectangle Style="{StaticResource AccentBar}" />
+                    <Border local:HighlightAnchor.Kind="Row" CornerRadius="8" />
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="40" />
@@ -370,8 +351,7 @@
             <DataTemplate x:Key="InfoRow">
                 <Grid Height="25" Background="Transparent" Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
                     <Border Style="{StaticResource HoverTint}" CornerRadius="6" Margin="6,0" />
-                    <Border Style="{StaticResource Tint}" CornerRadius="6" Margin="6,0" />
-                    <Rectangle Style="{StaticResource AccentBar}" Margin="6,0,0,0" />
+                    <Border local:HighlightAnchor.Kind="Row" CornerRadius="6" Margin="6,0" />
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="160" />
@@ -441,8 +421,7 @@
                         </TextBlock.Style>
                     </TextBlock>
                     <Grid Height="64" Margin="2,2,2,4" Background="Transparent" Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
-                        <Border x:Name="Outline" CornerRadius="12" Margin="-2" BorderThickness="2"
-                                BorderBrush="Transparent" />
+                        <Border local:HighlightAnchor.Kind="Outline" CornerRadius="12" Margin="-2" />
                         <Border CornerRadius="10" Background="{StaticResource CardBg}" BorderBrush="{StaticResource CardLine}"
                                 BorderThickness="1" />
                         <Grid Margin="12,0">
@@ -481,9 +460,6 @@
                     </Grid>
                 </StackPanel>
                 <DataTemplate.Triggers>
-                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                        <Setter TargetName="Outline" Property="BorderBrush" Value="{DynamicResource Accent}" />
-                    </DataTrigger>
                     <DataTrigger Binding="{Binding IsOn}" Value="True">
                         <Setter TargetName="PlayGlyph" Property="Text" Value="{x:Static core:Glyphs.Pause}" />
                     </DataTrigger>
@@ -530,8 +506,8 @@
 
             <!--
               One game on the shelf: cover (or icon, or a placeholder glyph), source badge, title below. The selected
-              cover lifts (scaled from its bottom edge, so it grows upwards) with a white outline and an accent glow;
-              tiles off the selected row are dimmed. The lift is static for now (motion comes later).
+              cover lifts (scaled from its bottom edge, so it grows upwards; CoverLift) with a white outline and an
+              accent glow; tiles off the selected row are dimmed.
             -->
             <DataTemplate x:Key="GameTile">
                 <Grid x:Name="Tile" Margin="{StaticResource CoverMargin}" Background="Transparent" Cursor="Hand"
@@ -540,7 +516,11 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <Grid x:Name="Cover" RenderTransformOrigin="0.5,1">
+                    <!-- Each cover has its own scale: the lift is animated per tile, never on a shared transform. -->
+                    <Grid x:Name="Cover" RenderTransformOrigin="0.5,1" local:CoverLift.IsLifted="{Binding IsSelected}">
+                        <Grid.RenderTransform>
+                            <ScaleTransform />
+                        </Grid.RenderTransform>
                         <!-- Covers are 2:3: the cover row takes its height from the cell width. -->
                         <Border Height="{Binding ActualWidth, ElementName=Tile, Converter={StaticResource Scale}, ConverterParameter=1.5}" />
                         <Border x:Name="Glow" Margin="-4" CornerRadius="12" BorderThickness="5"
@@ -581,7 +561,6 @@
                         <Setter TargetName="Tile" Property="Opacity" Value="{StaticResource ShelfDimOpacity}" />
                     </DataTrigger>
                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                        <Setter TargetName="Cover" Property="RenderTransform" Value="{StaticResource CoverLiftTransform}" />
                         <Setter TargetName="Glow" Property="Visibility" Value="Visible" />
                         <Setter TargetName="Outline" Property="BorderBrush" Value="{StaticResource Text}" />
                         <Setter TargetName="TileTitle" Property="Foreground" Value="{StaticResource Text}" />
@@ -616,8 +595,8 @@
 
             <!--
               Home tiles: the same rows (same RowVm, same handlers) drawn as shortcut tiles. The frame is a glass card
-              with the row's icon and caption at the top and the kind's control (the Content) below; the selected tile
-              gets the accent tint, a 2 DIP accent outline and a soft glow. No section headers.
+              with the row's icon and caption at the top and the kind's control (the Content) below; the highlight
+              gives the selected tile the accent tint, a 2 DIP accent outline and a soft glow. No section headers.
             -->
             <Style x:Key="TileFrame" TargetType="ContentControl">
                 <Setter Property="Focusable" Value="False" />
@@ -626,21 +605,11 @@
                         <ControlTemplate TargetType="ContentControl">
                             <Grid x:Name="Tile" MinHeight="{StaticResource TileHeight}" Background="Transparent"
                                   Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
-                                <Border x:Name="Glow" Margin="-3" CornerRadius="17" BorderThickness="4"
-                                        BorderBrush="{DynamicResource Accent}" Opacity="{StaticResource TileGlowOpacity}"
-                                        Visibility="Collapsed">
-                                    <Border.Effect>
-                                        <BlurEffect Radius="{StaticResource TileGlowRadius}" />
-                                    </Border.Effect>
-                                </Border>
+                                <Border local:HighlightAnchor.Kind="Tile" CornerRadius="{StaticResource TileCorner}" />
                                 <Border CornerRadius="{StaticResource TileCorner}" Background="{StaticResource CardBg}"
                                         BorderBrush="{StaticResource CardLine}" BorderThickness="1" />
                                 <Border x:Name="HoverBg" CornerRadius="{StaticResource TileCorner}"
                                         Background="{StaticResource Hover}" Visibility="Collapsed" />
-                                <Border x:Name="Lit" CornerRadius="{StaticResource TileCorner}" Background="{DynamicResource Accent}"
-                                        Opacity="{StaticResource TintOpacity}" Visibility="Collapsed" />
-                                <Border x:Name="Outline" CornerRadius="{StaticResource TileCorner}" BorderThickness="2"
-                                        BorderBrush="Transparent" />
                                 <DockPanel Margin="16,12,14,12">
                                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
                                         <TextBlock Style="{StaticResource RowIcon}" Text="{Binding Icon}"
@@ -658,9 +627,6 @@
                                     <Setter TargetName="HoverBg" Property="Visibility" Value="Visible" />
                                 </Trigger>
                                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                    <Setter TargetName="Glow" Property="Visibility" Value="Visible" />
-                                    <Setter TargetName="Lit" Property="Visibility" Value="Visible" />
-                                    <Setter TargetName="Outline" Property="BorderBrush" Value="{DynamicResource Accent}" />
                                     <Setter TargetName="Caption" Property="Foreground" Value="{StaticResource Text}" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding Caption}" Value="">
@@ -1066,15 +1032,18 @@
     </Window.Resources>
 
     <Grid>
-        <!-- Bottom layer: the frosted screenshot. A click on it (outside rail, column and stage cards) closes. -->
-        <local:FrostedBackdrop x:Name="Backdrop" MouseLeftButtonDown="OnBackdropMouseDown" />
+        <!--
+          Bottom layer: the frosted screenshot. A click on it (outside rail, column and stage cards) closes: pressed
+          and released on it (the mouse is captured in between), so the release never reaches the game.
+        -->
+        <local:FrostedBackdrop x:Name="Backdrop" MouseLeftButtonDown="OnBackdropMouseDown"
+                               MouseLeftButtonUp="OnBackdropMouseUp" LostMouseCapture="OnBackdropLostCapture" />
 
-        <!-- The frame: it slides and fades in on open (the backdrop does not move). No background of its own, so
-             the stage's empty space is the backdrop's. -->
+        <!--
+          The frame. No background of its own, so the stage's empty space is the backdrop's. On open the rail, then
+          the column slide in from the left and fade in (the stage fades in with the column); on close the reverse.
+        -->
         <Grid x:Name="FrameRoot">
-            <Grid.RenderTransform>
-                <TranslateTransform x:Name="Slide" />
-            </Grid.RenderTransform>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="{Binding RailWidth}" />
                 <ColumnDefinition Width="{Binding ColumnWidth}" />
@@ -1086,6 +1055,9 @@
               have rows of their own (the outer rows keep the gear's height), so they never overlap on a short screen.
             -->
             <Border x:Name="Rail" Background="Transparent" BorderBrush="{StaticResource RailLine}" BorderThickness="0,0,1,0">
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="RailSlide" />
+                </Border.RenderTransform>
                 <Grid>
                     <Grid.LayoutTransform>
                         <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
@@ -1118,6 +1090,9 @@
               only those parts take the mouse, a click on the empty space around them closes as on the other pages.
             -->
             <Border x:Name="Column" Grid.Column="1" Padding="{Binding ColumnPadding}">
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="ColumnSlide" />
+                </Border.RenderTransform>
                 <Border.Style>
                     <Style TargetType="Border">
                         <Setter Property="Background" Value="Transparent" />
@@ -1129,10 +1104,14 @@
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
-                <DockPanel>
+                <!-- The page: it slides and fades out and in on a page change (AnimatePage). -->
+                <DockPanel x:Name="PageHost">
                     <DockPanel.LayoutTransform>
                         <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
                     </DockPanel.LayoutTransform>
+                    <DockPanel.RenderTransform>
+                        <TranslateTransform x:Name="PageSlide" />
+                    </DockPanel.RenderTransform>
 
                     <StackPanel DockPanel.Dock="Top" Margin="12,0,0,10" HorizontalAlignment="Left">
                         <TextBlock Text="{Binding Eyebrow, Converter={StaticResource Upper}}" FontSize="{StaticResource EyebrowSize}"
@@ -1230,7 +1209,9 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
-                        <ItemsControl ItemsSource="{Binding Pills}" Focusable="False" ItemTemplate="{StaticResource SourcePill}">
+                        <!-- Transparent: a click in the gaps between the pills does not close the overlay. -->
+                        <ItemsControl ItemsSource="{Binding Pills}" Focusable="False" Background="Transparent"
+                                      ItemTemplate="{StaticResource SourcePill}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <StackPanel Orientation="Horizontal" />
@@ -1282,76 +1263,102 @@
 
                     <ScrollViewer x:Name="Scroller" Focusable="False" VerticalScrollBarVisibility="Hidden"
                                   HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Margin="0,0,0,8">
-                            <ItemsControl x:Name="RowList" Focusable="False"
-                                          ItemTemplateSelector="{StaticResource RowTemplates}">
-                                <ItemsControl.Style>
-                                    <Style TargetType="ItemsControl">
-                                        <Setter Property="ItemsSource" Value="{Binding Rows}" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ShowHomeTiles}" Value="True">
-                                                <Setter Property="ItemsSource" Value="{x:Null}" />
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </ItemsControl.Style>
-                            </ItemsControl>
-                            <!-- Home: the same rows as tiles, two per line, wide ones alone (TilePanel). -->
-                            <ItemsControl x:Name="HomeTileList" Focusable="False" Margin="6,6,10,10"
-                                          ItemTemplateSelector="{StaticResource TileTemplates}">
-                                <ItemsControl.Style>
-                                    <Style TargetType="ItemsControl">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ShowHomeTiles}" Value="True">
-                                                <Setter Property="ItemsSource" Value="{Binding Rows}" />
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </ItemsControl.Style>
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <local:TilePanel Gap="{StaticResource TileGap}" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                            </ItemsControl>
+                        <Grid x:Name="ListArea" Margin="0,0,0,8">
                             <!--
-                              The cover shelf. Its background takes the clicks between covers (they do not close); the
-                              top margin leaves room for the lifted first row. The selected tile is drawn above the
-                              others (ZIndex), so its lift and glow overlap its neighbours.
+                              The one selection highlight of rows and Home tiles, behind them (their backgrounds are clear
+                              or light glass, so it reads as their own tint). It is moved to the selected template's
+                              HighlightAnchor.Kind border and glides there; the Games covers have their own lift instead.
                             -->
-                            <ItemsControl x:Name="TileList" ItemsSource="{Binding Tiles}" Focusable="False"
-                                          ItemTemplate="{StaticResource GameTile}" Background="Transparent"
-                                          Margin="{StaticResource ShelfMargin}">
-                                <ItemsControl.ItemContainerStyle>
-                                    <Style TargetType="ContentPresenter">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                <Setter Property="Panel.ZIndex" Value="1" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </ItemsControl.ItemContainerStyle>
-                                <ItemsControl.Style>
-                                    <Style TargetType="ItemsControl">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ShowTiles}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </ItemsControl.Style>
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <UniformGrid Columns="{Binding TileColumns}"
-                                                     VerticalAlignment="Top" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                            </ItemsControl>
-                        </StackPanel>
+                            <Canvas x:Name="HighlightLayer" IsHitTestVisible="False">
+                                <Grid x:Name="Highlight" Visibility="Collapsed">
+                                    <Grid.RenderTransform>
+                                        <TranslateTransform x:Name="HighlightMove" />
+                                    </Grid.RenderTransform>
+                                    <Border x:Name="HighlightGlow" Margin="-3" BorderThickness="4"
+                                            BorderBrush="{DynamicResource Accent}" Opacity="{StaticResource TileGlowOpacity}">
+                                        <Border.Effect>
+                                            <BlurEffect Radius="{StaticResource TileGlowRadius}" />
+                                        </Border.Effect>
+                                    </Border>
+                                    <Border x:Name="HighlightTint" Background="{DynamicResource Accent}"
+                                            Opacity="{StaticResource TintOpacity}" />
+                                    <Border x:Name="HighlightOutline" BorderThickness="2" BorderBrush="{DynamicResource Accent}" />
+                                    <Rectangle x:Name="HighlightBar" Width="3" Height="22" RadiusX="1.5" RadiusY="1.5"
+                                               HorizontalAlignment="Left" VerticalAlignment="Center"
+                                               Fill="{DynamicResource Accent}" />
+                                </Grid>
+                            </Canvas>
+                            <StackPanel>
+                                <ItemsControl x:Name="RowList" Focusable="False"
+                                              ItemTemplateSelector="{StaticResource RowTemplates}">
+                                    <ItemsControl.Style>
+                                        <Style TargetType="ItemsControl">
+                                            <Setter Property="ItemsSource" Value="{Binding Rows}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowHomeTiles}" Value="True">
+                                                    <Setter Property="ItemsSource" Value="{x:Null}" />
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ItemsControl.Style>
+                                </ItemsControl>
+                                <!-- Home: the same rows as tiles, two per line, wide ones alone (TilePanel). -->
+                                <ItemsControl x:Name="HomeTileList" Focusable="False" Margin="6,6,10,10"
+                                              ItemTemplateSelector="{StaticResource TileTemplates}">
+                                    <ItemsControl.Style>
+                                        <Style TargetType="ItemsControl">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowHomeTiles}" Value="True">
+                                                    <Setter Property="ItemsSource" Value="{Binding Rows}" />
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ItemsControl.Style>
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <local:TilePanel Gap="{StaticResource TileGap}" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                                <!--
+                                  The cover shelf. Its background takes the clicks between covers (they do not close); the
+                                  top margin leaves room for the lifted first row. The selected tile is drawn above the
+                                  others (ZIndex), so its lift and glow overlap its neighbours.
+                                -->
+                                <ItemsControl x:Name="TileList" ItemsSource="{Binding Tiles}" Focusable="False"
+                                              ItemTemplate="{StaticResource GameTile}" Background="Transparent"
+                                              Margin="{StaticResource ShelfMargin}">
+                                    <ItemsControl.ItemContainerStyle>
+                                        <Style TargetType="ContentPresenter">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="Panel.ZIndex" Value="1" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ItemsControl.ItemContainerStyle>
+                                    <ItemsControl.Style>
+                                        <Style TargetType="ItemsControl">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowTiles}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ItemsControl.Style>
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="{Binding TileColumns}"
+                                                         VerticalAlignment="Top" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Grid>
                     </ScrollViewer>
                 </DockPanel>
             </Border>
@@ -1417,16 +1424,19 @@
                 <!--
                   Context of the selected row (ContextVm): the template follows its Kind (monitors, mixer, album art,
                   volume, else the label / value / description card). Hidden on the Games shelf (the column takes the
-                  stage) and when there is nothing to say. Cards swap at once (no cross-fade yet).
+                  stage) and when there is nothing to say. Two hosts, so a new card cross-fades with the old one
+                  (ShowContext); only the front one takes the mouse.
                 -->
-                <ContentControl x:Name="ContextHost" Focusable="False" HorizontalAlignment="Left"
-                                VerticalAlignment="Bottom" Content="{Binding Context}"
-                                ContentTemplateSelector="{StaticResource ContextTemplates}">
-                    <ContentControl.LayoutTransform>
+                <Grid x:Name="ContextHost" HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                    <Grid.LayoutTransform>
                         <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
-                    </ContentControl.LayoutTransform>
-                    <ContentControl.Style>
-                        <Style TargetType="ContentControl">
+                    </Grid.LayoutTransform>
+                    <ContentControl x:Name="ContextA" Focusable="False" VerticalAlignment="Bottom"
+                                    ContentTemplateSelector="{StaticResource ContextTemplates}" />
+                    <ContentControl x:Name="ContextB" Focusable="False" VerticalAlignment="Bottom" Opacity="0"
+                                    IsHitTestVisible="False" ContentTemplateSelector="{StaticResource ContextTemplates}" />
+                    <Grid.Style>
+                        <Style TargetType="Grid">
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding Context}" Value="{x:Null}">
                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -1436,8 +1446,8 @@
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </ContentControl.Style>
-                </ContentControl>
+                    </Grid.Style>
+                </Grid>
             </Grid>
         </Grid>
     </Grid>

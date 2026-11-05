@@ -64,6 +64,11 @@ internal sealed class OverlayController : IDisposable
     int _frostBlur = -1;    // blur radius of the image shown (or being made), -1 when none
     bool _fadePending;      // no image shown yet since the open
 
+    // The page drawn last (a different one is a page change, which the window animates) and the direction of the
+    // command being handled (-1 LT / a rail icon above, +1 RT / below, 0 anything else).
+    (OverlayPage Page, string Tab, string Sub) _drawnPage;
+    int _pageDirection;
+
     public OverlayController(Application app, ConfigStore config, MonitorProfiles monitors, OverlayContent content)
     {
         _app = app;
@@ -88,7 +93,10 @@ internal sealed class OverlayController : IDisposable
         _window.CommandIssued += OnCommand;
         _window.RowClicked += OnRowClicked;
         _window.RowHovered += index => { if (_open && _navigator.Hover(index)) Render(); };
-        _window.RailClicked += index => { if (_open) Apply(_navigator.ClickTab(index)); };
+        _window.RailClicked += index =>
+        {
+            if (_open) ApplyPaged(Math.Sign(index - CurrentTabIndex()), _navigator.ClickTab(index));
+        };
         _window.SettingsClicked += () => OnCommand(OverlayCommand.Settings);
         _window.BackdropClicked += () => Hide();
         _window.StepClicked += (index, direction) => { if (_open) Apply(_navigator.ClickStep(index, direction)); };
@@ -102,6 +110,7 @@ internal sealed class OverlayController : IDisposable
             if (index >= 0) Apply(_navigator.ClickTile(index)); // gone since it was drawn: nothing starts
         };
         _window.FilterClicked += OnFilterClicked;
+        _window.PageLeft += () => { if (_open) Render(); };
         _window.Closing += OnClosing;
 
         _hwnd = new WindowInteropHelper(_window).EnsureHandle(); // the window applies its chrome and backdrop here
@@ -195,22 +204,29 @@ internal sealed class OverlayController : IDisposable
         try
         {
             var cfg = _config.Current;
-            _prev = WindowFocus.ForegroundApp();
+            // Reads the motion setting; true when the close fade of the last open still ran (the window never hid).
+            var resumed = _window.BeginOpen();
+            var foreground = WindowFocus.ForegroundApp();
+            if (foreground != _hwnd) _prev = foreground; // ours only when the hand-back of that close failed
             FindCurrentGame(_prev);
             var (bounds, dpiScale) = _prev != 0 ? DisplayArea.MonitorForWindow(_prev) : DisplayArea.MonitorForCursor();
 
-            // While our window is still hidden, so the screenshot is of the game (about 25 ms, memory only).
-            CaptureBackdrop(cfg, bounds);
+            // While our window is still hidden, so the screenshot is of the game (about 25 ms, memory only). A resumed
+            // open keeps the backdrop on screen: a capture now would be of the overlay itself.
+            if (resumed) KeepBackdrop(cfg);
+            else CaptureBackdrop(cfg, bounds);
 
             _content.ResetTransient();
             RunCancel(_navigator.Reset(cfg.HiddenTabs));
+            _drawnPage = PageKey(); // the first render is not a page change
+            _pageDirection = 0;
             UpdateAccent();
 
             // Placed while still hidden, so a DPI change on the target monitor happens before the first frame.
             Layout(cfg, bounds, dpiScale);
             Render();
 
-            _window.PrepareOpening();
+            _window.PrepareOpening(resumed);
             _window.ResetPointer();
             _window.Show();
             Place(); // Show must not have moved it
@@ -229,6 +245,9 @@ internal sealed class OverlayController : IDisposable
         catch (Exception e)
         {
             Log.Error("Overlay show", e);
+            // A failed open must not keep the screenshot (or take a late image) until the next one.
+            _capture = null;
+            _frostVersion++;
         }
     }
 
@@ -291,12 +310,19 @@ internal sealed class OverlayController : IDisposable
             _pendingTimer.Stop(); // a pending confirm is dropped by Reset on the next open
             // A picked-up list entry must not stay moved but unsaved: put it back now.
             if (_navigator.Holding) RunCancel(_navigator.Reset(_config.Current.HiddenTabs));
-            _window.Hide();
-            DropBackdrop();
+            // The window takes no input from now on and the game has the focus already; the frame fades out
+            // (120 ms) and then the window hides, or it hides at once without motion.
+            _window.BeginClose();
         }
         catch (Exception e)
         {
             Log.Error("Overlay hide", e);
+            try { _window.HideNow(); }
+            catch (Exception ex) { Log.Error("Overlay hide", ex); }
+        }
+        finally
+        {
+            DropBackdrop();
         }
     }
 
@@ -378,8 +404,39 @@ internal sealed class OverlayController : IDisposable
 
     void OnCommand(OverlayCommand command)
     {
-        if (_open) Apply(_navigator.Handle(command));
+        if (!_open) return;
+        var direction = command switch
+        {
+            OverlayCommand.PrevTab => -1,
+            OverlayCommand.NextTab => 1,
+            _ => 0,
+        };
+        ApplyPaged(direction, _navigator.Handle(command));
     }
+
+    /// <summary>
+    /// <see cref="Apply"/> for a command that may change the page: a page change it causes slides that way (LT / RT,
+    /// rail clicks). The navigator has handled it already; only the drawing reads the direction.
+    /// </summary>
+    void ApplyPaged(int direction, NavResult result)
+    {
+        _pageDirection = direction;
+        try { Apply(result); }
+        finally { _pageDirection = 0; }
+    }
+
+    /// <summary>Index of the current tab among the visible ones (where a rail click moves from).</summary>
+    int CurrentTabIndex()
+    {
+        var tabs = _navigator.VisibleTabs;
+        var current = _navigator.CurrentTab.Id;
+        for (var i = 0; i < tabs.Count; i++)
+            if (tabs[i].Id == current) return i;
+        return 0;
+    }
+
+    (OverlayPage Page, string Tab, string Sub) PageKey() =>
+        (_navigator.Page, _navigator.CurrentTab.Id, _navigator.Page == OverlayPage.Sub ? _navigator.SubTitle : "");
 
     void OnRowClicked(int index, int? option)
     {
@@ -434,9 +491,22 @@ internal sealed class OverlayController : IDisposable
         {
             // Always: a row that became hidden must not stay selected until the next clock tick.
             RunCancel(_navigator.Refresh());
+            var page = PageKey();
+            if (page != _drawnPage)
+            {
+                _drawnPage = page;
+                if (_window.AnimatePage(_pageDirection))
+                {
+                    // The old page slides out first (90 ms); the rail already shows the new one. The page is drawn
+                    // on PageLeft, or by the next render if a command comes first.
+                    _vm.RefreshRail(_navigator);
+                    return;
+                }
+            }
             _vm.Eyebrow = EyebrowText();
             _vm.Refresh(_navigator, DateTime.Now.ToString("HH:mm"), _content.OutputDevice, _padConnected, _battery,
                 BatteryPercent);
+            _window.PageDrawn(); // a page that was sliding out: the new one comes in
         }
         catch (Exception e)
         {
@@ -508,6 +578,20 @@ internal sealed class OverlayController : IDisposable
     }
 
     /// <summary>
+    /// Re-open during the close fade: the backdrop on screen stays (no capture of our own window); only the settings
+    /// are applied again. Without a capture the Appearance sliders do not re-blur it during this open.
+    /// </summary>
+    void KeepBackdrop(AppConfig cfg)
+    {
+        _frostVersion++;
+        _frostBlur = -1;
+        _capture = null;
+        _fadePending = false;
+        try { _window.Backdrop.Apply(FrostSettings.FromConfig(cfg)); }
+        catch (Exception e) { Log.Error("Overlay backdrop", e); }
+    }
+
+    /// <summary>
     /// Blurs the kept capture on a worker and shows it when done, if the overlay is still open and nothing newer was
     /// asked meanwhile. A black capture (exclusive fullscreen, protected content) is not shown.
     /// </summary>
@@ -527,7 +611,7 @@ internal sealed class OverlayController : IDisposable
                 {
                     if (!_open || version != _frostVersion) return;
                     // Only the first image of an open fades in; a re-processed one replaces it at once.
-                    var fade = _fadePending && SystemParameters.ClientAreaAnimation;
+                    var fade = _fadePending && _window.MotionEnabled;
                     _fadePending = false;
                     try { _window.Backdrop.ShowImage(bitmap, fade); }
                     catch (Exception e) { Log.Error("Overlay backdrop show", e); }
@@ -555,13 +639,15 @@ internal sealed class OverlayController : IDisposable
         }
     }
 
-    /// <summary>On hide: the capture and the image are released, a result still on its way is dropped.</summary>
+    /// <summary>
+    /// On hide: the capture is released and a result still on its way is dropped. The image stays on screen while the
+    /// close fade runs; the window clears it when it hides.
+    /// </summary>
     void DropBackdrop()
     {
         _frostVersion++;
         _frostBlur = -1;
         _capture = null;
-        _window.Backdrop.Clear();
     }
 
     void UpdateAccent()

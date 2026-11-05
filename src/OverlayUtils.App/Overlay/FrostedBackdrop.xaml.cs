@@ -15,7 +15,10 @@ namespace OverlayUtils.App.Overlay;
 internal sealed partial class FrostedBackdrop : UserControl
 {
     const int GrainSize = 128;
-    static readonly Duration FadeIn = TimeSpan.FromMilliseconds(150);
+    // The first image of an open fades in as long as the window's own open fade of the backdrop.
+    static readonly Duration FadeIn = TimeSpan.FromMilliseconds(180);
+    static readonly Duration TintFade = TimeSpan.FromMilliseconds(150);
+    static readonly IEasingFunction EaseOut = Frozen(new CubicEase { EasingMode = EasingMode.EaseOut });
     static readonly Color FallbackDim = Color.FromRgb(0x08, 0x0A, 0x10); // FrameBg of the theme
     static readonly double[] DimOffsets = [0, 0.38, 0.72, 1];
     const double DownDarkFrom = 0.55; // top to bottom (Games): fully dark from about the shelf down
@@ -29,6 +32,7 @@ internal sealed partial class FrostedBackdrop : UserControl
     Brush? _down;
     bool _vertical;
     double? _tintOpacity;
+    int _tintVersion; // bumped on every tint change: a fade-out that ends after a newer tint does not hide it
 
     public FrostedBackdrop()
     {
@@ -78,20 +82,62 @@ internal sealed partial class FrostedBackdrop : UserControl
 
     /// <summary>
     /// Washes the backdrop with <paramref name="color"/> from the top right (the selected cover's colour on Games);
-    /// null removes it. Switches at once.
+    /// null removes it. With <paramref name="fade"/> the colour cross-fades in 150 ms from the one shown (a tint
+    /// appearing fades in from clear, one removed fades out, then the layer collapses); else it switches at once.
+    /// The stops always hold the final colour, so a change during a fade simply starts from where it is.
     /// </summary>
-    public void ShowTint(Color? color)
+    public void ShowTint(Color? color, bool fade)
     {
+        var version = ++_tintVersion;
+        var shown = Tint.Visibility == Visibility.Visible;
         if (color is not { } c)
         {
-            Tint.Visibility = Visibility.Collapsed;
+            if (!fade || !shown)
+            {
+                SetStop(_tintCore, _tintCore.Color, null);
+                SetStop(_tintEdge, _tintEdge.Color, null);
+                Tint.Visibility = Visibility.Collapsed;
+                return;
+            }
+            var core = _tintCore.Color;
+            var edge = _tintEdge.Color;
+            SetStop(_tintEdge, Color.FromArgb(0, edge.R, edge.G, edge.B), TintFade);
+            SetStop(_tintCore, Color.FromArgb(0, core.R, core.G, core.B), TintFade, () =>
+            {
+                if (version == _tintVersion) Tint.Visibility = Visibility.Collapsed;
+            });
             return;
         }
         _tintOpacity ??= TryFindResource("GamesTintOpacity") as double?;
         var alpha = (byte)Math.Round(Math.Clamp(_tintOpacity ?? FallbackTintOpacity, 0, 1) * 255);
-        _tintCore.Color = Color.FromArgb(alpha, c.R, c.G, c.B);
-        _tintEdge.Color = Color.FromArgb(0, c.R, c.G, c.B);
+        if (fade && !shown)
+        {
+            // From clear in the same colour, so it does not pass through grey.
+            SetStop(_tintCore, Color.FromArgb(0, c.R, c.G, c.B), null);
+            SetStop(_tintEdge, Color.FromArgb(0, c.R, c.G, c.B), null);
+        }
+        SetStop(_tintCore, Color.FromArgb(alpha, c.R, c.G, c.B), fade ? TintFade : null);
+        SetStop(_tintEdge, Color.FromArgb(0, c.R, c.G, c.B), fade ? TintFade : null);
         Tint.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Sets the stop to <paramref name="to"/> (its base value) and, with a duration, animates there from the colour
+    /// shown now; <paramref name="done"/> runs when that animation ends.
+    /// </summary>
+    static void SetStop(GradientStop stop, Color to, Duration? duration, Action? done = null)
+    {
+        var from = stop.Color; // the animated colour, if a fade is running
+        stop.BeginAnimation(GradientStop.ColorProperty, null);
+        stop.Color = to;
+        if (duration is not { } d || from == to)
+        {
+            done?.Invoke();
+            return;
+        }
+        var clock = new ColorAnimation(from, to, d) { EasingFunction = EaseOut, FillBehavior = FillBehavior.Stop }.CreateClock();
+        if (done is not null) clock.Completed += (_, _) => done();
+        stop.ApplyAnimationClock(GradientStop.ColorProperty, clock);
     }
 
     /// <summary>Shows a processed image (frozen); fades it in when <paramref name="fade"/>, else at once.</summary>
@@ -100,10 +146,7 @@ internal sealed partial class FrostedBackdrop : UserControl
         Picture.Source = image;
         Shot.BeginAnimation(OpacityProperty, null);
         if (fade)
-            Shot.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, FadeIn)
-            {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-            });
+            Shot.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, FadeIn) { EasingFunction = EaseOut });
         else Shot.Opacity = 1;
     }
 
@@ -113,6 +156,12 @@ internal sealed partial class FrostedBackdrop : UserControl
         Shot.BeginAnimation(OpacityProperty, null);
         Shot.Opacity = 0;
         Picture.Source = null;
+    }
+
+    static T Frozen<T>(T freezable) where T : Freezable
+    {
+        freezable.Freeze();
+        return freezable;
     }
 
     /// <summary>A frozen Bgr32 bitmap of a processed backdrop; any thread.</summary>
