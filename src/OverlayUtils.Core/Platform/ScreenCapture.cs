@@ -29,7 +29,9 @@ public static class ScreenCapture
             dib = Native.CreateDIBSection(screen, in bmi, 0, out var bits, 0, 0);
             if (dib == 0 || bits == 0) return null;
             old = Native.SelectObject(mem, dib);
+            if (old == 0) return null;
             if (!Native.BitBlt(mem, 0, 0, w, h, screen, bounds.Left, bounds.Top, Native.SRCCOPY)) return null;
+            Native.GdiFlush(); // the DIB bits are only valid to read after this
             var data = new byte[checked(w * h * 4)];
             Marshal.Copy(bits, data, 0, data.Length);
             return new CapturedScreen(data, w, h, w * 4);

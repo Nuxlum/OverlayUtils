@@ -42,8 +42,6 @@ public sealed class AppConfig
     [JsonPropertyName("overlay_dim")] public int OverlayDim { get; set; } = DefaultDim;
     public const int DefaultBlur = 50, DefaultFrost = 35, DefaultDim = 50;
 
-    /// <summary>"left" or "right" edge of the work area.</summary>
-
     /// <summary>Output devices, best first (Audio tab order).</summary>
     [JsonPropertyName("audio_output_order")] public List<AudioDeviceRef> AudioOutputOrder { get; set; } = [];
 
