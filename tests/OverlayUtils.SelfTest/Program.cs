@@ -1277,6 +1277,21 @@ string RepoRoot()
     Check(!maxVolume.Visible(), "Max volume hidden without a default output");
     audio.DefaultOutput = "spk";
 
+    // Stage context of the Volume tile: the default output's cap, none when missing or 100%.
+    var savedCaps = new Dictionary<string, int>(store.Current.AudioVolumeCaps);
+    store.Update(c => c.AudioVolumeCaps["spk"] = 80);
+    Check(content.OutputCapPercent() == 80, "OutputCapPercent: the default output's cap");
+    store.Update(c => c.AudioVolumeCaps["spk"] = 100);
+    Check(content.OutputCapPercent() is null, "OutputCapPercent: 100% is no cap");
+    store.Update(c => c.AudioVolumeCaps.Remove("spk"));
+    Check(content.OutputCapPercent() is null, "OutputCapPercent: no entry is no cap");
+    store.Update(c => c.AudioVolumeCaps["hs"] = 50);
+    Check(content.OutputCapPercent() is null, "OutputCapPercent: another device's cap is ignored");
+    audio.DefaultOutput = null;
+    Check(content.OutputCapPercent() is null, "OutputCapPercent: no default output");
+    audio.DefaultOutput = "spk";
+    store.Update(c => c.AudioVolumeCaps = savedCaps);
+
     // Hiding the Audio tab (with the Games tab hidden, so Controls and Audio are the only tabs).
     store.Update(c => c.HiddenTabs.Add(OverlayContent.GamesTabId));
     var audioTabRow = content.Settings().First(i => i.Kind == ItemKind.Toggle && i.Label() == Loc.T("Overlay.Tab.Audio"));

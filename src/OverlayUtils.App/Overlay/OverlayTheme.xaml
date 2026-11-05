@@ -70,6 +70,25 @@
     <sys:Double x:Key="TileGlowOpacity">0.55</sys:Double>
     <sys:Double x:Key="TileGlowRadius">12</sys:Double>
 
+    <!-- Stage context cards (bottom left of the stage). -->
+    <sys:Double x:Key="ContextWidth">460</sys:Double>
+    <sys:Double x:Key="ContextTitleSize">20</sys:Double>
+    <sys:Double x:Key="ContextValueSize">15</sys:Double>
+    <sys:Double x:Key="ContextBigSize">30</sys:Double>
+    <sys:Double x:Key="ContextGlyphSize">18</sys:Double>
+    <!-- Now playing: the album art, square. -->
+    <sys:Double x:Key="ContextArtSize">260</sys:Double>
+    <sys:Double x:Key="ContextArtGlyphSize">64</sys:Double>
+    <!-- Monitors: one small screen per profile. -->
+    <sys:Double x:Key="MonitorWidth">76</sys:Double>
+    <sys:Double x:Key="MonitorHeight">46</sys:Double>
+    <Thickness x:Key="MonitorMargin">0,0,22,6</Thickness>
+    <!-- Mixer: one vertical bar per channel plus master. -->
+    <sys:Double x:Key="MixerBarWidth">16</sys:Double>
+    <sys:Double x:Key="MixerBarHeight">150</sys:Double>
+    <sys:Double x:Key="MixerSlotWidth">64</sys:Double>
+    <SolidColorBrush x:Key="MixerTrack" Color="#26FFFFFF" />
+
     <Style x:Key="Icon" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
         <Setter Property="VerticalAlignment" Value="Center" />

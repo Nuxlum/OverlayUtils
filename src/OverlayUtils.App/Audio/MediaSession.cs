@@ -1,11 +1,16 @@
+using System.IO;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using OverlayUtils.Core.Audio;
 using OverlayUtils.Core.Diagnostics;
 using Windows.Media.Control;
+using Windows.Storage.Streams;
 
 namespace OverlayUtils.App.Audio;
 
 /// <summary>
 /// System media session (WinRT GlobalSystemMediaTransportControls). Events may be raised on any thread.
+/// The track's thumbnail is decoded on a worker into <see cref="Art"/>.
 /// </summary>
 public sealed class MediaSession : IMediaControl, IDisposable
 {
@@ -26,6 +31,14 @@ public sealed class MediaSession : IMediaControl, IDisposable
     private int _refreshing;
     private bool _again;
     private bool _disposed;
+    // Album art: the track it belongs to, whether its thumbnail was read already (once per track, so a broken
+    // thumbnail is not retried or logged again), and the decoded image.
+    private string? _artTrack;
+    private bool _artRead;
+    private ImageSource? _art;
+
+    /// <summary>Width the album art is decoded at (the stage shows it large, the Home tile small).</summary>
+    private const int ArtWidth = 300;
 
     public MediaSession()
     {
@@ -37,6 +50,13 @@ public sealed class MediaSession : IMediaControl, IDisposable
         get { lock (_gate) return _current; }
     }
 
+    /// <summary>Album art of the current track (frozen, any thread), null when the session has none or it failed.</summary>
+    public ImageSource? Art
+    {
+        get { lock (_gate) return _art; }
+    }
+
+    /// <summary>Raised when <see cref="Current"/> or <see cref="Art"/> changes.</summary>
     public event Action? Changed;
 
     public void Previous() => Command(s => s.TrySkipPreviousAsync().AsTask(), "Previous");
@@ -128,6 +148,7 @@ public sealed class MediaSession : IMediaControl, IDisposable
             while (true)
             {
                 NowPlaying? now = null;
+                IRandomAccessStreamReference? thumbnail = null;
                 try
                 {
                     GlobalSystemMediaTransportControlsSession? session;
@@ -135,6 +156,7 @@ public sealed class MediaSession : IMediaControl, IDisposable
                     if (session != null)
                     {
                         var props = await session.TryGetMediaPropertiesAsync();
+                        thumbnail = props?.Thumbnail;
                         var playing = session.GetPlaybackInfo()?.PlaybackStatus ==
                             GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
                         now = new NowPlaying(props?.Title ?? "", props?.Artist ?? "",
@@ -149,11 +171,8 @@ public sealed class MediaSession : IMediaControl, IDisposable
                     changed = !Equals(_current, now);
                     _current = now;
                 }
-                if (changed)
-                {
-                    try { Changed?.Invoke(); }
-                    catch (Exception ex) { Log.Error("MediaSession.Changed", ex); }
-                }
+                if (changed) RaiseChanged();
+                await UpdateArtAsync(now, thumbnail);
 
                 lock (_gate)
                 {
@@ -168,6 +187,70 @@ public sealed class MediaSession : IMediaControl, IDisposable
             lock (_gate) { _refreshing = 0; _again = false; }
             Log.Error("MediaSession.Refresh", ex);
         }
+    }
+
+    private void RaiseChanged()
+    {
+        try { Changed?.Invoke(); }
+        catch (Exception ex) { Log.Error("MediaSession.Changed", ex); }
+    }
+
+    /// <summary>
+    /// A new track drops the old art at once; its thumbnail (which may arrive with a later properties change) is
+    /// read and decoded once on a worker. Runs inside the serialized refresh, so loads never overlap.
+    /// </summary>
+    private async Task UpdateArtAsync(NowPlaying? now, IRandomAccessStreamReference? thumbnail)
+    {
+        var track = now is null ? null : now.Title + "\n" + now.Artist + "\n" + now.App;
+        bool cleared, load;
+        lock (_gate)
+        {
+            cleared = false;
+            if (track != _artTrack)
+            {
+                _artTrack = track;
+                _artRead = false;
+                cleared = _art is not null;
+                _art = null;
+            }
+            load = track is not null && thumbnail is not null && !_artRead;
+            if (load) _artRead = true;
+        }
+        if (cleared) RaiseChanged();
+        if (!load) return;
+
+        var art = await Task.Run(async () =>
+        {
+            try
+            {
+                using var stream = await thumbnail!.OpenReadAsync();
+                using var input = stream.AsStreamForRead();
+                using var bytes = new MemoryStream();
+                await input.CopyToAsync(bytes);
+                bytes.Position = 0;
+                var image = new BitmapImage();
+                image.BeginInit();
+                image.CacheOption = BitmapCacheOption.OnLoad; // the stream is not kept
+                image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+                image.DecodePixelWidth = ArtWidth;
+                image.StreamSource = bytes;
+                image.EndInit();
+                image.Freeze();
+                return (ImageSource?)image;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("MediaSession.Art", ex); // at most once per track (_artRead)
+                return null;
+            }
+        });
+        if (art is null) return;
+        lock (_gate)
+        {
+            if (_disposed || _artTrack != track) return; // the track changed meanwhile
+            _art = art;
+        }
+        RaiseChanged();
     }
 
     private void Command(Func<GlobalSystemMediaTransportControlsSession, Task> action, string name)

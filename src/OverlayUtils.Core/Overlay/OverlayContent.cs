@@ -742,6 +742,16 @@ public sealed class OverlayContent
         else c.AudioInputOrder.RemoveAll(d => d.Id == id);
     });
 
+    /// <summary>
+    /// Cap of the default output in percent as the Max volume row shows it, null when there is no default output,
+    /// no cap stored for it, or the cap is 100% (the stage context of the Volume tile).
+    /// </summary>
+    public int? OutputCapPercent() =>
+        _audio.Default(AudioFlow.Output) is { } device && _config.Current.AudioVolumeCaps.ContainsKey(device.Id)
+            && CurrentCap(device.Id) is var cap && cap < MaxVolumeCap
+            ? cap
+            : null;
+
     /// <summary>Cap of the current default output in percent (100 when none is stored).</summary>
     int CurrentCap(string id) =>
         _config.Current.AudioVolumeCaps.TryGetValue(id, out var cap) ? Math.Clamp(cap, MinVolumeCap, MaxVolumeCap) : MaxVolumeCap;

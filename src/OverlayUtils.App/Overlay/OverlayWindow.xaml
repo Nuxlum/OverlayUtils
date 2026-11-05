@@ -698,10 +698,18 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Border Width="44" Height="44" CornerRadius="8" Background="{StaticResource SegmentActive}">
-                            <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Music}" FontSize="19"
-                                       Foreground="{StaticResource Muted}" />
-                        </Border>
+                        <Grid Width="44" Height="44">
+                            <Border CornerRadius="8" Background="{StaticResource SegmentActive}">
+                                <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Music}" FontSize="19"
+                                           Foreground="{StaticResource Muted}" />
+                            </Border>
+                            <!-- The album art over the glyph, once the session has one. -->
+                            <Border x:Name="TileArt" CornerRadius="8">
+                                <Border.Background>
+                                    <ImageBrush ImageSource="{Binding Art}" Stretch="UniformToFill" />
+                                </Border.Background>
+                            </Border>
+                        </Grid>
                         <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
                             <TextBlock Style="{StaticResource TileText}" Text="{Binding Label}" />
                             <TextBlock x:Name="Subtitle" Text="{Binding Value}" Margin="0,2,0,0" FontSize="12.5"
@@ -734,6 +742,9 @@
                     </Trigger>
                     <DataTrigger Binding="{Binding Value}" Value="">
                         <Setter TargetName="Subtitle" Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding Art}" Value="{x:Null}">
+                        <Setter TargetName="TileArt" Property="Visibility" Value="Collapsed" />
                     </DataTrigger>
                 </DataTemplate.Triggers>
             </DataTemplate>
@@ -795,6 +806,215 @@
                     </DockPanel>
                 </ContentControl>
             </DataTemplate>
+
+            <!--
+              Stage context cards (ContextHost, bottom left of the stage), one per ContextVm.Kind. Title, value line and
+              body text collapse when empty.
+            -->
+            <Style x:Key="ContextTitle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+                <Setter Property="FontSize" Value="{StaticResource ContextTitleSize}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                <Style.Triggers>
+                    <Trigger Property="Text" Value="">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="ContextValue" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="{StaticResource ContextValueSize}" />
+                <Setter Property="Margin" Value="0,4,0,0" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Style.Triggers>
+                    <Trigger Property="Text" Value="">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="ContextBody" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="{StaticResource ContextSize}" />
+                <Setter Property="LineHeight" Value="21" />
+                <Setter Property="Margin" Value="0,6,0,0" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                <Style.Triggers>
+                    <Trigger Property="Text" Value="">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="ContextCard" TargetType="Border" BasedOn="{StaticResource GlassCard}">
+                <Setter Property="MaxWidth" Value="{StaticResource ContextWidth}" />
+                <Setter Property="Padding" Value="20,16" />
+                <Setter Property="HorizontalAlignment" Value="Left" />
+            </Style>
+
+            <!-- Default: the row's label, its value (if any) and its description. -->
+            <DataTemplate x:Key="TextContext">
+                <Border Style="{StaticResource ContextCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource ContextTitle}" Text="{Binding Title}" />
+                        <TextBlock Style="{StaticResource ContextValue}" Text="{Binding Value}" />
+                        <TextBlock Style="{StaticResource ContextBody}" Text="{Binding Text}" />
+                    </StackPanel>
+                </Border>
+            </DataTemplate>
+
+            <!-- Screen row / tile: one small screen per monitor profile, the active one lit. -->
+            <DataTemplate x:Key="MonitorsContext">
+                <Border Style="{StaticResource ContextCard}">
+                    <StackPanel>
+                        <ItemsControl ItemsSource="{Binding Monitors}" Focusable="False" Margin="0,4,0,14">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel x:Name="Monitor" Margin="{StaticResource MonitorMargin}" Opacity="0.6">
+                                        <!-- The screen, its stand and foot. -->
+                                        <Grid Width="{StaticResource MonitorWidth}" Height="{StaticResource MonitorHeight}">
+                                            <Border x:Name="Lit" CornerRadius="5" Background="{DynamicResource Accent}"
+                                                    Opacity="0" />
+                                            <Border x:Name="Screen" CornerRadius="5" BorderThickness="2"
+                                                    BorderBrush="{StaticResource Subtle}" />
+                                        </Grid>
+                                        <Rectangle x:Name="Stand" Width="6" Height="7" Fill="{StaticResource Subtle}" />
+                                        <Rectangle x:Name="Foot" Width="28" Height="3" RadiusX="1.5" RadiusY="1.5"
+                                                   Fill="{StaticResource Subtle}" />
+                                        <TextBlock Text="{Binding Name}" Margin="0,6,0,0" FontSize="13"
+                                                   HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                   MaxWidth="{StaticResource MonitorWidth}" />
+                                    </StackPanel>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding Active}" Value="True">
+                                            <Setter TargetName="Monitor" Property="Opacity" Value="1" />
+                                            <Setter TargetName="Lit" Property="Opacity" Value="{StaticResource TintOpacity}" />
+                                            <Setter TargetName="Screen" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                            <Setter TargetName="Stand" Property="Fill" Value="{DynamicResource Accent}" />
+                                            <Setter TargetName="Foot" Property="Fill" Value="{DynamicResource Accent}" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Style="{StaticResource ContextTitle}" Text="{Binding Title}" />
+                        <TextBlock Style="{StaticResource ContextBody}" Text="{Binding Text}" />
+                    </StackPanel>
+                </Border>
+            </DataTemplate>
+
+            <!--
+              Audio page, volume and channel rows: the whole mix as vertical bars (channels, then master), the
+              selected one outlined; below, the selected channel with its apps.
+            -->
+            <DataTemplate x:Key="MixerContext">
+                <Border Style="{StaticResource ContextCard}">
+                    <StackPanel>
+                        <ItemsControl ItemsSource="{Binding Bars}" Focusable="False" Margin="0,4,0,14">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel x:Name="Slot" Width="{StaticResource MixerSlotWidth}" Margin="0,0,0,6"
+                                                Opacity="0.7">
+                                        <Border x:Name="Outline" HorizontalAlignment="Center" Padding="3" CornerRadius="11"
+                                                BorderThickness="2" BorderBrush="Transparent">
+                                            <Grid Width="{StaticResource MixerBarWidth}" Height="{StaticResource MixerBarHeight}">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="{Binding Level, Converter={StaticResource Star}, ConverterParameter=rest}" />
+                                                    <RowDefinition Height="{Binding Level, Converter={StaticResource Star}}" />
+                                                </Grid.RowDefinitions>
+                                                <Border Grid.RowSpan="2" CornerRadius="8" Background="{StaticResource MixerTrack}" />
+                                                <Border x:Name="Fill" Grid.Row="1" CornerRadius="8" Background="{DynamicResource Accent}" />
+                                            </Grid>
+                                        </Border>
+                                        <TextBlock x:Name="BarName" Text="{Binding Name}" Margin="0,8,0,0" FontSize="12.5"
+                                                   HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                   MaxWidth="{StaticResource MixerSlotWidth}" />
+                                    </StackPanel>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding Muted}" Value="True">
+                                            <Setter TargetName="Fill" Property="Background" Value="{StaticResource Subtle}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Selected}" Value="True">
+                                            <Setter TargetName="Slot" Property="Opacity" Value="1" />
+                                            <Setter TargetName="Outline" Property="BorderBrush" Value="{StaticResource Text}" />
+                                            <Setter TargetName="BarName" Property="FontWeight" Value="SemiBold" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding Value}" Margin="12,0,0,0"
+                                       FontSize="{StaticResource ContextValueSize}" VerticalAlignment="Center"
+                                       Foreground="{StaticResource Muted}" />
+                            <TextBlock Style="{StaticResource ContextTitle}" Text="{Binding Title}" />
+                        </DockPanel>
+                        <TextBlock Style="{StaticResource ContextValue}" Text="{Binding Apps}" />
+                        <TextBlock Style="{StaticResource ContextBody}" Text="{Binding Text}" />
+                    </StackPanel>
+                </Border>
+            </DataTemplate>
+
+            <!-- Now playing: the album art large (a music glyph until it arrives), title, artist · app. -->
+            <DataTemplate x:Key="MediaContext">
+                <Border Style="{StaticResource ContextCard}" Padding="16">
+                    <StackPanel>
+                        <Grid Width="{StaticResource ContextArtSize}" Height="{StaticResource ContextArtSize}"
+                              HorizontalAlignment="Left">
+                            <Border CornerRadius="10" Background="{StaticResource SegmentActive}">
+                                <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Music}"
+                                           FontSize="{StaticResource ContextArtGlyphSize}" Foreground="{StaticResource Muted}" />
+                            </Border>
+                            <Border x:Name="Art" CornerRadius="10">
+                                <Border.Background>
+                                    <ImageBrush ImageSource="{Binding Art}" Stretch="UniformToFill" />
+                                </Border.Background>
+                            </Border>
+                        </Grid>
+                        <TextBlock Style="{StaticResource ContextTitle}" Text="{Binding Title}" Margin="4,14,4,0"
+                                   MaxWidth="{StaticResource ContextArtSize}" HorizontalAlignment="Left" />
+                        <TextBlock Style="{StaticResource ContextBody}" Text="{Binding Text}" Margin="4,4,4,2"
+                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                   MaxWidth="{StaticResource ContextArtSize}" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding Art}" Value="{x:Null}">
+                        <Setter TargetName="Art" Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <!-- Home volume tile: the output device, the volume big, and its cap (else the description). -->
+            <DataTemplate x:Key="VolumeContext">
+                <Border Style="{StaticResource ContextCard}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="{Binding Glyph}" Margin="0,0,10,0"
+                                       FontSize="{StaticResource ContextGlyphSize}" Foreground="{StaticResource Muted}" />
+                            <TextBlock Style="{StaticResource ContextTitle}" Text="{Binding Title}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding Value}" Margin="0,6,0,0" FontFamily="{StaticResource DisplayFont}"
+                                   FontSize="{StaticResource ContextBigSize}" FontWeight="SemiBold" />
+                        <TextBlock Style="{StaticResource ContextBody}" Text="{Binding Text}" />
+                    </StackPanel>
+                </Border>
+            </DataTemplate>
+
+            <local:ContextTemplateSelector x:Key="ContextTemplates"
+                                           Text="{StaticResource TextContext}"
+                                           Monitors="{StaticResource MonitorsContext}"
+                                           Mixer="{StaticResource MixerContext}"
+                                           Media="{StaticResource MediaContext}"
+                                           Volume="{StaticResource VolumeContext}" />
 
             <local:RowTemplateSelector x:Key="TileTemplates"
                                        Action="{StaticResource ActionTile}"
@@ -1070,15 +1290,20 @@
                 </Border>
 
                 <!--
-                  Context of the selected row. For now the default card: the row's description. Hidden on the
-                  Games grid (the column takes the stage) and when there is nothing to say.
+                  Context of the selected row (ContextVm): the template follows its Kind (monitors, mixer, album art,
+                  volume, else the label / value / description card). Hidden on the Games grid (the column takes the
+                  stage) and when there is nothing to say. Cards swap at once (no cross-fade yet).
                 -->
                 <ContentControl x:Name="ContextHost" Focusable="False" HorizontalAlignment="Left"
-                                VerticalAlignment="Bottom">
+                                VerticalAlignment="Bottom" Content="{Binding Context}"
+                                ContentTemplateSelector="{StaticResource ContextTemplates}">
+                    <ContentControl.LayoutTransform>
+                        <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
+                    </ContentControl.LayoutTransform>
                     <ContentControl.Style>
                         <Style TargetType="ContentControl">
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding Description}" Value="">
+                                <DataTrigger Binding="{Binding Context}" Value="{x:Null}">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsWide}" Value="True">
@@ -1087,13 +1312,6 @@
                             </Style.Triggers>
                         </Style>
                     </ContentControl.Style>
-                    <Border Style="{StaticResource GlassCard}" MaxWidth="460" Padding="20,16">
-                        <Border.LayoutTransform>
-                            <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
-                        </Border.LayoutTransform>
-                        <TextBlock Text="{Binding Description}" FontSize="{StaticResource ContextSize}" LineHeight="21"
-                                   TextWrapping="Wrap" Foreground="{StaticResource Muted}" />
-                    </Border>
                 </ContentControl>
             </Grid>
         </Grid>

@@ -416,6 +416,27 @@ internal sealed partial class OverlayWindow : Window
 }
 
 /// <summary>Picks the row template from <see cref="RowVm.Kind"/>.</summary>
+/// <summary>The stage context card for a <see cref="ContextVm"/>, by its kind.</summary>
+internal sealed class ContextTemplateSelector : DataTemplateSelector
+{
+    public DataTemplate? Text { get; set; }
+    public DataTemplate? Monitors { get; set; }
+    public DataTemplate? Mixer { get; set; }
+    public DataTemplate? Media { get; set; }
+    public DataTemplate? Volume { get; set; }
+
+    public override DataTemplate? SelectTemplate(object item, DependencyObject container) =>
+        (item as ContextVm)?.Kind switch
+        {
+            ContextKind.Monitors => Monitors,
+            ContextKind.Mixer => Mixer,
+            ContextKind.Media => Media,
+            ContextKind.Volume => Volume,
+            ContextKind.Text => Text,
+            _ => null,
+        };
+}
+
 internal sealed class RowTemplateSelector : DataTemplateSelector
 {
     public DataTemplate? Action { get; set; }

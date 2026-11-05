@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using OverlayUtils.App.Games;
 using OverlayUtils.Core;
+using OverlayUtils.Core.Diagnostics;
 using OverlayUtils.Core.Games;
 using OverlayUtils.Core.Localization;
 using OverlayUtils.Core.Overlay;
@@ -50,6 +51,50 @@ internal sealed record RowVm(
     /// label is the tile's text), else the label. Empty off a tiles page.
     /// </summary>
     public string Caption { get; init; } = "";
+
+    /// <summary>Album art of a Media row (the Home tile shows it), null when there is none.</summary>
+    public ImageSource? Art { get; init; }
+}
+
+/// <summary>What the stage's context card shows for the selected row.</summary>
+internal enum ContextKind { Text, Monitors, Mixer, Media, Volume }
+
+/// <summary>One monitor profile of the Monitors card; <see cref="Active"/> is the profile in use (lit).</summary>
+internal sealed record MonitorVm(string Name, bool Active);
+
+/// <summary>One vertical bar of the Mixer card (a channel or the master): level 0..1, the selected one outlined.</summary>
+internal sealed record BarVm(string Name, double Level, bool Muted, bool Selected);
+
+/// <summary>
+/// Stage context of the selected row. <see cref="Title"/> and <see cref="Text"/> are the card's heading and body;
+/// <see cref="Value"/> the row's value line; <see cref="Glyph"/> the device icon (Volume); <see cref="Apps"/> the
+/// apps of the selected channel (Mixer); <see cref="Art"/> the album art (Media). Equal contexts compare equal, so a
+/// refresh that changes nothing keeps the card as it is.
+/// </summary>
+internal sealed record ContextVm(ContextKind Kind, string Title, string Text)
+{
+    public string Value { get; init; } = "";
+    public string Glyph { get; init; } = "";
+    public IReadOnlyList<MonitorVm> Monitors { get; init; } = [];
+    public IReadOnlyList<BarVm> Bars { get; init; } = [];
+    public string Apps { get; init; } = "";
+    public ImageSource? Art { get; init; }
+
+    public bool Equals(ContextVm? other) =>
+        other is not null && Kind == other.Kind && Title == other.Title && Text == other.Text && Value == other.Value
+        && Glyph == other.Glyph && Apps == other.Apps && ReferenceEquals(Art, other.Art)
+        && Monitors.SequenceEqual(other.Monitors) && Bars.SequenceEqual(other.Bars);
+
+    public override int GetHashCode() => HashCode.Combine(Kind, Title, Text, Value, Apps);
+}
+
+/// <summary>
+/// What the stage context reads besides the navigator (set once by the controller): the cap of the default output,
+/// the monitor profiles with the active one (for the many-profiles Choice shape), the album art.
+/// </summary>
+internal sealed record StageSources(Func<int?> OutputCap, Func<IReadOnlyList<MonitorVm>> Monitors, Func<ImageSource?> Art)
+{
+    public static readonly StageSources None = new(() => null, () => [], () => null);
 }
 
 /// <summary>
@@ -108,6 +153,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     string _batteryText = "";
     IReadOnlyList<RowVm> _rows = [];
     string _description = "";
+    ContextVm? _context;
     IReadOnlyList<FooterVm> _footer = [];
     string _batteryGlyph = "";
     Brush _accentBrush = Frozen(FallbackAccent);
@@ -176,6 +222,10 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     public bool IsWide => _showTiles;
     public IReadOnlyList<RowVm> Rows { get => _rows; private set => Set(ref _rows, value); }
     public string Description { get => _description; private set => Set(ref _description, value); }
+    /// <summary>Stage card of the selected row, null when there is nothing to show (the card is hidden).</summary>
+    public ContextVm? Context { get => _context; private set => Set(ref _context, value); }
+    /// <summary>Cap, monitor profiles and album art for the stage context; set by the controller.</summary>
+    public StageSources Sources { get; set; } = StageSources.None;
     public IReadOnlyList<FooterVm> Footer { get => _footer; private set => Set(ref _footer, value); }
 
     /// <summary>The Games grid, drawn under the rows while the page has a visible Grid row.</summary>
@@ -229,6 +279,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         IsOnPage = nav.Page != OverlayPage.Tabs;
 
         var tiles = nav.Page == OverlayPage.Tabs && nav.CurrentTab.Tiles;
+        var art = Art();
         var rows = new List<RowVm>();
         var items = nav.Items;
         for (var i = 0; i < items.Count; i++)
@@ -266,14 +317,108 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
             rows.Add(new RowVm(i, string.IsNullOrEmpty(section) ? null : section.ToUpper(Loc.Culture), item.Icon,
                 label, item.Kind, value, isOn, hint,
                 item.Kind == ItemKind.Action && hint.Length == 0 && (item.Stay || item.OpensInfo || item.SubPage != null),
-                selected, options, sliderLevel, selected && nav.Holding, item.Child) { Caption = caption });
+                selected, options, sliderLevel, selected && nav.Holding, item.Child)
+            {
+                Caption = caption,
+                Art = item.Kind == ItemKind.Media ? art : null,
+            });
         }
         ShowHomeTiles = tiles;
         Rows = rows;
         RefreshTiles(nav, items);
         Description = nav.Description();
+        Context = BuildContext(nav, items, rows, outputDevice, art);
         Footer = nav.Footer(pad).Select(h => new FooterVm(h.Keys, h.Label, h.Command)).ToList();
     }
+
+    /// <summary>The album art from <see cref="Sources"/>; a failure only loses the art.</summary>
+    ImageSource? Art()
+    {
+        try { return Sources.Art(); }
+        catch (Exception e)
+        {
+            Log.Error("Overlay album art", e);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The stage card for the selected row: the monitors for the Screen row, the mixer for the Audio page's volume
+    /// and channel rows, the device and its cap for the Home volume tile, the album art for Now playing, else the
+    /// row's label, value and description. Null when nothing is selected or there is nothing to say.
+    /// </summary>
+    ContextVm? BuildContext(OverlayNavigator nav, IReadOnlyList<OverlayItem> items, IReadOnlyList<RowVm> rows,
+        string outputDevice, ImageSource? art)
+    {
+        try
+        {
+            if (nav.Index < 0 || nav.Index >= items.Count) return null;
+            var item = items[nav.Index];
+            var at = -1;
+            for (var i = 0; i < rows.Count; i++)
+                if (rows[i].IsSelected) at = i;
+            if (at < 0) return null;
+            var row = rows[at];
+            var description = item.Description();
+            var key = item.Key ?? "";
+            var tab = nav.Page == OverlayPage.Tabs ? nav.CurrentTab.Id : "";
+
+            if (key == "controls.monitor")
+            {
+                IReadOnlyList<MonitorVm> monitors = item.Kind == ItemKind.Segmented
+                    ? row.Options.Select(o => new MonitorVm(o.Label, o.IsActive)).ToList()
+                    : Sources.Monitors(); // Choice (many profiles): the options are not rows
+                return new ContextVm(ContextKind.Monitors, row.Label, description) { Monitors = monitors };
+            }
+            if (tab == OverlayContent.AudioTabId && (key == "audio.volume" || IsChannel(key)))
+            {
+                // One bar per channel row, the master last (mockup); app rows are not bars.
+                var bars = new List<BarVm>();
+                BarVm? master = null;
+                foreach (var r in rows)
+                {
+                    var rowKey = KeyOf(items, r);
+                    if (r.Kind != ItemKind.Slider || r.Child) continue;
+                    var bar = new BarVm(r.Label, r.Level, r.IsOn, r.IsSelected);
+                    if (rowKey == "audio.volume") master = bar;
+                    else if (IsChannel(rowKey)) bars.Add(bar);
+                }
+                if (master is not null) bars.Add(master);
+                var apps = new List<string>();
+                if (IsChannel(key))
+                    for (var i = at + 1; i < rows.Count && rows[i].Child; i++) apps.Add(rows[i].Label);
+                return new ContextVm(ContextKind.Mixer, row.Label, description)
+                {
+                    Bars = bars, Apps = string.Join(", ", apps), Value = row.Value,
+                };
+            }
+            if (tab == OverlayContent.HomeTabId && key == "audio.volume")
+            {
+                var cap = Sources.OutputCap();
+                return new ContextVm(ContextKind.Volume, outputDevice.Length > 0 ? outputDevice : row.Label,
+                    cap is { } percent ? Loc.T("Overlay.Context.Cap", percent) : description)
+                {
+                    Value = row.Value,
+                    Glyph = outputDevice.Length > 0 ? OverlayContent.OutputIcon(outputDevice) : Glyphs.Volume,
+                };
+            }
+            if (key == "audio.media")
+                return new ContextVm(ContextKind.Media, row.Label, row.Value) { Art = art };
+
+            if (description.Length == 0 && row.Value.Length == 0) return null;
+            return new ContextVm(ContextKind.Text, row.Label, description) { Value = row.Value };
+        }
+        catch (Exception e)
+        {
+            Log.Error("Overlay stage context", e);
+            return null;
+        }
+    }
+
+    static bool IsChannel(string key) => key.StartsWith("ch.", StringComparison.Ordinal);
+
+    static string KeyOf(IReadOnlyList<OverlayItem> items, RowVm row) =>
+        row.Index >= 0 && row.Index < items.Count ? items[row.Index].Key ?? "" : "";
 
     /// <summary>Rail icon of a tab.</summary>
     static string RailGlyph(string tabId) => tabId switch

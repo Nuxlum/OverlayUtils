@@ -4,6 +4,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
+using OverlayUtils.App.Audio;
 using OverlayUtils.Core.Config;
 using OverlayUtils.Core.Diagnostics;
 using OverlayUtils.Core.Interop;
@@ -63,6 +64,14 @@ internal sealed class OverlayController : IDisposable
         _content = content;
         _navigator = new OverlayNavigator(content.Tabs, content.Settings, content.Info, media: content.Media);
 
+        _vm.Sources = new StageSources(
+            content.OutputCapPercent,
+            () =>
+            {
+                var current = monitors.Current;
+                return monitors.List().Select(p => new MonitorVm(p, p == current)).ToList();
+            },
+            () => (content.Media as MediaSession)?.Art);
         _window.Bind(_vm);
         _window.CommandIssued += OnCommand;
         _window.RowClicked += OnRowClicked;

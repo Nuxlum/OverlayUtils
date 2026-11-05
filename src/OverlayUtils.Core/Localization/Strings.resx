@@ -133,6 +133,7 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Overlay.CloseWindow.Desc" xml:space="preserve"><value>Closes the window that was in front before the overlay.</value></data>
   <data name="Overlay.CloseWindow.Label" xml:space="preserve"><value>Close window</value></data>
   <data name="Overlay.ConfirmPending" xml:space="preserve"><value>Confirm?</value></data>
+  <data name="Overlay.Context.Cap" xml:space="preserve"><value>Your cap for this device is {0}%.</value></data>
   <data name="Overlay.DeletePending" xml:space="preserve"><value>Delete? Press again</value></data>
   <data name="Overlay.Footer.ConfirmDelete" xml:space="preserve"><value>Confirm delete</value></data>
   <data name="Overlay.Footer.Apply" xml:space="preserve"><value>Apply</value></data>

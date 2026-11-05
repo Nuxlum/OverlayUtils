@@ -133,6 +133,7 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.CloseWindow.Desc" xml:space="preserve"><value>Chiude la finestra che era in primo piano prima dell'overlay.</value></data>
   <data name="Overlay.CloseWindow.Label" xml:space="preserve"><value>Chiudi finestra</value></data>
   <data name="Overlay.ConfirmPending" xml:space="preserve"><value>Conferma?</value></data>
+  <data name="Overlay.Context.Cap" xml:space="preserve"><value>Il limite per questo dispositivo è {0}%.</value></data>
   <data name="Overlay.DeletePending" xml:space="preserve"><value>Eliminare? Premi di nuovo</value></data>
   <data name="Overlay.Footer.ConfirmDelete" xml:space="preserve"><value>Conferma eliminazione</value></data>
   <data name="Overlay.Footer.Apply" xml:space="preserve"><value>Applica</value></data>
