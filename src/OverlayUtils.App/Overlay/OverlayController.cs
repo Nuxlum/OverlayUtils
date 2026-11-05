@@ -339,23 +339,12 @@ internal sealed class OverlayController : IDisposable
     }
 
     /// <summary>
-    /// A source pill of the Games page: that filter at once (not a run of X cycles), then, as X does, the selected game
-    /// stays if it is still shown, else the shelf starts on its first tile.
+    /// A source pill of the Games page: that filter at once (not a run of Y cycles), under the same keep-the-game rule
+    /// as Y (<see cref="OverlayNavigator.ApplyFilter"/>), and not while a list entry is held.
     /// </summary>
     void OnFilterClicked(GameSource? source)
     {
-        if (!_open) return;
-        try
-        {
-            var id = _navigator.Selected?.Kind == ItemKind.Grid ? _navigator.SelectedTile?.Id : null;
-            _content.SetGamesFilter(source);
-            _navigator.HoverTile(Math.Max(0, _navigator.IndexOfTile(id)));
-        }
-        catch (Exception e)
-        {
-            Log.Error("Overlay filter pill", e);
-        }
-        Render();
+        if (_open) Apply(_navigator.ApplyFilter(() => _content.SetGamesFilter(source)));
     }
 
     void Apply(NavResult result)

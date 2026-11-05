@@ -930,6 +930,8 @@ string RepoRoot()
     Check(order.SequenceEqual(["b", "c", "a"]) && nav.Index == 2, "moves to the end");
     Check(nav.Handle(OverlayCommand.Down).Effect == NavEffect.None && nav.Index == 2, "Down cannot leave the list while holding");
     Check(nav.Handle(OverlayCommand.Left).Effect == NavEffect.None && nav.Handle(OverlayCommand.Remove).Effect == NavEffect.None, "other commands ignored while holding");
+    var filterRan = false;
+    Check(nav.ApplyFilter(() => filterRan = true).Effect == NavEffect.None && !filterRan, "a filter change is refused while holding");
     log.Clear();
     var commit = nav.Handle(OverlayCommand.A);
     Check(commit.Effect == NavEffect.RunHere && !nav.Holding, "A drops"); Run(commit);
@@ -2371,6 +2373,17 @@ string RepoRoot()
     content.SetGamesFilter(GameSource.Steam);
     nav.Refresh();
     Check(nav.Selected?.Label() == Loc.T("Games.Source.Steam"), "the grid follows a pill click");
+    content.SetGamesFilter(null);
+    nav.Refresh();
+
+    // The pill click goes through the same rule as Y: keep the game by id, else the first tile.
+    nav.HoverTile(nav.IndexOfTile("epic:3"));
+    nav.ApplyFilter(() => content.SetGamesFilter(GameSource.Epic)).Action?.Invoke();
+    nav.Refresh();
+    Check(nav.SelectedTile?.Id == "epic:3", "pill click keeps the selected game by id");
+    nav.ApplyFilter(() => content.SetGamesFilter(GameSource.Steam)).Action?.Invoke();
+    nav.Refresh();
+    Check(nav.SelectedTile?.Id == "steam:0" && nav.SelectedTileIndex == 0, "pill click without the selected game: first tile");
     content.SetGamesFilter(null);
     nav.Refresh();
 

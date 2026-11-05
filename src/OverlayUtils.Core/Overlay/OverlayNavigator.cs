@@ -232,15 +232,7 @@ public sealed class OverlayNavigator
     /// <summary>Runs the row's RemoveEntry; a <see cref="OverlayItem.ConfirmRemove"/> row needs a second press within 3 s.</summary>
     NavResult Remove()
     {
-        if (Selected?.AltAction is { } alt) return new NavResult(NavEffect.RunHere, () =>
-        {
-            alt();
-            // The grid's filter changed: keep the game if it is still shown, else start on the first tile.
-            var tiles = Tiles();
-            if (tiles.Count == 0) return;
-            var index = IndexOfTile(_tileId);
-            SetTile(index >= 0 ? index : 0, tiles);
-        });
+        if (Selected?.AltAction is { } alt) return ApplyFilter(alt);
         if (Selected is not { RemoveEntry: { } remove } item) return None;
         if (item.ConfirmRemove)
         {
@@ -253,6 +245,23 @@ public sealed class OverlayNavigator
             _removePending = null;
         }
         return new NavResult(NavEffect.RunHere, remove);
+    }
+
+    /// <summary>
+    /// Runs a change of the grid's filter (Y, or a source pill), then keeps the selected game if it is still shown, else
+    /// starts on the first tile. Nothing while a list entry is held.
+    /// </summary>
+    public NavResult ApplyFilter(Action change)
+    {
+        if (_holding) return None;
+        return new NavResult(NavEffect.RunHere, () =>
+        {
+            change();
+            var tiles = Tiles();
+            if (tiles.Count == 0) return;
+            var index = IndexOfTile(_tileId);
+            SetTile(index >= 0 ? index : 0, tiles);
+        });
     }
 
     static NavResult Media(Action? action) => action == null ? None : new NavResult(NavEffect.RunHere, action);
