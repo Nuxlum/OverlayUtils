@@ -78,6 +78,9 @@ public sealed class ConfigStore
                     loaded.AudioPresets ??= [];
                     loaded.GamesSourcesHidden ??= [];
                     loaded.GamesManualApps ??= [];
+                    loaded.OverlayBlur = Math.Clamp(loaded.OverlayBlur, 0, 100);
+                    loaded.OverlayFrost = Math.Clamp(loaded.OverlayFrost, 0, 100);
+                    loaded.OverlayDim = Math.Clamp(loaded.OverlayDim, 0, 100);
                     DropRemovedFeatures(loaded);
                     return loaded;
                 }

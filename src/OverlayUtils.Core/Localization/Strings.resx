@@ -205,7 +205,15 @@ Windows will ask for administrator permission once.</value></data>
   <data name="Overlay.Section.Monitor" xml:space="preserve"><value>Monitor</value></data>
   <data name="Overlay.Section.NowPlaying" xml:space="preserve"><value>Now playing</value></data>
   <data name="Overlay.Section.Other" xml:space="preserve"><value>Other</value></data>
-  <data name="Overlay.Section.Overlay" xml:space="preserve"><value>Overlay</value></data>
+  <data name="Overlay.Section.Appearance" xml:space="preserve"><value>Appearance</value></data>
+  <data name="Overlay.Footer.Adjust" xml:space="preserve"><value>Adjust</value></data>
+  <data name="Overlay.Footer.Reset" xml:space="preserve"><value>Reset</value></data>
+  <data name="Settings.Blur" xml:space="preserve"><value>Blur</value></data>
+  <data name="Settings.Blur.Desc" xml:space="preserve"><value>How blurred the game behind the overlay is.</value></data>
+  <data name="Settings.Frost" xml:space="preserve"><value>Frost</value></data>
+  <data name="Settings.Frost.Desc" xml:space="preserve"><value>How milky the frosted glass looks.</value></data>
+  <data name="Settings.Darkness" xml:space="preserve"><value>Darkness</value></data>
+  <data name="Settings.Darkness.Desc" xml:space="preserve"><value>How dark the background is behind the text.</value></data>
   <data name="Overlay.Section.Presets" xml:space="preserve"><value>Presets</value></data>
   <data name="Overlay.Section.Screen" xml:space="preserve"><value>Screen</value></data>
   <data name="Overlay.Section.Steam" xml:space="preserve"><value>Steam</value></data>

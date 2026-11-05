@@ -54,6 +54,7 @@ public sealed class OverlayItem
     public Action? RemoveEntry { get; init; }            // any row: the Remove command (Y on the pad)
     public bool ConfirmRemove { get; init; }             // Remove: second Y / Delete within 3 s (destructive deletes)
     public bool Child { get; init; }                     // drawn indented under the row above (an app under its channel)
+    public Func<string>? StepLabel { get; init; }        // Slider: footer label of the arrows when "Volume" does not fit
     public Func<string>? ActionLabel { get; init; }      // footer label of A when the kind's default does not fit
     public Func<IReadOnlyList<GameEntry>>? Tiles { get; init; } // Grid: the tiles, in display order
     public int Columns { get; init; } = 3;               // Grid

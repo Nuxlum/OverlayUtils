@@ -2388,6 +2388,101 @@ string RepoRoot()
     Check(CurrentGame.PlayTime(TimeSpan.FromMinutes(-5)) == "0 min", "negative time clamps to zero");
 }
 
+// --- Frost: frosted backdrop core and Appearance settings -----------------------
+{
+    var def = FrostSettings.FromConfig(new AppConfig());
+    Check(def.BlurRadius == 32 && Math.Abs(def.FrostOpacity - 0.07) < 1e-9, "frost defaults: radius 32, opacity 0.07");
+    Check(def.GradientAlphas.SequenceEqual(new byte[] { 0xE0, 0xB3, 0x59, 0x33 }), "frost defaults: gradient alphas");
+    Check(FrostSettings.FromConfig(new AppConfig { OverlayDim = 100 }).GradientAlphas[0] == 255, "full darkness clamps alpha to 255");
+    Check(FrostSettings.FromConfig(new AppConfig { OverlayBlur = 0 }).BlurRadius == 0, "blur 0 gives radius 0");
+
+    var frostPath = Path.Combine(temp, "frostcfg", "config.json");
+    Directory.CreateDirectory(Path.GetDirectoryName(frostPath)!);
+    File.WriteAllText(frostPath, """{ "overlay_blur": 400, "overlay_frost": -3 }""");
+    var frostCfg = new ConfigStore(frostPath).Current;
+    Check(frostCfg.OverlayBlur == 100 && frostCfg.OverlayFrost == 0 && frostCfg.OverlayDim == 50, "overlay_* values are clamped on load");
+
+    byte[] Img(int w, int h, Func<int, int, (byte R, byte G, byte B)> px)
+    {
+        var data = new byte[w * h * 4];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                var (r, g, b) = px(x, y);
+                int i = (y * w + x) * 4;
+                data[i] = b; data[i + 1] = g; data[i + 2] = r; data[i + 3] = 255;
+            }
+        return data;
+    }
+
+    var grey = Frost.Process(Img(8, 8, (_, _) => (128, 128, 128)), 8, 8, 32, def);
+    Check(grey is { Width: 2, Height: 2 }, "8x8 downscales to 2x2");
+    if (grey != null)
+    {
+        int expect = (int)Math.Min(255, Math.Round(128 * 1.08));
+        bool ok = true;
+        for (int i = 0; i < 4; i++)
+        {
+            byte b = grey.Bgr32[i * 4], g = grey.Bgr32[i * 4 + 1], r = grey.Bgr32[i * 4 + 2];
+            ok &= b == g && g == r && Math.Abs(r - expect) <= 1;
+        }
+        Check(ok, "uniform grey stays grey, lifted by the brightness");
+    }
+
+    var flat = new FrostSettings(0, 1, 1, 0, 0, new byte[] { 0, 0, 0, 0 });
+    var split = Img(16, 4, (x, _) => x < 8 ? ((byte)255, (byte)0, (byte)0) : ((byte)0, (byte)0, (byte)255));
+    var sharp = Frost.Process(split, 16, 4, 64, flat);
+    Check(sharp is { Width: 4, Height: 1 }, "16x4 downscales to 4x1");
+    if (sharp != null)
+        Check(sharp.Bgr32[2] == 255 && sharp.Bgr32[0] == 0, "no blur: pixel 0 is pure red");
+    if (sharp != null)
+        Check(sharp.Bgr32[12] == 255 && sharp.Bgr32[14] == 0, "no blur: pixel 3 is pure blue");
+    var blurred = Frost.Process(split, 16, 4, 64, flat with { BlurRadius = 16 });
+    if (blurred != null)
+        Check(blurred.Bgr32[6] > 0 && blurred.Bgr32[4] > 0 && blurred.Bgr32[10] > 0 && blurred.Bgr32[8] > 0, "blur mixes red and blue at the seam");
+    else Check(false, "blurred image produced");
+
+    var muted = Frost.Process(Img(4, 4, (_, _) => (150, 120, 120)), 4, 4, 16, flat with { Saturation = 1.3 });
+    Check(muted != null && muted.Bgr32[2] - muted.Bgr32[1] > 30, "saturation boosts a muted colour");
+    Check(Frost.Process(Img(3, 3, (_, _) => (1, 2, 3)), 3, 3, 12, def) is null, "3x3 is too small");
+
+    // Settings rows.
+    var store = new ConfigStore(Path.Combine(temp, "frostrows", "config.json"));
+    var monitors = new MonitorProfiles(store, new MonitorSwitcherLocator(store), Path.Combine(temp, "frostrows", "none"));
+    var content = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), new FakeHost(), new FakeAudio());
+    var rows = content.Settings();
+    var blur = rows.FirstOrDefault(i => i.Label() == Loc.T("Settings.Blur"));
+    var frostRow = rows.FirstOrDefault(i => i.Label() == Loc.T("Settings.Frost"));
+    var dark = rows.FirstOrDefault(i => i.Label() == Loc.T("Settings.Darkness"));
+    Check(blur?.Kind == ItemKind.Slider && frostRow?.Kind == ItemKind.Slider && dark?.Kind == ItemKind.Slider, "Blur, Frost, Darkness are sliders");
+    Check(rows.First(i => i.Label() == Loc.T("Settings.Size.Label")).Section!() == Loc.T("Overlay.Section.Appearance"), "Size opens the Appearance section");
+    if (blur != null && frostRow != null && dark != null)
+    {
+        Check(blur.Value() == "50%" && frostRow.Value() == "35%" && dark.Value() == "50%" && !blur.IsOn(), "slider values show the percent");
+        blur.Step!(1);
+        Check(store.Current.OverlayBlur == 55, "Step(1) moves blur by 5");
+        blur.SetLevel!(0.2);
+        Check(store.Current.OverlayBlur == 20, "SetLevel(0.2) gives 20");
+        blur.Toggle!();
+        Check(store.Current.OverlayBlur == 50, "A resets blur to the default");
+        frostRow.Toggle!(); dark.Toggle!();
+        Check(store.Current.OverlayFrost == 35 && store.Current.OverlayDim == 50, "A resets frost and darkness");
+        store.Update(c => c.OverlayBlur = 100);
+        blur.Step!(1);
+        Check(store.Current.OverlayBlur == 100, "Step(1) at 100 stays 100");
+        store.Update(c => c.OverlayBlur = 50);
+
+        var fnav = new OverlayNavigator(content.Tabs, content.Settings, content.Info);
+        fnav.Reset([]);
+        fnav.Handle(OverlayCommand.Settings);
+        for (int i = 0; i < 80 && fnav.Selected?.Label() != Loc.T("Settings.Blur"); i++) fnav.Handle(OverlayCommand.Down);
+        var ff = fnav.Footer();
+        Check(fnav.Selected?.Label() == Loc.T("Settings.Blur")
+              && ff.Any(f => f.Keys == "← →" && f.Label == Loc.T("Overlay.Footer.Adjust"))
+              && ff.Any(f => f.Keys == "Enter" && f.Label == Loc.T("Overlay.Footer.Reset")), "Blur footer: Adjust for arrows, Reset for A");
+    }
+}
+
 try { Directory.Delete(temp, recursive: true); } catch { /* best effort */ }
 Console.WriteLine(failures == 0 ? $"All {passed} checks passed." : $"{failures} failed, {passed} passed.");
 return failures == 0 ? 0 : 1;

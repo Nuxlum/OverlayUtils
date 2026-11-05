@@ -538,7 +538,7 @@ public sealed class OverlayNavigator
             if (item.Kind is ItemKind.Segmented or ItemKind.Choice)
                 hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.Change")));
             else if (item.Kind == ItemKind.Slider)
-                hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.Volume")));
+                hints.Add(new FooterHint("← →", item.StepLabel?.Invoke() ?? Loc.T("Overlay.Footer.Volume")));
             else if (item.Kind == ItemKind.Media)
                 hints.Add(new FooterHint("← →", Loc.T("Overlay.Footer.Track")));
             else if (item.Kind == ItemKind.Reorder && item.Step != null)

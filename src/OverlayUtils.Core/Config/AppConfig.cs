@@ -36,6 +36,12 @@ public sealed class AppConfig
     /// <summary>"normal", "large" or "auto" (large on the TV profile).</summary>
     [JsonPropertyName("overlay_size")] public string OverlaySize { get; set; } = OverlaySizes.Auto;
 
+    /// <summary>Appearance sliders, 0..100: blur of the frosted backdrop, milkiness of the glass, darkness behind the text.</summary>
+    [JsonPropertyName("overlay_blur")] public int OverlayBlur { get; set; } = DefaultBlur;
+    [JsonPropertyName("overlay_frost")] public int OverlayFrost { get; set; } = DefaultFrost;
+    [JsonPropertyName("overlay_dim")] public int OverlayDim { get; set; } = DefaultDim;
+    public const int DefaultBlur = 50, DefaultFrost = 35, DefaultDim = 50;
+
     /// <summary>"left" or "right" edge of the work area.</summary>
 
     /// <summary>Output devices, best first (Audio tab order).</summary>

@@ -898,7 +898,7 @@ public sealed class OverlayContent
             new OverlayItem
             {
                 Kind = ItemKind.Segmented, Icon = Glyphs.Monitor,
-                Section = () => Loc.T("Overlay.Section.Overlay"),
+                Section = () => Loc.T("Overlay.Section.Appearance"),
                 Label = () => Loc.T("Settings.Size.Label"),
                 Description = () => Loc.T("Settings.Size.Desc"),
                 Options = () =>
@@ -908,6 +908,9 @@ public sealed class OverlayContent
                     ConfigOption("Settings.Size.Auto", c => c.OverlaySize, (c, v) => c.OverlaySize = v, OverlaySizes.Auto),
                 ],
             },
+            AppearanceSlider("settings.blur", "Settings.Blur", Glyphs.Monitor, c => c.OverlayBlur, (c, v) => c.OverlayBlur = v, AppConfig.DefaultBlur),
+            AppearanceSlider("settings.frost", "Settings.Frost", Glyphs.Monitor, c => c.OverlayFrost, (c, v) => c.OverlayFrost = v, AppConfig.DefaultFrost),
+            AppearanceSlider("settings.darkness", "Settings.Darkness", Glyphs.Monitor, c => c.OverlayDim, (c, v) => c.OverlayDim = v, AppConfig.DefaultDim),
             new OverlayItem
             {
                 Kind = ItemKind.Segmented, Icon = Glyphs.Game, Confirm = true,
@@ -962,6 +965,24 @@ public sealed class OverlayContent
     OverlayOption HomeKeyOption(string labelKey, string mode) => new(
         () => Loc.T(labelKey), () => _config.Update(c => c.HomeKeyMode = mode), Stay: true,
         Active: () => _config.Current.HomeKeyMode == mode);
+
+    /// <summary>A 0..100 % slider of the Appearance section: arrows step by 5, a click sets, A resets.</summary>
+    OverlayItem AppearanceSlider(string key, string labelKey, string icon, Func<AppConfig, int> get, Action<AppConfig, int> set, int fallback)
+    {
+        void Set(int value) => _config.Update(c => set(c, Math.Clamp(value, 0, 100)));
+        return new OverlayItem
+        {
+            Kind = ItemKind.Slider, Icon = icon, Key = key,
+            Label = () => Loc.T(labelKey),
+            Description = () => Loc.T(labelKey + ".Desc"),
+            Value = () => get(_config.Current) + "%",
+            Step = direction => Set(get(_config.Current) + direction * 5),
+            SetLevel = level => Set((int)Math.Round(level * 100)),
+            Toggle = () => Set(fallback),
+            StepLabel = () => Loc.T("Overlay.Footer.Adjust"),
+            ActionLabel = () => Loc.T("Overlay.Footer.Reset"),
+        };
+    }
 
     OverlayOption ConfigOption(string labelKey, Func<AppConfig, string> get, Action<AppConfig, string> set, string value) => new(
         () => Loc.T(labelKey), () => _config.Update(c => set(c, value)), Stay: true,

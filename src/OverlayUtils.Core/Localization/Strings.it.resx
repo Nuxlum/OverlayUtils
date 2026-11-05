@@ -205,7 +205,15 @@ Windows chiederà una volta i permessi di amministratore.</value></data>
   <data name="Overlay.Section.Monitor" xml:space="preserve"><value>Monitor</value></data>
   <data name="Overlay.Section.NowPlaying" xml:space="preserve"><value>In riproduzione</value></data>
   <data name="Overlay.Section.Other" xml:space="preserve"><value>Altro</value></data>
-  <data name="Overlay.Section.Overlay" xml:space="preserve"><value>Overlay</value></data>
+  <data name="Overlay.Section.Appearance" xml:space="preserve"><value>Aspetto</value></data>
+  <data name="Overlay.Footer.Adjust" xml:space="preserve"><value>Regola</value></data>
+  <data name="Overlay.Footer.Reset" xml:space="preserve"><value>Ripristina</value></data>
+  <data name="Settings.Blur" xml:space="preserve"><value>Sfocatura</value></data>
+  <data name="Settings.Blur.Desc" xml:space="preserve"><value>Quanto è sfocato il gioco dietro l'overlay.</value></data>
+  <data name="Settings.Frost" xml:space="preserve"><value>Brina</value></data>
+  <data name="Settings.Frost.Desc" xml:space="preserve"><value>Quanto è lattiginoso il vetro smerigliato.</value></data>
+  <data name="Settings.Darkness" xml:space="preserve"><value>Oscurità</value></data>
+  <data name="Settings.Darkness.Desc" xml:space="preserve"><value>Quanto è scuro lo sfondo dietro il testo.</value></data>
   <data name="Overlay.Section.Presets" xml:space="preserve"><value>Preset</value></data>
   <data name="Overlay.Section.Screen" xml:space="preserve"><value>Schermo</value></data>
   <data name="Overlay.Section.Steam" xml:space="preserve"><value>Steam</value></data>

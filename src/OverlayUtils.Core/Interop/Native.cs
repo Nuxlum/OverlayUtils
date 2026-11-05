@@ -272,4 +272,46 @@ internal static partial class Native
 
     [LibraryImport("ole32.dll")]
     public static partial int PropVariantClear(ref CoreAudio.PropVariant value);
+
+    // --- GDI screen capture ---------------------------------------------------
+    public const uint SRCCOPY = 0x00CC0020;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct BITMAPINFOHEADER
+    {
+        public uint biSize;
+        public int biWidth, biHeight;
+        public ushort biPlanes, biBitCount;
+        public uint biCompression, biSizeImage;
+        public int biXPelsPerMeter, biYPelsPerMeter;
+        public uint biClrUsed, biClrImportant;
+    }
+
+    [LibraryImport("user32.dll")]
+    public static partial nint GetDC(nint hWnd);
+
+    [LibraryImport("user32.dll")]
+    public static partial int ReleaseDC(nint hWnd, nint hdc);
+
+    [LibraryImport("gdi32.dll")]
+    public static partial nint CreateCompatibleDC(nint hdc);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool DeleteDC(nint hdc);
+
+    // The 32bpp format needs no colour table, so the header alone stands in for BITMAPINFO.
+    [LibraryImport("gdi32.dll")]
+    public static partial nint CreateDIBSection(nint hdc, in BITMAPINFOHEADER bmi, uint usage, out nint bits, nint section, uint offset);
+
+    [LibraryImport("gdi32.dll")]
+    public static partial nint SelectObject(nint hdc, nint obj);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool DeleteObject(nint obj);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool BitBlt(nint dst, int x, int y, int w, int h, nint src, int sx, int sy, uint rop);
 }
