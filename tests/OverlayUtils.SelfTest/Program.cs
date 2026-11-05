@@ -2361,6 +2361,31 @@ string RepoRoot()
     nav.Refresh();
     Check(nav.Selected?.Label() == Loc.T("Overlay.Games.All"), "a fallen-back filter does not come back by itself");
 
+    // Filter pills: a click sets one source directly.
+    Check(content.GamesFilters().SequenceEqual(new GameSource?[] { null, GameSource.Steam, GameSource.Epic }), "pills: All then the sources present");
+    content.SetGamesFilter(GameSource.Epic);
+    Check(content.GamesFilter == GameSource.Epic
+        && content.Games().First(i => i.Kind == ItemKind.Grid).Tiles!().All(g => g.Source == GameSource.Epic), "pill click shows that source");
+    content.SetGamesFilter(GameSource.Gog);
+    Check(content.GamesFilter == null, "pill for a source without games shows All");
+    content.SetGamesFilter(GameSource.Steam);
+    nav.Refresh();
+    Check(nav.Selected?.Label() == Loc.T("Games.Source.Steam"), "the grid follows a pill click");
+    content.SetGamesFilter(null);
+    nav.Refresh();
+
+    // Cover columns change while open (monitor / DPI change): the same game stays selected, moves use the new columns.
+    view.Set(Enumerable.Range(0, 20).Select(i => G($"steam:c{i:00}", GameSource.Steam, $"C{i:00}")).ToList());
+    nav.Refresh();
+    content.GameColumns = 4;
+    nav.HoverTile(5);
+    content.GameColumns = 6;
+    nav.Refresh();
+    Check(nav.SelectedTile?.Id == "steam:c05", "column change keeps the selected game");
+    nav.Handle(OverlayCommand.Down);
+    Check(nav.SelectedTile?.Id == "steam:c11", "down after a column change moves by the new columns");
+    content.GameColumns = 3;
+
     // Before the first read: Loading, not "No games found".
     var loading = new FakeGames { Loading = true };
     var loadingContent = new OverlayContent(store, monitors, new MonitorSwitcherLocator(store), host, new FakeAudio(), null, null, loading);

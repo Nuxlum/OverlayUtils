@@ -89,6 +89,32 @@
     <sys:Double x:Key="MixerSlotWidth">64</sys:Double>
     <SolidColorBrush x:Key="MixerTrack" Color="#26FFFFFF" />
 
+    <!-- Games page: hero (selected game), source pills, the cover shelf and the backdrop tint. -->
+    <sys:Double x:Key="HeroTitleSize">46</sys:Double>
+    <!-- The hero stays left of the status corner at every size. -->
+    <sys:Double x:Key="HeroMaxWidth">760</sys:Double>
+    <sys:Double x:Key="PillHeight">30</sys:Double>
+    <sys:Double x:Key="PillTextSize">13</sys:Double>
+    <!-- The current pill: the accent at this opacity under the label, with an accent outline. -->
+    <sys:Double x:Key="PillLitOpacity">0.24</sys:Double>
+    <SolidColorBrush x:Key="BadgeBg" Color="#1FFFFFFF" />
+    <sys:Double x:Key="PlayHeight">38</sys:Double>
+    <sys:Double x:Key="PlayTextSize">15</sys:Double>
+    <SolidColorBrush x:Key="PlayBg" Color="#F3F5F8" />
+    <SolidColorBrush x:Key="PlayText" Color="#0B0D12" />
+    <SolidColorBrush x:Key="PlayKeyBg" Color="#1F0B0D12" />
+    <!-- Each cover's cell margin; the shelf's margin leaves room for the lifted first row. -->
+    <Thickness x:Key="CoverMargin">7,8,7,10</Thickness>
+    <Thickness x:Key="ShelfMargin">2,26,6,8</Thickness>
+    <!-- Selected cover: scale, glow; covers off its row are dimmed. -->
+    <sys:Double x:Key="CoverLift">1.1</sys:Double>
+    <ScaleTransform x:Key="CoverLiftTransform" ScaleX="{StaticResource CoverLift}" ScaleY="{StaticResource CoverLift}" />
+    <sys:Double x:Key="CoverGlowOpacity">0.7</sys:Double>
+    <sys:Double x:Key="CoverGlowRadius">16</sys:Double>
+    <sys:Double x:Key="ShelfDimOpacity">0.55</sys:Double>
+    <!-- Opacity of the selected cover's colour washed over the backdrop from the top right. -->
+    <sys:Double x:Key="GamesTintOpacity">0.50</sys:Double>
+
     <Style x:Key="Icon" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
         <Setter Property="VerticalAlignment" Value="Center" />

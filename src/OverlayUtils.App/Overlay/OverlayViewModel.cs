@@ -95,17 +95,27 @@ internal sealed record ContextVm(ContextKind Kind, string Title, string Text)
 internal sealed record StageSources(Func<int?> OutputCap, Func<IReadOnlyList<MonitorVm>> Monitors, Func<ImageSource?> Art)
 {
     public static readonly StageSources None = new(() => null, () => [], () => null);
+
+    /// <summary>The Games page's source pills (All = null first) and the one shown now.</summary>
+    public Func<IReadOnlyList<GameSource?>> GameFilters { get; init; } = () => [];
+    public Func<GameSource?> GameFilter { get; init; } = () => null;
 }
+
+/// <summary>One source filter pill of the Games page (null: All); a click shows that source.</summary>
+internal sealed record PillVm(GameSource? Source, string Label, bool IsCurrent);
 
 /// <summary>
 /// One game of the Games tab. Tiles live as long as the list of games shown does not change, so moving the
-/// selection only flips <see cref="IsSelected"/> and the art arrives later without rebuilding the grid.
+/// selection only flips <see cref="IsSelected"/> / <see cref="IsDimmed"/> and the art arrives later without
+/// rebuilding the grid. <see cref="Ambient"/> is the cover's colour (the backdrop tint while it is selected).
 /// </summary>
 internal sealed class TileVm(int index, GameEntry game, string badge) : INotifyPropertyChanged
 {
     ImageSource? _cover;
     ImageSource? _icon;
+    Color? _ambient;
     bool _isSelected;
+    bool _isDimmed;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -117,6 +127,16 @@ internal sealed class TileVm(int index, GameEntry game, string badge) : INotifyP
     public ImageSource? Icon { get => _icon; set { _icon = value; Changed(); Changed(nameof(HasArt)); } }
     /// <summary>A cover or an icon is shown, so the placeholder glyph is not.</summary>
     public bool HasArt => _cover is not null || _icon is not null;
+    public Color? Ambient
+    {
+        get => _ambient;
+        set
+        {
+            if (_ambient == value) return;
+            _ambient = value;
+            Changed();
+        }
+    }
     public bool IsSelected
     {
         get => _isSelected;
@@ -124,6 +144,17 @@ internal sealed class TileVm(int index, GameEntry game, string badge) : INotifyP
         {
             if (_isSelected == value) return;
             _isSelected = value;
+            Changed();
+        }
+    }
+    /// <summary>The tile is not on the selected tile's row of the shelf (drawn fainter).</summary>
+    public bool IsDimmed
+    {
+        get => _isDimmed;
+        set
+        {
+            if (_isDimmed == value) return;
+            _isDimmed = value;
             Changed();
         }
     }
@@ -160,9 +191,16 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     double _sizeFactor = 1;
     IReadOnlyList<TileVm> _tiles = [];
     string _tilesCulture = "";
+    string _pillsCulture = "";
     bool _showTiles;
     bool _showHomeTiles;
     int _selectedTile = -1;
+    TileVm? _hero;
+    Color? _ambient;
+    IReadOnlyList<PillVm> _pills = [];
+    string _playKeys = "";
+    string _playLabel = "";
+    string _gameCount = "";
     CancellationTokenSource? _artLoad;              // cancelled when the tiles are rebuilt
     readonly HashSet<TileVm> _withArt = [];         // tiles that hold their art now
     readonly HashSet<TileVm> _requested = [];       // tiles whose art a worker is decoding
@@ -208,6 +246,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
             foreach (var name in new[] { nameof(Frame), nameof(RailWidth), nameof(ColumnWidth), nameof(ColumnPadding),
                          nameof(StagePadding), nameof(TileColumns) })
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+            UpdateDimmed(); // the shelf's rows changed with the columns; the navigator keeps the game by id
         }
     }
     public GridLength RailWidth => new(_frame.RailWidth);
@@ -244,6 +283,17 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     public bool ShowHomeTiles { get => _showHomeTiles; private set => Set(ref _showHomeTiles, value); }
     /// <summary>Index of the selected tile, -1 when the grid is not selected.</summary>
     public int SelectedTile { get => _selectedTile; private set => Set(ref _selectedTile, value); }
+    /// <summary>The selected game, drawn large in the Games hero (null when no tile is selected).</summary>
+    public TileVm? Hero { get => _hero; private set => Set(ref _hero, value); }
+    /// <summary>Backdrop tint of the Games page: the selected cover's colour (null: no tint, or not on Games).</summary>
+    public Color? Ambient { get => _ambient; private set => Set(ref _ambient, value); }
+    /// <summary>Source filter pills of the Games page (All first); reassigned only when they change.</summary>
+    public IReadOnlyList<PillVm> Pills { get => _pills; private set => Set(ref _pills, value); }
+    /// <summary>Key and label of the hero's Play button ("A" / "Enter", "Play").</summary>
+    public string PlayKeys { get => _playKeys; private set => Set(ref _playKeys, value); }
+    public string PlayLabel { get => _playLabel; private set => Set(ref _playLabel, value); }
+    /// <summary>Number of games on the shelf (right end of the pills row).</summary>
+    public string GameCount { get => _gameCount; private set => Set(ref _gameCount, value); }
 
     /// <summary>Selection, switches, cursor outline. Replaced when the Windows accent is known.</summary>
     public Brush AccentBrush { get => _accentBrush; set => Set(ref _accentBrush, value); }
@@ -325,7 +375,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         }
         ShowHomeTiles = tiles;
         Rows = rows;
-        RefreshTiles(nav, items);
+        RefreshTiles(nav, items, pad);
         Description = nav.Description();
         Context = BuildContext(nav, items, rows, outputDevice, art);
         Footer = nav.Footer(pad).Select(h => new FooterVm(h.Keys, h.Label, h.Command)).ToList();
@@ -430,11 +480,15 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         _ => Glyphs.List,
     };
 
-    void RefreshTiles(OverlayNavigator nav, IReadOnlyList<OverlayItem> items)
+    void RefreshTiles(OverlayNavigator nav, IReadOnlyList<OverlayItem> items, bool pad)
     {
         var grid = items.FirstOrDefault(i => i.Kind == ItemKind.Grid && i.Visible());
         ShowTiles = grid is not null;
-        if (grid?.Tiles?.Invoke() is not { } games) return; // kept while hidden: coming back to the tab is instant
+        if (grid?.Tiles?.Invoke() is not { } games)
+        {
+            UpdateAmbient(); // the tiles are kept while hidden (coming back to the tab is instant); the tint goes
+            return;
+        }
         // Whole records: a re-read that only found new art or a new title must show it.
         if (_tilesCulture != Loc.Culture.Name || games.Count != _tiles.Count
             || !games.SequenceEqual(_tiles.Select(t => t.Game)))
@@ -449,7 +503,46 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         var selected = nav.Selected?.Kind == ItemKind.Grid && _tiles.Count > 0 ? nav.SelectedTileIndex : -1;
         foreach (var tile in _tiles) tile.IsSelected = tile.Index == selected;
         SelectedTile = selected;
+        Hero = selected >= 0 ? _tiles[selected] : null;
+        UpdateDimmed();
+        UpdateAmbient();
+        RefreshPills();
+        PlayKeys = pad ? "A" : "Enter";
+        PlayLabel = Loc.T("Overlay.Footer.Play");
+        GameCount = _tiles.Count.ToString(Loc.Culture);
     }
+
+    /// <summary>The pills from <see cref="Sources"/>, reassigned only when a label, a source or the lit one changed.</summary>
+    void RefreshPills()
+    {
+        try
+        {
+            var current = Sources.GameFilter();
+            var filters = Sources.GameFilters();
+            var same = filters.Count == _pills.Count;
+            for (var i = 0; same && i < filters.Count; i++)
+                same = _pills[i].Source == filters[i] && _pills[i].IsCurrent == (filters[i] == current);
+            if (same && _pillsCulture == Loc.Culture.Name) return; // the usual case: a move on the shelf
+            _pillsCulture = Loc.Culture.Name;
+            Pills = filters.Select(s => new PillVm(s,
+                s is { } source ? Loc.T("Games.Source." + source) : Loc.T("Overlay.Games.All"), s == current)).ToList();
+        }
+        catch (Exception e)
+        {
+            Log.Error("Overlay game filters", e);
+        }
+    }
+
+    /// <summary>Tiles off the selected tile's shelf row are dimmed; none when no tile is selected.</summary>
+    void UpdateDimmed()
+    {
+        var columns = TileColumns;
+        var row = _selectedTile >= 0 ? _selectedTile / columns : -1;
+        foreach (var tile in _tiles) tile.IsDimmed = row >= 0 && tile.Index / columns != row;
+    }
+
+    /// <summary>The tint follows the selected cover while the shelf is shown (its colour may arrive later).</summary>
+    void UpdateAmbient() => Ambient = _showTiles ? _hero?.Ambient : null;
 
     /// <summary>
     /// The tiles from <paramref name="first"/> to <paramref name="last"/> are on screen or next to it (window, UI
@@ -461,8 +554,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         var keep = ArtKeepRows * TileColumns;
         foreach (var tile in _withArt.Where(t => t.Index < first - keep || t.Index > last + keep).ToList())
         {
-            tile.Cover = null;
-            tile.Icon = null;
+            SetArt(tile, null, null);
             _withArt.Remove(tile);
         }
         var pending = new List<TileVm>();
@@ -472,8 +564,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
             if (_withArt.Contains(tile) || _requested.Contains(tile)) continue;
             if (GameArt.TryCached(tile.Game.ArtPath, tile.Game.IconPath, out var cover, out var icon))
             {
-                tile.Cover = cover;
-                tile.Icon = icon;
+                SetArt(tile, cover, icon);
                 _withArt.Add(tile);
             }
             else
@@ -497,12 +588,20 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
                 {
                     if (token.IsCancellationRequested) return; // the grid was rebuilt meanwhile
                     _requested.Remove(tile);
-                    tile.Cover = cover;
-                    tile.Icon = icon;
+                    SetArt(tile, cover, icon);
                     _withArt.Add(tile);
                 });
             }
         }, token);
+    }
+
+    /// <summary>Cover, ambient colour and icon of a tile; the backdrop tint follows when it is the selected one.</summary>
+    void SetArt(TileVm tile, CoverArt? cover, ImageSource? icon)
+    {
+        tile.Cover = cover?.Image;
+        tile.Ambient = cover?.Ambient;
+        tile.Icon = icon;
+        if (ReferenceEquals(tile, _hero)) UpdateAmbient();
     }
 
     /// <summary>A Slider's Value is its percent ("45%").</summary>

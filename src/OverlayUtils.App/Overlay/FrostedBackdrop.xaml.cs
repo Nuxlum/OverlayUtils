@@ -18,12 +18,26 @@ internal sealed partial class FrostedBackdrop : UserControl
     static readonly Duration FadeIn = TimeSpan.FromMilliseconds(150);
     static readonly Color FallbackDim = Color.FromRgb(0x08, 0x0A, 0x10); // FrameBg of the theme
     static readonly double[] DimOffsets = [0, 0.38, 0.72, 1];
+    const double DownDarkFrom = 0.55; // top to bottom (Games): fully dark from about the shelf down
+    const double FallbackTintOpacity = 0.5;
     static readonly Lazy<ImageBrush> GrainBrush = new(MakeGrain);
+
+    // The tint is one brush whose colour is changed in place, so a selection change allocates nothing.
+    readonly GradientStop _tintCore = new(Colors.Transparent, 0);
+    readonly GradientStop _tintEdge = new(Colors.Transparent, 1);
+    Brush? _across;
+    Brush? _down;
+    bool _vertical;
+    double? _tintOpacity;
 
     public FrostedBackdrop()
     {
         InitializeComponent();
         Grain.Fill = GrainBrush.Value;
+        Tint.Fill = new RadialGradientBrush(new GradientStopCollection { _tintCore, _tintEdge })
+        {
+            Center = new Point(0.78, 0.28), GradientOrigin = new Point(0.78, 0.28), RadiusX = 0.62, RadiusY = 0.8,
+        };
     }
 
     /// <summary>True when <paramref name="source"/> is the bare backdrop (not the frame or a card above it).</summary>
@@ -35,11 +49,49 @@ internal sealed partial class FrostedBackdrop : UserControl
         FrostLayer.Opacity = settings.FrostOpacity;
         Grain.Opacity = settings.GrainOpacity;
         var dim = (TryFindResource("FrameBg") as SolidColorBrush)?.Color ?? FallbackDim;
-        var gradient = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
-        for (var i = 0; i < DimOffsets.Length && i < settings.GradientAlphas.Count; i++)
-            gradient.GradientStops.Add(new GradientStop(Color.FromArgb(settings.GradientAlphas[i], dim.R, dim.G, dim.B), DimOffsets[i]));
-        gradient.Freeze();
-        Dim.Fill = gradient;
+        Color Dimmed(byte alpha) => Color.FromArgb(alpha, dim.R, dim.G, dim.B);
+        var across = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
+        var alphas = settings.GradientAlphas;
+        for (var i = 0; i < DimOffsets.Length && i < alphas.Count; i++)
+            across.GradientStops.Add(new GradientStop(Dimmed(alphas[i]), DimOffsets[i]));
+        across.Freeze();
+        // Games: lighter at the top where the hero sits over the game, dark under the shelf; same Darkness setting.
+        var down = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1) };
+        if (alphas.Count >= 3)
+        {
+            down.GradientStops.Add(new GradientStop(Dimmed((byte)((alphas[1] + alphas[2]) / 2)), 0));
+            down.GradientStops.Add(new GradientStop(Dimmed(alphas[0]), DownDarkFrom));
+            down.GradientStops.Add(new GradientStop(Dimmed(alphas[0]), 1));
+        }
+        down.Freeze();
+        _across = across;
+        _down = down;
+        Dim.Fill = _vertical ? _down : _across;
+    }
+
+    /// <summary>Top-to-bottom gradient (the Games page) instead of the left-to-right one.</summary>
+    public void SetVertical(bool vertical)
+    {
+        _vertical = vertical;
+        if (_across is not null) Dim.Fill = vertical ? _down : _across;
+    }
+
+    /// <summary>
+    /// Washes the backdrop with <paramref name="color"/> from the top right (the selected cover's colour on Games);
+    /// null removes it. Switches at once.
+    /// </summary>
+    public void ShowTint(Color? color)
+    {
+        if (color is not { } c)
+        {
+            Tint.Visibility = Visibility.Collapsed;
+            return;
+        }
+        _tintOpacity ??= TryFindResource("GamesTintOpacity") as double?;
+        var alpha = (byte)Math.Round(Math.Clamp(_tintOpacity ?? FallbackTintOpacity, 0, 1) * 255);
+        _tintCore.Color = Color.FromArgb(alpha, c.R, c.G, c.B);
+        _tintEdge.Color = Color.FromArgb(0, c.R, c.G, c.B);
+        Tint.Visibility = Visibility.Visible;
     }
 
     /// <summary>Shows a processed image (frozen); fades it in when <paramref name="fade"/>, else at once.</summary>

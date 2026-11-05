@@ -1,6 +1,6 @@
 <!--
   Backdrop of the full-screen overlay: the frosted screenshot taken at open, bottom to top image, white frost,
-  static grain, dark gradient. Image, frost and grain fade in together once the image is ready; without one only
+  static grain, dark gradient (left to right; top to bottom on Games, with the cover tint). Image, frost and grain fade in together once the image is ready; without one only
   the window's plain FrameBg shows under the gradient. Only Surface takes the mouse (a click on it closes the
   overlay); every layer is IsHitTestVisible="False".
 -->
@@ -15,5 +15,7 @@
             <Rectangle x:Name="Grain" RenderOptions.BitmapScalingMode="NearestNeighbor" />
         </Grid>
         <Rectangle x:Name="Dim" IsHitTestVisible="False" />
+        <!-- Games: a wash of the selected cover's colour from the top right (ShowTint). -->
+        <Rectangle x:Name="Tint" IsHitTestVisible="False" Visibility="Collapsed" />
     </Grid>
 </UserControl>

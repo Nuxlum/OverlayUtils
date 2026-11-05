@@ -521,58 +521,52 @@
             </DataTemplate>
 
             <!--
-              Header of the Games grid (the tiles are drawn by TileList under the rows): the filter shown, which a
-              click cycles like Y / Delete, and the number of games.
+              The Games grid row draws nothing in the row list: the page has its own hero, source pills and cover
+              shelf (TileList), which read the same row through the view model.
             -->
             <DataTemplate x:Key="GridRow">
-                <Grid Height="34" Margin="0,4,0,2">
-                    <Border HorizontalAlignment="Left" Height="28" Padding="10,0,8,0" Cursor="Hand"
-                            MouseLeftButtonDown="OnFilterMouseDown">
-                        <Border.Style>
-                            <Style TargetType="Border" BasedOn="{StaticResource HoverButton}">
-                                <Setter Property="CornerRadius" Value="14" />
-                                <Setter Property="Background" Value="{StaticResource SegmentBg}" />
-                            </Style>
-                        </Border.Style>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Style="{StaticResource Icon}" Text="{Binding Icon}" FontSize="13"
-                                       Foreground="{DynamicResource Accent}" />
-                            <TextBlock Text="{Binding Label}" Margin="8,0,6,0" FontSize="13" FontWeight="SemiBold"
-                                       VerticalAlignment="Center" />
-                            <TextBlock Style="{StaticResource RowChevron}" Text="&#xE70D;" />
-                        </StackPanel>
-                    </Border>
-                    <TextBlock Text="{Binding Value}" HorizontalAlignment="Right" Margin="0,0,8,0" FontSize="12"
-                               VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
-                </Grid>
+                <Border />
             </DataTemplate>
 
-            <!-- One game: cover (or icon, or a placeholder glyph), source badge, title below; accent outline when selected. -->
+            <!--
+              One game on the shelf: cover (or icon, or a placeholder glyph), source badge, title below. The selected
+              cover lifts (scaled from its bottom edge, so it grows upwards) with a white outline and an accent glow;
+              tiles off the selected row are dimmed. The lift is static for now (motion comes later).
+            -->
             <DataTemplate x:Key="GameTile">
-                <Grid x:Name="Tile" Margin="6,6,6,10" Background="Transparent" Cursor="Hand"
+                <Grid x:Name="Tile" Margin="{StaticResource CoverMargin}" Background="Transparent" Cursor="Hand"
                       MouseLeftButtonDown="OnTileMouseDown">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <!-- Covers are 2:3: the cover row takes its height from the cell width. -->
-                    <Border Height="{Binding ActualWidth, ElementName=Tile, Converter={StaticResource Scale}, ConverterParameter=1.5}" />
-                    <Border x:Name="Outline" CornerRadius="11" Margin="-3" BorderThickness="2" BorderBrush="Transparent" />
-                    <Border CornerRadius="8" Background="{StaticResource CardBg}" />
-                    <TextBlock x:Name="Placeholder" Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Game}"
-                               FontSize="30" Foreground="{StaticResource Subtle}" />
-                    <Image Source="{Binding Icon}" Width="56" Height="56" RenderOptions.BitmapScalingMode="HighQuality" />
-                    <Border CornerRadius="8">
-                        <Border.Background>
-                            <ImageBrush ImageSource="{Binding Cover}" Stretch="UniformToFill" />
-                        </Border.Background>
-                    </Border>
-                    <Border x:Name="HoverShade" CornerRadius="8" Background="{StaticResource Hover}" Visibility="Collapsed" />
-                    <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6" Padding="5,1" CornerRadius="4"
-                            Background="{StaticResource FrameBg}" Opacity="0.85">
-                        <TextBlock Text="{Binding Badge}" FontSize="10" FontWeight="SemiBold" />
-                    </Border>
-                    <TextBlock x:Name="TileTitle" Grid.Row="1" Text="{Binding Title}" Margin="2,6,2,0" FontSize="12"
+                    <Grid x:Name="Cover" RenderTransformOrigin="0.5,1">
+                        <!-- Covers are 2:3: the cover row takes its height from the cell width. -->
+                        <Border Height="{Binding ActualWidth, ElementName=Tile, Converter={StaticResource Scale}, ConverterParameter=1.5}" />
+                        <Border x:Name="Glow" Margin="-4" CornerRadius="12" BorderThickness="5"
+                                BorderBrush="{DynamicResource Accent}" Opacity="{StaticResource CoverGlowOpacity}"
+                                Visibility="Collapsed">
+                            <Border.Effect>
+                                <BlurEffect Radius="{StaticResource CoverGlowRadius}" />
+                            </Border.Effect>
+                        </Border>
+                        <Border CornerRadius="8" Background="{StaticResource CardBg}" />
+                        <TextBlock x:Name="Placeholder" Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Game}"
+                                   FontSize="30" Foreground="{StaticResource Subtle}" />
+                        <Image Source="{Binding Icon}" Width="56" Height="56" RenderOptions.BitmapScalingMode="HighQuality" />
+                        <Border CornerRadius="8">
+                            <Border.Background>
+                                <ImageBrush ImageSource="{Binding Cover}" Stretch="UniformToFill" />
+                            </Border.Background>
+                        </Border>
+                        <Border x:Name="HoverShade" CornerRadius="8" Background="{StaticResource Hover}" Visibility="Collapsed" />
+                        <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6" Padding="5,1" CornerRadius="4"
+                                Background="{StaticResource FrameBg}" Opacity="0.85">
+                            <TextBlock Text="{Binding Badge}" FontSize="10" FontWeight="SemiBold" />
+                        </Border>
+                        <Border x:Name="Outline" CornerRadius="10" Margin="-2" BorderThickness="2" BorderBrush="Transparent" />
+                    </Grid>
+                    <TextBlock x:Name="TileTitle" Grid.Row="1" Text="{Binding Title}" Margin="2,8,2,0" FontSize="12"
                                TextTrimming="CharacterEllipsis" Foreground="{StaticResource Muted}" />
                 </Grid>
                 <DataTemplate.Triggers>
@@ -583,10 +577,39 @@
                         <Setter TargetName="HoverShade" Property="Visibility" Value="Visible" />
                         <Setter TargetName="TileTitle" Property="Foreground" Value="{StaticResource Text}" />
                     </Trigger>
+                    <DataTrigger Binding="{Binding IsDimmed}" Value="True">
+                        <Setter TargetName="Tile" Property="Opacity" Value="{StaticResource ShelfDimOpacity}" />
+                    </DataTrigger>
                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                        <Setter TargetName="Outline" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                        <Setter TargetName="Cover" Property="RenderTransform" Value="{StaticResource CoverLiftTransform}" />
+                        <Setter TargetName="Glow" Property="Visibility" Value="Visible" />
+                        <Setter TargetName="Outline" Property="BorderBrush" Value="{StaticResource Text}" />
                         <Setter TargetName="TileTitle" Property="Foreground" Value="{StaticResource Text}" />
                         <Setter TargetName="TileTitle" Property="FontWeight" Value="SemiBold" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <!-- One source pill of the Games page; the current one is lit with the accent. A click shows that source. -->
+            <DataTemplate x:Key="SourcePill">
+                <Grid x:Name="Pill" Height="{StaticResource PillHeight}" Margin="0,0,8,0" Background="Transparent"
+                      Cursor="Hand" MouseLeftButtonDown="OnPillMouseDown">
+                    <Border x:Name="PillBg" CornerRadius="15" Background="{StaticResource CardBg}" />
+                    <Border x:Name="Lit" CornerRadius="15" Background="{DynamicResource Accent}"
+                            Opacity="{StaticResource PillLitOpacity}" Visibility="Collapsed" />
+                    <Border x:Name="Outline" CornerRadius="15" BorderThickness="1" BorderBrush="Transparent" />
+                    <TextBlock x:Name="PillText" Text="{Binding Label}" Margin="14,0" FontSize="{StaticResource PillTextSize}"
+                               FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
+                </Grid>
+                <DataTemplate.Triggers>
+                    <Trigger SourceName="Pill" Property="IsMouseOver" Value="True">
+                        <Setter TargetName="PillBg" Property="Background" Value="{StaticResource Hover}" />
+                        <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
+                    </Trigger>
+                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                        <Setter TargetName="Lit" Property="Visibility" Value="Visible" />
+                        <Setter TargetName="Outline" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                        <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
                     </DataTrigger>
                 </DataTemplate.Triggers>
             </DataTemplate>
@@ -1090,15 +1113,18 @@
             </Border>
 
             <!--
-              Column: eyebrow, page title, rows, footer at the bottom. On the Games grid it takes the stage too
-              (the covers need the width). Transparent, so a click in it never reaches the backdrop.
+              Column: eyebrow, page title, rows, footer at the bottom. Transparent, so a click in it never reaches the
+              backdrop. On Games it takes the stage too (hero, source pills, the cover shelf) and has no background:
+              only those parts take the mouse, a click on the empty space around them closes as on the other pages.
             -->
-            <Border x:Name="Column" Grid.Column="1" Background="Transparent" Padding="{Binding ColumnPadding}">
+            <Border x:Name="Column" Grid.Column="1" Padding="{Binding ColumnPadding}">
                 <Border.Style>
                     <Style TargetType="Border">
+                        <Setter Property="Background" Value="Transparent" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsWide}" Value="True">
                                 <Setter Property="Grid.ColumnSpan" Value="2" />
+                                <Setter Property="Background" Value="{x:Null}" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -1108,11 +1134,23 @@
                         <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
                     </DockPanel.LayoutTransform>
 
-                    <StackPanel DockPanel.Dock="Top" Margin="12,0,0,10">
+                    <StackPanel DockPanel.Dock="Top" Margin="12,0,0,10" HorizontalAlignment="Left">
                         <TextBlock Text="{Binding Eyebrow, Converter={StaticResource Upper}}" FontSize="{StaticResource EyebrowSize}"
                                    FontWeight="SemiBold" Foreground="{DynamicResource Accent}" TextTrimming="CharacterEllipsis" />
-                        <!-- On Settings, Info and sub-pages a back chevron precedes the title; a click on it is B. -->
+                        <!--
+                          On Settings, Info and sub-pages a back chevron precedes the title; a click on it is B. On the
+                          Games shelf the hero's game title takes its place.
+                        -->
                         <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ShowTiles}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
                             <Border Style="{StaticResource HoverButton}" Width="32" Height="32" Margin="-8,0,4,0"
                                     VerticalAlignment="Center" MouseLeftButtonDown="OnBackMouseDown">
                                 <Border.Visibility>
@@ -1132,12 +1170,84 @@
                     </StackPanel>
 
                     <!--
+                      Games hero: the selected game's title (large), its source badge and the Play button (a click is
+                      A, which launches the selected game). Left aligned and capped in width, so it never runs under
+                      the status corner and the space beside it stays the backdrop's.
+                    -->
+                    <StackPanel x:Name="Hero" DockPanel.Dock="Top" Margin="12,0,0,0" HorizontalAlignment="Left"
+                                MaxWidth="{StaticResource HeroMaxWidth}" Background="Transparent">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ShowTiles}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Hero}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Text="{Binding Hero.Title}" FontFamily="{StaticResource DisplayFont}"
+                                   FontSize="{StaticResource HeroTitleSize}" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                            <Border Height="{StaticResource PillHeight}" Padding="12,0" CornerRadius="15"
+                                    Background="{StaticResource BadgeBg}" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Hero.Badge}" FontSize="{StaticResource PillTextSize}"
+                                           FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </Border>
+                            <Border x:Name="PlayButton" Height="{StaticResource PlayHeight}" Padding="16,0,10,0"
+                                    Margin="12,0,0,0" CornerRadius="19" Background="{StaticResource PlayBg}"
+                                    Cursor="Hand" VerticalAlignment="Center" MouseLeftButtonDown="OnPlayMouseDown">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Play}" FontSize="14"
+                                               Foreground="{StaticResource PlayText}" />
+                                    <TextBlock Text="{Binding PlayLabel}" Margin="9,0,10,0" FontSize="{StaticResource PlayTextSize}"
+                                               FontWeight="SemiBold" VerticalAlignment="Center"
+                                               Foreground="{StaticResource PlayText}" />
+                                    <Border Height="22" Padding="7,0" CornerRadius="5" VerticalAlignment="Center"
+                                            Background="{StaticResource PlayKeyBg}">
+                                        <TextBlock Text="{Binding PlayKeys}" FontSize="11" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" Foreground="{StaticResource PlayText}" />
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Games source filter: All and each source with games, the current one lit; the number of games. -->
+                    <StackPanel x:Name="SourcePills" DockPanel.Dock="Top" Orientation="Horizontal" Margin="12,26,0,6"
+                                HorizontalAlignment="Left">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ShowTiles}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <ItemsControl ItemsSource="{Binding Pills}" Focusable="False" ItemTemplate="{StaticResource SourcePill}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding GameCount}" Margin="8,0,0,0" FontSize="{StaticResource PillTextSize}"
+                                   VerticalAlignment="Center" Foreground="{StaticResource Subtle}" />
+                    </StackPanel>
+
+                    <!--
                       Footer (Python _render_footer), pinned to the bottom on every page. The Viewbox only shrinks it
                       when a language's labels are wider than the column.
                     -->
                     <Viewbox DockPanel.Dock="Bottom" Height="22" Margin="12,12,0,0" HorizontalAlignment="Left"
                              Stretch="Uniform" StretchDirection="DownOnly">
-                        <ItemsControl ItemsSource="{Binding Footer}" Focusable="False">
+                        <ItemsControl ItemsSource="{Binding Footer}" Focusable="False" Background="Transparent">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <StackPanel Orientation="Horizontal" />
@@ -1207,8 +1317,23 @@
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                             </ItemsControl>
+                            <!--
+                              The cover shelf. Its background takes the clicks between covers (they do not close); the
+                              top margin leaves room for the lifted first row. The selected tile is drawn above the
+                              others (ZIndex), so its lift and glow overlap its neighbours.
+                            -->
                             <ItemsControl x:Name="TileList" ItemsSource="{Binding Tiles}" Focusable="False"
-                                          ItemTemplate="{StaticResource GameTile}">
+                                          ItemTemplate="{StaticResource GameTile}" Background="Transparent"
+                                          Margin="{StaticResource ShelfMargin}">
+                                <ItemsControl.ItemContainerStyle>
+                                    <Style TargetType="ContentPresenter">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="Panel.ZIndex" Value="1" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ItemsControl.ItemContainerStyle>
                                 <ItemsControl.Style>
                                     <Style TargetType="ItemsControl">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -1291,7 +1416,7 @@
 
                 <!--
                   Context of the selected row (ContextVm): the template follows its Kind (monitors, mixer, album art,
-                  volume, else the label / value / description card). Hidden on the Games grid (the column takes the
+                  volume, else the label / value / description card). Hidden on the Games shelf (the column takes the
                   stage) and when there is nothing to say. Cards swap at once (no cross-fade yet).
                 -->
                 <ContentControl x:Name="ContextHost" Focusable="False" HorizontalAlignment="Left"

@@ -142,6 +142,18 @@ public sealed class OverlayContent
         ];
     }
 
+    /// <summary>The source filters the Games page offers as pills: All (null), then each source with games.</summary>
+    public IReadOnlyList<GameSource?> GamesFilters() => GameLibrary.FilterCycle(_games?.Games ?? []);
+
+    /// <summary>The source filter shown now (null: All).</summary>
+    public GameSource? GamesFilter => GameLibrary.Valid(_gamesFilter, _games?.Games ?? []);
+
+    /// <summary>
+    /// Shows one source (a click on its pill; null: All). A source without games shows All. The caller re-syncs the
+    /// grid's tile, as the X / Y cycle does.
+    /// </summary>
+    public void SetGamesFilter(GameSource? filter) => _gamesFilter = GameLibrary.Valid(filter, _games?.Games ?? []);
+
     static string SourceName(GameSource source) => source.ToString().ToLowerInvariant();
 
     static string SourceLabel(GameSource source) => Loc.T("Games.Source." + source);

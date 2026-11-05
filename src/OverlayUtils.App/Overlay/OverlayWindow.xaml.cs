@@ -7,6 +7,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using OverlayUtils.Core.Config;
 using OverlayUtils.Core.Diagnostics;
+using OverlayUtils.Core.Games;
 using OverlayUtils.Core.Overlay;
 
 namespace OverlayUtils.App.Overlay;
@@ -64,6 +65,9 @@ internal sealed partial class OverlayWindow : Window
     /// <summary>A game tile was clicked (game id: the list may have changed since it was drawn).</summary>
     public event Action<string>? TileClicked;
 
+    /// <summary>A source pill of the Games page was clicked (null: All).</summary>
+    public event Action<GameSource?>? FilterClicked;
+
     // Last cursor position seen, in screen pixels: hover acts only when the mouse really moves, not when the
     // overlay opens under a still cursor or the list scrolls under it.
     Point? _lastPointer;
@@ -100,9 +104,17 @@ internal sealed partial class OverlayWindow : Window
         else if (e.PropertyName is nameof(OverlayViewModel.Rows) or nameof(OverlayViewModel.SelectedTile))
             // After the new rows are laid out, so their containers exist.
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, BringSelectedIntoView);
+        else if (e.PropertyName == nameof(OverlayViewModel.Ambient))
+            Backdrop.ShowTint(_vm.Ambient);
         else if (e.PropertyName is nameof(OverlayViewModel.Tiles) or nameof(OverlayViewModel.ShowTiles)
                  or nameof(OverlayViewModel.TileColumns))
+        {
+            if (e.PropertyName == nameof(OverlayViewModel.ShowTiles)) Backdrop.SetVertical(_vm.ShowTiles);
+            // A new column count reflows the shelf: the same game stays selected (by id), so bring it back into view.
+            if (e.PropertyName == nameof(OverlayViewModel.TileColumns))
+                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, BringSelectedIntoView);
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, UpdateArtRange);
+        }
     }
 
     /// <summary>
@@ -148,7 +160,9 @@ internal sealed partial class OverlayWindow : Window
         if (_vm is { ShowTiles: true, SelectedTile: >= 0 and var tile }
             && TileList.ItemContainerGenerator.ContainerFromIndex(tile) is FrameworkElement tileContainer)
         {
-            tileContainer.BringIntoView();
+            // With the room the lifted cover and its glow take above and below the cell.
+            var lift = tileContainer.ActualHeight * 0.12;
+            tileContainer.BringIntoView(new Rect(0, -lift, tileContainer.ActualWidth, tileContainer.ActualHeight + 2 * lift));
             return;
         }
         var row = _vm?.Rows.FirstOrDefault(r => r.IsSelected);
@@ -375,12 +389,21 @@ internal sealed partial class OverlayWindow : Window
         Raise(() => TileClicked?.Invoke(tile.Game.Id), "tile click");
     }
 
-    /// <summary>The filter pill of the Games grid: same as Y / Delete.</summary>
-    void OnFilterMouseDown(object sender, MouseButtonEventArgs e)
+    /// <summary>A source pill of the Games page: shows that source.</summary>
+    void OnPillMouseDown(object sender, MouseButtonEventArgs e)
     {
+        if ((sender as FrameworkElement)?.DataContext is not PillVm pill) return;
         e.Handled = true;
         if (e.ClickCount > 1) return;
-        Issue(OverlayCommand.Remove);
+        Raise(() => FilterClicked?.Invoke(pill.Source), "filter pill");
+    }
+
+    /// <summary>The hero's Play button: A, which launches the selected game.</summary>
+    void OnPlayMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        if (e.ClickCount > 1) return; // a double-click must not start the game twice
+        Issue(OverlayCommand.A);
     }
 
     static TileVm? TileOf(DependencyObject? node) =>
@@ -415,7 +438,6 @@ internal sealed partial class OverlayWindow : Window
     }
 }
 
-/// <summary>Picks the row template from <see cref="RowVm.Kind"/>.</summary>
 /// <summary>The stage context card for a <see cref="ContextVm"/>, by its kind.</summary>
 internal sealed class ContextTemplateSelector : DataTemplateSelector
 {
@@ -437,6 +459,7 @@ internal sealed class ContextTemplateSelector : DataTemplateSelector
         };
 }
 
+/// <summary>Picks the row template from <see cref="RowVm.Kind"/>.</summary>
 internal sealed class RowTemplateSelector : DataTemplateSelector
 {
     public DataTemplate? Action { get; set; }

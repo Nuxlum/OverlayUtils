@@ -7,6 +7,7 @@ using Microsoft.Win32;
 using OverlayUtils.App.Audio;
 using OverlayUtils.Core.Config;
 using OverlayUtils.Core.Diagnostics;
+using OverlayUtils.Core.Games;
 using OverlayUtils.Core.Interop;
 using OverlayUtils.Core.Localization;
 using OverlayUtils.Core.Monitors;
@@ -71,7 +72,11 @@ internal sealed class OverlayController : IDisposable
                 var current = monitors.Current;
                 return monitors.List().Select(p => new MonitorVm(p, p == current)).ToList();
             },
-            () => (content.Media as MediaSession)?.Art);
+            () => (content.Media as MediaSession)?.Art)
+        {
+            GameFilters = content.GamesFilters,
+            GameFilter = () => content.GamesFilter,
+        };
         _window.Bind(_vm);
         _window.CommandIssued += OnCommand;
         _window.RowClicked += OnRowClicked;
@@ -89,6 +94,7 @@ internal sealed class OverlayController : IDisposable
             var index = _navigator.IndexOfTile(id);
             if (index >= 0) Apply(_navigator.ClickTile(index)); // gone since it was drawn: nothing starts
         };
+        _window.FilterClicked += OnFilterClicked;
         _window.Closing += OnClosing;
 
         _hwnd = new WindowInteropHelper(_window).EnsureHandle(); // the window applies its chrome and backdrop here
@@ -330,6 +336,26 @@ internal sealed class OverlayController : IDisposable
     void OnRowClicked(int index, int? option)
     {
         if (_open) Apply(_navigator.Click(index, option));
+    }
+
+    /// <summary>
+    /// A source pill of the Games page: that filter at once (not a run of X cycles), then, as X does, the selected game
+    /// stays if it is still shown, else the shelf starts on its first tile.
+    /// </summary>
+    void OnFilterClicked(GameSource? source)
+    {
+        if (!_open) return;
+        try
+        {
+            var id = _navigator.Selected?.Kind == ItemKind.Grid ? _navigator.SelectedTile?.Id : null;
+            _content.SetGamesFilter(source);
+            _navigator.HoverTile(Math.Max(0, _navigator.IndexOfTile(id)));
+        }
+        catch (Exception e)
+        {
+            Log.Error("Overlay filter pill", e);
+        }
+        Render();
     }
 
     void Apply(NavResult result)
