@@ -26,3 +26,20 @@ internal sealed class ScaleConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         Binding.DoNothing;
 }
+
+/// <summary>
+/// A 0..1 fraction as a star column width (a bar's fill), or with the parameter "rest" the remainder (1 - fraction),
+/// so a two-column Grid draws a bar of any width.
+/// </summary>
+internal sealed class StarConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var fraction = value is double d && double.IsFinite(d) ? Math.Clamp(d, 0, 1) : 0;
+        return new System.Windows.GridLength(parameter as string == "rest" ? 1 - fraction : fraction,
+            System.Windows.GridUnitType.Star);
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        Binding.DoNothing;
+}

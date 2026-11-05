@@ -55,6 +55,20 @@
     <sys:Double x:Key="RowHeight">44</sys:Double>
     <sys:Double x:Key="RowLabelSize">15</sys:Double>
     <sys:Double x:Key="RowGlyphSize">17</sys:Double>
+    <!-- Room above and below the rail icons: the gear (52) plus its bottom margin (28). -->
+    <sys:Double x:Key="RailEndHeight">80</sys:Double>
+
+    <!-- Home tiles (2-column grid in the column; volume and now playing span both). -->
+    <sys:Double x:Key="TileHeight">96</sys:Double>
+    <sys:Double x:Key="TileGap">12</sys:Double>
+    <sys:Double x:Key="TileCaptionSize">11</sys:Double>
+    <sys:Double x:Key="TileGlyphSize">15</sys:Double>
+    <sys:Double x:Key="TileValueSize">24</sys:Double>
+    <sys:Double x:Key="TileTextSize">16</sys:Double>
+    <CornerRadius x:Key="TileCorner">14</CornerRadius>
+    <!-- Soft accent halo around the selected tile (a blurred ring). -->
+    <sys:Double x:Key="TileGlowOpacity">0.55</sys:Double>
+    <sys:Double x:Key="TileGlowRadius">12</sys:Double>
 
     <Style x:Key="Icon" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource IconFont}" />

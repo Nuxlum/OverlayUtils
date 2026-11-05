@@ -10,6 +10,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:OverlayUtils.App.Overlay"
         xmlns:core="clr-namespace:OverlayUtils.Core.Overlay;assembly=OverlayUtils.Core"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" ShowActivated="True"
         Width="1280" Height="720" Background="{DynamicResource FrameBg}"
         FontFamily="{DynamicResource TextFont}" Foreground="{DynamicResource Text}"
@@ -27,6 +28,50 @@
 
             <local:UpperCaseConverter x:Key="Upper" />
             <local:ScaleConverter x:Key="Scale" />
+            <local:StarConverter x:Key="Star" />
+
+            <!--
+              Rail button (page icon or the Settings gear): the Content is the glyph, Tag (bool) lights it with the
+              accent tint, the bar and full opacity. The click handler is set where it is used.
+            -->
+            <Style x:Key="RailButton" TargetType="ContentControl">
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Width" Value="{StaticResource RailButtonSize}" />
+                <Setter Property="Height" Value="{StaticResource RailButtonSize}" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ContentControl">
+                            <Grid Background="Transparent">
+                                <Border x:Name="HoverBg" CornerRadius="14" Background="{StaticResource Hover}"
+                                        Visibility="Collapsed" />
+                                <Border x:Name="Lit" CornerRadius="14" Background="{DynamicResource Accent}"
+                                        Opacity="{StaticResource TintOpacity}" Visibility="Collapsed" />
+                                <Rectangle x:Name="Bar" Width="3" Height="24" RadiusX="1.5" RadiusY="1.5"
+                                           HorizontalAlignment="Left" Fill="{DynamicResource Accent}"
+                                           Visibility="Collapsed" />
+                                <TextBlock x:Name="Glyph" Style="{StaticResource Icon}" Opacity="0.5"
+                                           Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                           FontSize="{StaticResource RailGlyphSize}" />
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="HoverBg" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="Glyph" Property="Opacity" Value="0.85" />
+                                </Trigger>
+                                <Trigger Property="Tag">
+                                    <Trigger.Value>
+                                        <sys:Boolean>True</sys:Boolean>
+                                    </Trigger.Value>
+                                    <Setter TargetName="Lit" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="Glyph" Property="Opacity" Value="1" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
 
             <!-- Shown only on the selected row (tint, accent bar). -->
             <Style x:Key="SelectedOnly" TargetType="FrameworkElement">
@@ -188,46 +233,55 @@
                 </ContentControl>
             </DataTemplate>
 
+            <!-- One option pill of a segmented row or tile; the click walks up to the row. -->
+            <DataTemplate x:Key="SegmentPill">
+                <Border x:Name="Pill" CornerRadius="11" Padding="9,0" BorderThickness="1"
+                        BorderBrush="Transparent" Background="Transparent" Cursor="Hand"
+                        MouseLeftButtonDown="OnOptionMouseDown">
+                    <TextBlock x:Name="PillText" Text="{Binding Label}" FontSize="12"
+                               FontWeight="SemiBold" VerticalAlignment="Center"
+                               Foreground="{StaticResource Muted}" />
+                </Border>
+                <DataTemplate.Triggers>
+                    <Trigger SourceName="Pill" Property="IsMouseOver" Value="True">
+                        <Setter TargetName="Pill" Property="Background" Value="{StaticResource Hover}" />
+                        <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
+                    </Trigger>
+                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                        <Setter TargetName="Pill" Property="Background" Value="{StaticResource SegmentActive}" />
+                        <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsCursor}" Value="True">
+                        <Setter TargetName="Pill" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                        <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsPending}" Value="True">
+                        <Setter TargetName="Pill" Property="Background" Value="{StaticResource Danger}" />
+                        <Setter TargetName="Pill" Property="BorderBrush" Value="{StaticResource Danger}" />
+                        <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <!-- The capsule of pills (segmented rows and tiles). -->
+            <Style x:Key="SegmentCapsule" TargetType="Border">
+                <Setter Property="Height" Value="28" />
+                <Setter Property="Padding" Value="3" />
+                <Setter Property="CornerRadius" Value="14" />
+                <Setter Property="Background" Value="{StaticResource SegmentBg}" />
+            </Style>
+
             <!-- Python _render_segmented: pills in a dark capsule; cursor outlined, pending in danger red. -->
             <DataTemplate x:Key="SegmentedRow">
                 <ContentControl Style="{StaticResource RowFrame}">
-                    <Border Height="28" Padding="3" CornerRadius="14" Background="{StaticResource SegmentBg}">
-                        <ItemsControl ItemsSource="{Binding Options}" Focusable="False">
+                    <Border Style="{StaticResource SegmentCapsule}">
+                        <ItemsControl ItemsSource="{Binding Options}" Focusable="False"
+                                      ItemTemplate="{StaticResource SegmentPill}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <StackPanel Orientation="Horizontal" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border x:Name="Pill" CornerRadius="11" Padding="9,0" BorderThickness="1"
-                                            BorderBrush="Transparent" Background="Transparent" Cursor="Hand"
-                                            MouseLeftButtonDown="OnOptionMouseDown">
-                                        <TextBlock x:Name="PillText" Text="{Binding Label}" FontSize="12"
-                                                   FontWeight="SemiBold" VerticalAlignment="Center"
-                                                   Foreground="{StaticResource Muted}" />
-                                    </Border>
-                                    <DataTemplate.Triggers>
-                                        <Trigger SourceName="Pill" Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="Pill" Property="Background" Value="{StaticResource Hover}" />
-                                            <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
-                                        </Trigger>
-                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                            <Setter TargetName="Pill" Property="Background" Value="{StaticResource SegmentActive}" />
-                                            <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding IsCursor}" Value="True">
-                                            <Setter TargetName="Pill" Property="BorderBrush" Value="{DynamicResource Accent}" />
-                                            <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding IsPending}" Value="True">
-                                            <Setter TargetName="Pill" Property="Background" Value="{StaticResource Danger}" />
-                                            <Setter TargetName="Pill" Property="BorderBrush" Value="{StaticResource Danger}" />
-                                            <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource Text}" />
-                                        </DataTrigger>
-                                    </DataTemplate.Triggers>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </Border>
                 </ContentControl>
@@ -537,6 +591,223 @@
                 </DataTemplate.Triggers>
             </DataTemplate>
 
+            <!--
+              Home tiles: the same rows (same RowVm, same handlers) drawn as shortcut tiles. The frame is a glass card
+              with the row's icon and caption at the top and the kind's control (the Content) below; the selected tile
+              gets the accent tint, a 2 DIP accent outline and a soft glow. No section headers.
+            -->
+            <Style x:Key="TileFrame" TargetType="ContentControl">
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ContentControl">
+                            <Grid x:Name="Tile" MinHeight="{StaticResource TileHeight}" Background="Transparent"
+                                  Cursor="Hand" MouseLeftButtonDown="OnRowMouseDown">
+                                <Border x:Name="Glow" Margin="-3" CornerRadius="17" BorderThickness="4"
+                                        BorderBrush="{DynamicResource Accent}" Opacity="{StaticResource TileGlowOpacity}"
+                                        Visibility="Collapsed">
+                                    <Border.Effect>
+                                        <BlurEffect Radius="{StaticResource TileGlowRadius}" />
+                                    </Border.Effect>
+                                </Border>
+                                <Border CornerRadius="{StaticResource TileCorner}" Background="{StaticResource CardBg}"
+                                        BorderBrush="{StaticResource CardLine}" BorderThickness="1" />
+                                <Border x:Name="HoverBg" CornerRadius="{StaticResource TileCorner}"
+                                        Background="{StaticResource Hover}" Visibility="Collapsed" />
+                                <Border x:Name="Lit" CornerRadius="{StaticResource TileCorner}" Background="{DynamicResource Accent}"
+                                        Opacity="{StaticResource TintOpacity}" Visibility="Collapsed" />
+                                <Border x:Name="Outline" CornerRadius="{StaticResource TileCorner}" BorderThickness="2"
+                                        BorderBrush="Transparent" />
+                                <DockPanel Margin="16,12,14,12">
+                                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource RowIcon}" Text="{Binding Icon}"
+                                                   FontSize="{StaticResource TileGlyphSize}" />
+                                        <TextBlock x:Name="Caption" Text="{Binding Caption, Converter={StaticResource Upper}}"
+                                                   Margin="9,0,0,0" FontSize="{StaticResource TileCaptionSize}"
+                                                   FontWeight="SemiBold" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" Foreground="{StaticResource Muted}" />
+                                    </StackPanel>
+                                    <ContentPresenter Margin="0,8,0,0" VerticalAlignment="Center" />
+                                </DockPanel>
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger SourceName="Tile" Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="HoverBg" Property="Visibility" Value="Visible" />
+                                </Trigger>
+                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                    <Setter TargetName="Glow" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="Lit" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="Outline" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                    <Setter TargetName="Caption" Property="Foreground" Value="{StaticResource Text}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Caption}" Value="">
+                                    <Setter TargetName="Caption" Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Big value or label of a tile; muted until the tile is selected. -->
+            <Style x:Key="TileText" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="{StaticResource TileTextSize}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            </Style>
+
+            <!-- Volume (wide): the output device in the caption, the percent (or Muted) big, a bar across the tile. -->
+            <DataTemplate x:Key="SliderTile">
+                <ContentControl Style="{StaticResource TileFrame}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="Percent" Style="{StaticResource TileText}" Text="{Binding Value}" MinWidth="72"
+                                   FontFamily="{StaticResource DisplayFont}" FontSize="{StaticResource TileValueSize}" />
+                        <!-- Same contract as the row's bar: Tag VolumeBar (wheel), 7 DIP inset on each side (drag). -->
+                        <Grid Grid.Column="1" Height="26" Margin="10,0,0,0" VerticalAlignment="Center"
+                              Background="Transparent" Cursor="Hand" Tag="VolumeBar" MouseLeftButtonDown="OnBarMouseDown">
+                            <Grid Margin="7,0" Height="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="{Binding Level, Converter={StaticResource Star}}" />
+                                    <ColumnDefinition Width="{Binding Level, Converter={StaticResource Star}, ConverterParameter=rest}" />
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.ColumnSpan="2" CornerRadius="3" Background="{StaticResource Line}" />
+                                <Border x:Name="Fill" CornerRadius="3" Background="{DynamicResource Accent}" />
+                            </Grid>
+                        </Grid>
+                    </Grid>
+                </ContentControl>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsOn}" Value="True">
+                        <Setter TargetName="Fill" Property="Background" Value="{StaticResource Subtle}" />
+                        <Setter TargetName="Percent" Property="Foreground" Value="{StaticResource Muted}" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <!-- Now playing (wide): art, title, artist · app, previous / play-pause / next. -->
+            <DataTemplate x:Key="MediaTile">
+                <ContentControl Style="{StaticResource TileFrame}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="44" Height="44" CornerRadius="8" Background="{StaticResource SegmentActive}">
+                            <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Music}" FontSize="19"
+                                       Foreground="{StaticResource Muted}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource TileText}" Text="{Binding Label}" />
+                            <TextBlock x:Name="Subtitle" Text="{Binding Value}" Margin="0,2,0,0" FontSize="12.5"
+                                       Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Style="{StaticResource HoverButton}" Tag="-1" Width="32" Height="32"
+                                    CornerRadius="16" MouseLeftButtonDown="OnMediaMouseDown">
+                                <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Previous}" FontSize="15" />
+                            </Border>
+                            <Grid Width="36" Height="36" Margin="4,0" Cursor="Hand" Tag="0"
+                                  MouseLeftButtonDown="OnMediaMouseDown">
+                                <Ellipse x:Name="PlayDisc" Fill="{DynamicResource Accent}" />
+                                <TextBlock x:Name="PlayGlyph" Style="{StaticResource Icon}" FontSize="15"
+                                           Text="{x:Static core:Glyphs.Play}" Foreground="{StaticResource Bg}" />
+                            </Grid>
+                            <Border Style="{StaticResource HoverButton}" Tag="1" Width="32" Height="32"
+                                    CornerRadius="16" MouseLeftButtonDown="OnMediaMouseDown">
+                                <TextBlock Style="{StaticResource Icon}" Text="{x:Static core:Glyphs.Next}" FontSize="15" />
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </ContentControl>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding IsOn}" Value="True">
+                        <Setter TargetName="PlayGlyph" Property="Text" Value="{x:Static core:Glyphs.Pause}" />
+                    </DataTrigger>
+                    <Trigger SourceName="PlayDisc" Property="IsMouseOver" Value="True">
+                        <Setter TargetName="PlayDisc" Property="Opacity" Value="0.8" />
+                    </Trigger>
+                    <DataTrigger Binding="{Binding Value}" Value="">
+                        <Setter TargetName="Subtitle" Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <!-- Choice (microphone, or the monitor with many profiles): the value big, ‹ › to switch it. -->
+            <DataTemplate x:Key="ChoiceTile">
+                <ContentControl Style="{StaticResource TileFrame}">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="6,0,0,0">
+                            <Border Style="{StaticResource HoverButton}" Tag="-1" Width="24" Height="28"
+                                    MouseLeftButtonDown="OnStepMouseDown">
+                                <TextBlock Style="{StaticResource RowChevron}" Text="{x:Static core:Glyphs.ChevronLeft}" />
+                            </Border>
+                            <Border Style="{StaticResource HoverButton}" Tag="1" Width="24" Height="28"
+                                    MouseLeftButtonDown="OnStepMouseDown">
+                                <TextBlock Style="{StaticResource RowChevron}" Text="{x:Static core:Glyphs.ChevronRight}" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource TileText}" Text="{Binding Value}" />
+                    </DockPanel>
+                </ContentControl>
+            </DataTemplate>
+
+            <!-- Segmented (Screen Desk / TV, Big Picture Open / Exit): the pills, shrunk only when they do not fit. -->
+            <DataTemplate x:Key="SegmentedTile">
+                <ContentControl Style="{StaticResource TileFrame}">
+                    <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Left" Height="28">
+                        <Border Style="{StaticResource SegmentCapsule}">
+                            <ItemsControl ItemsSource="{Binding Options}" Focusable="False"
+                                          ItemTemplate="{StaticResource SegmentPill}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                        </Border>
+                    </Viewbox>
+                </ContentControl>
+            </DataTemplate>
+
+            <!-- Action (Close window) and any other kind: the label big, the hint as a keycap on the right. -->
+            <DataTemplate x:Key="ActionTile">
+                <ContentControl Style="{StaticResource TileFrame}">
+                    <DockPanel>
+                        <Border DockPanel.Dock="Right" Margin="6,0,0,0">
+                            <Border.Style>
+                                <Style TargetType="Border" BasedOn="{StaticResource Keycap}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Hint}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Style="{StaticResource KeycapText}" Text="{Binding Hint}" />
+                        </Border>
+                        <TextBlock Style="{StaticResource TileText}" Text="{Binding Label}" />
+                    </DockPanel>
+                </ContentControl>
+            </DataTemplate>
+
+            <local:RowTemplateSelector x:Key="TileTemplates"
+                                       Action="{StaticResource ActionTile}"
+                                       Segmented="{StaticResource SegmentedTile}"
+                                       Choice="{StaticResource ChoiceTile}"
+                                       Toggle="{StaticResource ActionTile}"
+                                       Expander="{StaticResource ActionTile}"
+                                       Info="{StaticResource ActionTile}"
+                                       Slider="{StaticResource SliderTile}"
+                                       Media="{StaticResource MediaTile}"
+                                       Reorder="{StaticResource ActionTile}"
+                                       Grid="{StaticResource ActionTile}" />
+
             <local:RowTemplateSelector x:Key="RowTemplates"
                                        Action="{StaticResource ActionRow}"
                                        Segmented="{StaticResource SegmentedRow}"
@@ -567,100 +838,34 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Rail: one icon per visible tab (LT / RT order), centred; the Settings gear at the bottom. -->
+            <!--
+              Rail: one icon per visible tab (LT / RT order), centred; the Settings gear at the bottom. Icons and gear
+              have rows of their own (the outer rows keep the gear's height), so they never overlap on a short screen.
+            -->
             <Border x:Name="Rail" Background="Transparent" BorderBrush="{StaticResource RailLine}" BorderThickness="0,0,1,0">
                 <Grid>
                     <Grid.LayoutTransform>
                         <ScaleTransform ScaleX="{Binding SizeFactor}" ScaleY="{Binding SizeFactor}" />
                     </Grid.LayoutTransform>
-                    <ItemsControl ItemsSource="{Binding RailItems}" Focusable="False" VerticalAlignment="Center"
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" MinHeight="{StaticResource RailEndHeight}" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" MinHeight="{StaticResource RailEndHeight}" />
+                    </Grid.RowDefinitions>
+                    <ItemsControl Grid.Row="1" ItemsSource="{Binding RailItems}" Focusable="False"
                                   HorizontalAlignment="Center">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Grid x:Name="RailButton" Width="{StaticResource RailButtonSize}"
-                                      Height="{StaticResource RailButtonSize}" Margin="0,7" Background="Transparent"
-                                      Cursor="Hand" ToolTip="{Binding Title}" MouseLeftButtonDown="OnRailMouseDown">
-                                    <Border x:Name="HoverBg" CornerRadius="14" Background="{StaticResource Hover}"
-                                            Visibility="Collapsed" />
-                                    <Border x:Name="Lit" CornerRadius="14" Background="{DynamicResource Accent}"
-                                            Opacity="{StaticResource TintOpacity}" Visibility="Collapsed" />
-                                    <Rectangle x:Name="Bar" Width="3" Height="24" RadiusX="1.5" RadiusY="1.5"
-                                               HorizontalAlignment="Left" Fill="{DynamicResource Accent}"
-                                               Visibility="Collapsed" />
-                                    <TextBlock x:Name="RailGlyph" Style="{StaticResource Icon}" Text="{Binding Glyph}"
-                                               FontSize="{StaticResource RailGlyphSize}" Opacity="0.5" />
-                                </Grid>
-                                <DataTemplate.Triggers>
-                                    <Trigger SourceName="RailButton" Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="HoverBg" Property="Visibility" Value="Visible" />
-                                        <Setter TargetName="RailGlyph" Property="Opacity" Value="0.85" />
-                                    </Trigger>
-                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                                        <Setter TargetName="Lit" Property="Visibility" Value="Visible" />
-                                        <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
-                                        <Setter TargetName="RailGlyph" Property="Opacity" Value="1" />
-                                    </DataTrigger>
-                                </DataTemplate.Triggers>
+                                <ContentControl Style="{StaticResource RailButton}" Margin="0,7" Content="{Binding Glyph}"
+                                                Tag="{Binding IsCurrent}" ToolTip="{Binding Title}"
+                                                MouseLeftButtonDown="OnRailMouseDown" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <Grid x:Name="Gear" Width="{StaticResource RailButtonSize}" Height="{StaticResource RailButtonSize}"
-                          Margin="0,0,0,28" VerticalAlignment="Bottom" HorizontalAlignment="Center"
-                          Background="Transparent" Cursor="Hand" ToolTip="{Binding SettingsTitle}"
-                          MouseLeftButtonDown="OnGearMouseDown">
-                        <Border x:Name="GearHover" CornerRadius="14" Background="{StaticResource Hover}">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsMouseOver, ElementName=Gear}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                        </Border>
-                        <Border CornerRadius="14" Background="{DynamicResource Accent}" Opacity="{StaticResource TintOpacity}">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding SettingsCurrent}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                        </Border>
-                        <Rectangle Width="3" Height="24" RadiusX="1.5" RadiusY="1.5" HorizontalAlignment="Left"
-                                   Fill="{DynamicResource Accent}">
-                            <Rectangle.Style>
-                                <Style TargetType="Rectangle">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding SettingsCurrent}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Rectangle.Style>
-                        </Rectangle>
-                        <TextBlock Text="{x:Static core:Glyphs.Settings}" FontSize="{StaticResource RailGlyphSize}">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
-                                    <Setter Property="Opacity" Value="0.5" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsMouseOver, ElementName=Gear}" Value="True">
-                                            <Setter Property="Opacity" Value="0.85" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding SettingsCurrent}" Value="True">
-                                            <Setter Property="Opacity" Value="1" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Grid>
+                    <ContentControl x:Name="Gear" Grid.Row="2" Style="{StaticResource RailButton}" Margin="0,0,0,28"
+                                    VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                                    Content="{x:Static core:Glyphs.Settings}" Tag="{Binding SettingsCurrent}"
+                                    ToolTip="{Binding SettingsTitle}" MouseLeftButtonDown="OnGearMouseDown" />
                 </Grid>
             </Border>
 
@@ -748,8 +953,40 @@
                     <ScrollViewer x:Name="Scroller" Focusable="False" VerticalScrollBarVisibility="Hidden"
                                   HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,0,0,8">
-                            <ItemsControl x:Name="RowList" ItemsSource="{Binding Rows}" Focusable="False"
-                                          ItemTemplateSelector="{StaticResource RowTemplates}" />
+                            <ItemsControl x:Name="RowList" Focusable="False"
+                                          ItemTemplateSelector="{StaticResource RowTemplates}">
+                                <ItemsControl.Style>
+                                    <Style TargetType="ItemsControl">
+                                        <Setter Property="ItemsSource" Value="{Binding Rows}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowHomeTiles}" Value="True">
+                                                <Setter Property="ItemsSource" Value="{x:Null}" />
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ItemsControl.Style>
+                            </ItemsControl>
+                            <!-- Home: the same rows as tiles, two per line, wide ones alone (TilePanel). -->
+                            <ItemsControl x:Name="HomeTileList" Focusable="False" Margin="6,6,10,10"
+                                          ItemTemplateSelector="{StaticResource TileTemplates}">
+                                <ItemsControl.Style>
+                                    <Style TargetType="ItemsControl">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowHomeTiles}" Value="True">
+                                                <Setter Property="ItemsSource" Value="{Binding Rows}" />
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ItemsControl.Style>
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <local:TilePanel Gap="{StaticResource TileGap}" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
                             <ItemsControl x:Name="TileList" ItemsSource="{Binding Tiles}" Focusable="False"
                                           ItemTemplate="{StaticResource GameTile}">
                                 <ItemsControl.Style>

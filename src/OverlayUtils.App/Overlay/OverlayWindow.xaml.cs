@@ -152,7 +152,8 @@ internal sealed partial class OverlayWindow : Window
             return;
         }
         var row = _vm?.Rows.FirstOrDefault(r => r.IsSelected);
-        if (row is not null && RowList.ItemContainerGenerator.ContainerFromItem(row) is FrameworkElement container)
+        var list = _vm is { ShowHomeTiles: true } ? HomeTileList : RowList;
+        if (row is not null && list.ItemContainerGenerator.ContainerFromItem(row) is FrameworkElement container)
             container.BringIntoView();
     }
 
@@ -443,4 +444,77 @@ internal sealed class RowTemplateSelector : DataTemplateSelector
             ItemKind.Grid => Grid,
             _ => null,
         };
+}
+
+/// <summary>
+/// The Home tiles: a 2-column grid in reading order. A wide row (<see cref="RowVm.IsWide"/>) takes a line of its
+/// own; two other rows in a row share a line; one whose partner is not there (a wide row follows, or the list ends)
+/// keeps its half on the left. Hidden items are not in the list, so the grid simply closes up. Both tiles of a line
+/// get the taller one's height.
+/// </summary>
+internal sealed class TilePanel : Panel
+{
+    public static readonly DependencyProperty GapProperty = DependencyProperty.Register(nameof(Gap), typeof(double),
+        typeof(TilePanel), new FrameworkPropertyMetadata(12.0, FrameworkPropertyMetadataOptions.AffectsMeasure));
+
+    /// <summary>Space between the two columns and between lines (DIPs).</summary>
+    public double Gap { get => (double)GetValue(GapProperty); set => SetValue(GapProperty, value); }
+
+    static bool IsWide(UIElement child) => (child as FrameworkElement)?.DataContext is RowVm { IsWide: true };
+
+    /// <summary>First child index and child count of each line.</summary>
+    List<(int First, int Count, bool Wide)> Lines()
+    {
+        var lines = new List<(int, int, bool)>();
+        var children = InternalChildren;
+        for (var i = 0; i < children.Count;)
+        {
+            if (IsWide(children[i])) { lines.Add((i, 1, true)); i++; continue; }
+            var pair = i + 1 < children.Count && !IsWide(children[i + 1]);
+            lines.Add((i, pair ? 2 : 1, false));
+            i += pair ? 2 : 1;
+        }
+        return lines;
+    }
+
+    protected override Size MeasureOverride(Size available)
+    {
+        var width = double.IsFinite(available.Width) ? available.Width : 0;
+        var half = Math.Max(0, (width - Gap) / 2);
+        double height = 0, widest = 0;
+        var lines = Lines();
+        foreach (var (first, count, wide) in lines)
+        {
+            double line = 0, lineWidth = 0;
+            for (var i = first; i < first + count; i++)
+            {
+                var child = InternalChildren[i];
+                child.Measure(new Size(width == 0 ? double.PositiveInfinity : wide ? width : half, double.PositiveInfinity));
+                line = Math.Max(line, child.DesiredSize.Height);
+                lineWidth += child.DesiredSize.Width;
+            }
+            height += line;
+            widest = Math.Max(widest, lineWidth + (count - 1) * Gap);
+        }
+        if (lines.Count > 1) height += (lines.Count - 1) * Gap;
+        return new Size(width > 0 ? width : widest, height);
+    }
+
+    protected override Size ArrangeOverride(Size final)
+    {
+        var half = Math.Max(0, (final.Width - Gap) / 2);
+        double y = 0;
+        foreach (var (first, count, wide) in Lines())
+        {
+            double line = 0;
+            for (var i = first; i < first + count; i++) line = Math.Max(line, InternalChildren[i].DesiredSize.Height);
+            for (var i = first; i < first + count; i++)
+            {
+                var x = i == first ? 0 : half + Gap;
+                InternalChildren[i].Arrange(new Rect(x, y, wide ? final.Width : half, line));
+            }
+            y += line + Gap;
+        }
+        return final;
+    }
 }

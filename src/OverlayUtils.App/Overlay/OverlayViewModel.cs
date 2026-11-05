@@ -29,6 +29,7 @@ internal sealed record FooterVm(string Keys, string Label, OverlayCommand? Comma
 /// One visible row. <see cref="Index"/> is the navigator index, so clicks map back to it. <see cref="IsOn"/> is the
 /// switch for Toggle/Expander, the mute for Slider and "playing" for Media; <see cref="Level"/> is the Slider's 0..1;
 /// <see cref="IsHeld"/> marks a picked-up Reorder row; <see cref="Child"/> an indented row (an app under its channel).
+/// On a tiles page (Home) <see cref="Caption"/> is the small line at the top of the tile.
 /// </summary>
 internal sealed record RowVm(
     int Index, string? Section, string Icon, string Label, ItemKind Kind, string Value, bool IsOn, string Hint,
@@ -40,6 +41,15 @@ internal sealed record RowVm(
 
     public double SliderFill => Level * SliderWidth;
     public Thickness KnobMargin => new(SliderFill - KnobRadius, 0, 0, 0);
+
+    /// <summary>On a tiles page the row spans both columns (volume, now playing).</summary>
+    public bool IsWide => Kind is ItemKind.Slider or ItemKind.Media;
+
+    /// <summary>
+    /// Top line of the tile: the output device for the volume, the section for media, nothing for an action (its
+    /// label is the tile's text), else the label. Empty off a tiles page.
+    /// </summary>
+    public string Caption { get; init; } = "";
 }
 
 /// <summary>
@@ -105,6 +115,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     IReadOnlyList<TileVm> _tiles = [];
     string _tilesCulture = "";
     bool _showTiles;
+    bool _showHomeTiles;
     int _selectedTile = -1;
     CancellationTokenSource? _artLoad;              // cancelled when the tiles are rebuilt
     readonly HashSet<TileVm> _withArt = [];         // tiles that hold their art now
@@ -179,6 +190,8 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsWide)));
         }
     }
+    /// <summary>The page is a tiles tab (Home): <see cref="Rows"/> are drawn as shortcut tiles, without sections.</summary>
+    public bool ShowHomeTiles { get => _showHomeTiles; private set => Set(ref _showHomeTiles, value); }
     /// <summary>Index of the selected tile, -1 when the grid is not selected.</summary>
     public int SelectedTile { get => _selectedTile; private set => Set(ref _selectedTile, value); }
 
@@ -215,6 +228,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
         };
         IsOnPage = nav.Page != OverlayPage.Tabs;
 
+        var tiles = nav.Page == OverlayPage.Tabs && nav.CurrentTab.Tiles;
         var rows = new List<RowVm>();
         var items = nav.Items;
         for (var i = 0; i < items.Count; i++)
@@ -243,11 +257,18 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
             var sliderLevel = item.Kind == ItemKind.Slider ? SliderLevel(value) : 0;
             if (item.Kind == ItemKind.Slider && isOn) value = Loc.T("Overlay.Audio.Muted");
             if (nav.IsRemovePending(i)) value = Loc.T("Overlay.DeletePending");
+            var label = item.Label();
+            var caption = !tiles ? ""
+                : item.Kind == ItemKind.Slider && outputDevice.Length > 0 ? outputDevice
+                : item.Kind == ItemKind.Media && !string.IsNullOrEmpty(section) ? section
+                : item.Kind == ItemKind.Action ? "" // the label is the tile's text already
+                : label;
             rows.Add(new RowVm(i, string.IsNullOrEmpty(section) ? null : section.ToUpper(Loc.Culture), item.Icon,
-                item.Label(), item.Kind, value, isOn, hint,
+                label, item.Kind, value, isOn, hint,
                 item.Kind == ItemKind.Action && hint.Length == 0 && (item.Stay || item.OpensInfo || item.SubPage != null),
-                selected, options, sliderLevel, selected && nav.Holding, item.Child));
+                selected, options, sliderLevel, selected && nav.Holding, item.Child) { Caption = caption });
         }
+        ShowHomeTiles = tiles;
         Rows = rows;
         RefreshTiles(nav, items);
         Description = nav.Description();
