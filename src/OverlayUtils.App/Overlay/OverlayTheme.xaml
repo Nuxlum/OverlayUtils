@@ -92,7 +92,6 @@
     <!-- Games page: hero (selected game), source pills, the cover shelf and the backdrop tint. -->
     <sys:Double x:Key="HeroTitleSize">46</sys:Double>
     <!-- The hero stays left of the status corner at every size. -->
-    <sys:Double x:Key="HeroMaxWidth">760</sys:Double>
     <sys:Double x:Key="PillHeight">30</sys:Double>
     <sys:Double x:Key="PillTextSize">13</sys:Double>
     <!-- The current pill: the accent at this opacity under the label, with an accent outline. -->

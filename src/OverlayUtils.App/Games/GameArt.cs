@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using OverlayUtils.Core.Diagnostics;
 
 namespace OverlayUtils.App.Games;
 
@@ -77,6 +78,8 @@ internal static class GameArt
     /// Dominant colour of a cover: an 8x8 copy averaged with more weight on saturated pixels (so a black or white
     /// frame does not wash the colour out), then darkened to <see cref="AmbientMaxLuma"/>. Null if it cannot be read.
     /// </summary>
+    static int _ambientErrorLogged;
+
     static Color? AmbientOf(BitmapSource image)
     {
         try
@@ -114,9 +117,12 @@ internal static class GameArt
             }
             return Color.FromRgb((byte)Math.Round(r), (byte)Math.Round(g), (byte)Math.Round(b));
         }
-        catch (Exception)
+        catch (Exception e)
         {
-            return null; // no tint for this cover: the backdrop stays plain
+            // No tint for this cover: the backdrop stays plain. Logged once: a cause shared by every cover would
+            // otherwise fill the log on each Games page.
+            if (Interlocked.Exchange(ref _ambientErrorLogged, 1) == 0) Log.Error("Cover ambient colour", e);
+            return null;
         }
     }
 

@@ -186,6 +186,7 @@ internal static partial class Native
 
     // --- window placement / styles -------------------------------------------
     public const uint WM_DPICHANGED = 0x02E0;
+    public const uint WM_DISPLAYCHANGE = 0x007E;
     public static readonly nint HWND_TOPMOST = -1;
     public const uint SWP_NOACTIVATE = 0x0010;
     public const uint SWP_NOOWNERZORDER = 0x0200;
@@ -208,23 +209,11 @@ internal static partial class Native
     // --- DWM (overlay look) ----------------------------------------------------
     public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
     public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
-    public const int DWMWA_BORDER_COLOR = 34;
-    public const int DWMWA_SYSTEMBACKDROP_TYPE = 38;   // Windows 11 22621+
     public const int DWMWCP_DONOTROUND = 1;
-    public const int DWMWCP_ROUND = 2;
-    public const int DWMSBT_NONE = 1;
-    public const int DWMSBT_TRANSIENTWINDOW = 3;       // acrylic
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct MARGINS { public int Left, Right, Top, Bottom; }
 
     /// <summary>Returns an HRESULT (0 = S_OK).</summary>
     [LibraryImport("dwmapi.dll")]
     public static partial int DwmSetWindowAttribute(nint hWnd, int attribute, ref int value, int size);
-
-    /// <summary>Returns an HRESULT (0 = S_OK).</summary>
-    [LibraryImport("dwmapi.dll")]
-    public static partial int DwmExtendFrameIntoClientArea(nint hWnd, ref MARGINS margins);
 
     // --- monitors -----------------------------------------------------------
     public const uint MONITOR_DEFAULTTONEAREST = 2;

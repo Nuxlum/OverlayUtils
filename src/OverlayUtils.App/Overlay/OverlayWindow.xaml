@@ -1154,7 +1154,7 @@
                       the status corner and the space beside it stays the backdrop's.
                     -->
                     <StackPanel x:Name="Hero" DockPanel.Dock="Top" Margin="12,0,0,0" HorizontalAlignment="Left"
-                                MaxWidth="{StaticResource HeroMaxWidth}" Background="Transparent">
+                                MaxWidth="{Binding HeroMaxWidth}" Background="Transparent">
                         <StackPanel.Style>
                             <Style TargetType="StackPanel">
                                 <Setter Property="Visibility" Value="Collapsed" />

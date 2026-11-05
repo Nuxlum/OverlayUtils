@@ -248,6 +248,14 @@ internal sealed class OverlayController : IDisposable
             // A failed open must not keep the screenshot (or take a late image) until the next one.
             _capture = null;
             _frostVersion++;
+            if (!_open)
+            {
+                // Failed after the window was shown: it would cover the screen and take no input. Hide it now.
+                _focusTimer.Stop();
+                _clockTimer.Stop();
+                try { _window.HideNow(); }
+                catch (Exception ex) { Log.Error("Overlay show", ex); }
+            }
         }
     }
 
@@ -336,6 +344,7 @@ internal sealed class OverlayController : IDisposable
         var frame = OverlayLayout.Frame(bounds.Width / dpiScale, sizeFactor);
         _vm.SizeFactor = sizeFactor;
         _vm.Frame = frame;
+        _vm.ScreenWidth = bounds.Width / dpiScale;
         _content.GameColumns = frame.CoverColumns; // the navigator's grid moves follow the columns drawn
         _placement = bounds; // the whole monitor, taskbar included
         _window.Width = _placement.Width / dpiScale;
@@ -375,6 +384,9 @@ internal sealed class OverlayController : IDisposable
         // in DIPs changed) and put the window back on the whole monitor.
         if (msg == Native.WM_DPICHANGED)
             _app.Dispatcher.BeginInvoke(DispatcherPriority.Send, () => Relayout(_config.Current));
+        // A resolution change of the monitor while open: the window covers the new size and the frame follows it.
+        else if (msg == Native.WM_DISPLAYCHANGE)
+            _app.Dispatcher.BeginInvoke(DispatcherPriority.Send, () => { if (_open) Relayout(_config.Current); });
         return 0;
     }
 
@@ -487,6 +499,7 @@ internal sealed class OverlayController : IDisposable
 
     void Render()
     {
+        var sliding = false;
         try
         {
             // Always: a row that became hidden must not stay selected until the next clock tick.
@@ -500,17 +513,27 @@ internal sealed class OverlayController : IDisposable
                     // The old page slides out first (90 ms); the rail already shows the new one. The page is drawn
                     // on PageLeft, or by the next render if a command comes first.
                     _vm.RefreshRail(_navigator);
+                    sliding = true;
                     return;
                 }
             }
             _vm.Eyebrow = EyebrowText();
             _vm.Refresh(_navigator, DateTime.Now.ToString("HH:mm"), _content.OutputDevice, _padConnected, _battery,
                 BatteryPercent);
-            _window.PageDrawn(); // a page that was sliding out: the new one comes in
         }
         catch (Exception e)
         {
             Log.Error("Overlay render", e);
+        }
+        finally
+        {
+            // A page that was sliding out: the new one comes in, even when the refresh threw (the column must not
+            // stay invisible). Not while the old page is still sliding out: PageLeft draws it then.
+            if (!sliding)
+            {
+                try { _window.PageDrawn(); }
+                catch (Exception e) { Log.Error("Overlay render", e); }
+            }
         }
     }
 

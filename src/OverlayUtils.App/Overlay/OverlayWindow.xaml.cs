@@ -30,6 +30,8 @@ internal sealed partial class OverlayWindow : Window
         SourceInitialized += (_, _) => WindowEffects.ApplyChrome(this);
         Scroller.ScrollChanged += (_, _) => UpdateArtRange();
         ListArea.SizeChanged += (_, _) => QueueHighlight();
+        // The Games hero keeps clear of the status corner, whose width follows the device name and battery.
+        StatusCorner.SizeChanged += (_, _) => { if (_vm is not null) _vm.StatusWidth = StatusCorner.ActualWidth; };
         _contextFront = ContextA;
         _rowTintMask = TryFindResource("TintFade") as Brush;
     }
@@ -100,6 +102,7 @@ internal sealed partial class OverlayWindow : Window
         DataContext = vm;
         Resources[AccentKey] = vm.AccentBrush;
         vm.PropertyChanged += OnViewModelChanged;
+        vm.StatusWidth = StatusCorner.ActualWidth;
         ShowContext(vm.Context);
     }
 

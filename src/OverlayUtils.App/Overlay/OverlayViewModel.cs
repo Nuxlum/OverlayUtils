@@ -189,6 +189,8 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     string _batteryGlyph = "";
     Brush _accentBrush = Frozen(FallbackAccent);
     double _sizeFactor = 1;
+    double _screenWidth;
+    double _statusWidth;
     IReadOnlyList<TileVm> _tiles = [];
     string _tilesCulture = "";
     string _pillsCulture = "";
@@ -244,7 +246,7 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
             if (_frame == value) return;
             _frame = value;
             foreach (var name in new[] { nameof(Frame), nameof(RailWidth), nameof(ColumnWidth), nameof(ColumnPadding),
-                         nameof(StagePadding), nameof(TileColumns) })
+                         nameof(StagePadding), nameof(TileColumns), nameof(HeroMaxWidth) })
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
             UpdateDimmed(); // the shelf's rows changed with the columns; the navigator keeps the game by id
         }
@@ -299,7 +301,43 @@ internal sealed class OverlayViewModel : INotifyPropertyChanged
     public Brush AccentBrush { get => _accentBrush; set => Set(ref _accentBrush, value); }
 
     /// <summary>Scale of the frame's content (Large size); set by the controller.</summary>
-    public double SizeFactor { get => _sizeFactor; set => Set(ref _sizeFactor, value); }
+    public double SizeFactor
+    {
+        get => _sizeFactor;
+        set { Set(ref _sizeFactor, value); PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HeroMaxWidth))); }
+    }
+
+    /// <summary>Width of the monitor the overlay covers (DIPs); set by the controller with the frame.</summary>
+    public double ScreenWidth
+    {
+        get => _screenWidth;
+        set { Set(ref _screenWidth, value); PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HeroMaxWidth))); }
+    }
+
+    /// <summary>Width of the status corner before its size scale (DIPs); set by the window when it is measured.</summary>
+    public double StatusWidth
+    {
+        get => _statusWidth;
+        set { Set(ref _statusWidth, value); PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HeroMaxWidth))); }
+    }
+
+    /// <summary>
+    /// Width the Games hero may take inside the scaled page (so in unscaled DIPs): the screen less the rail, the
+    /// column's left gutter, the hero's own margin, the status corner with the stage gutter on its right and one more
+    /// gutter of air before it; never more than <see cref="HeroCap"/>. The title trims beyond it.
+    /// </summary>
+    public double HeroMaxWidth
+    {
+        get
+        {
+            if (_screenWidth <= 0 || _sizeFactor <= 0) return HeroCap;
+            var free = _screenWidth - _frame.RailWidth - 3 * _frame.Gutter - _statusWidth * _sizeFactor;
+            return Math.Clamp(free / _sizeFactor - HeroMargin, 0, HeroCap);
+        }
+    }
+
+    const double HeroCap = 760;    // the design's widest hero, at any size
+    const double HeroMargin = 12;  // the hero's left margin inside the page (OverlayWindow.xaml)
 
     /// <summary>
     /// Only the rail (lit page icon, gear): while the old page slides out, the rail already shows where the command
