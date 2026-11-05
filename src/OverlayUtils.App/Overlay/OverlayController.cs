@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using OverlayUtils.App.Audio;
+using OverlayUtils.Core;
 using OverlayUtils.Core.Config;
 using OverlayUtils.Core.Diagnostics;
 using OverlayUtils.Core.Games;
@@ -50,6 +51,12 @@ internal sealed class OverlayController : IDisposable
     bool _hadFocus;
     RectI _placement;
     bool _disposed;
+
+    // The game that was in front when the overlay opened (Home eyebrow). Found off the UI thread; the version drops a
+    // result that arrives after the overlay closed or opened again.
+    int _gameLookup;
+    GameEntry? _currentGame;
+    DateTime _currentStartUtc;
 
     // Frosted backdrop: the monitor captured at open, kept while open so the Appearance sliders can re-process it.
     CapturedScreen? _capture;
@@ -189,6 +196,7 @@ internal sealed class OverlayController : IDisposable
         {
             var cfg = _config.Current;
             _prev = WindowFocus.ForegroundApp();
+            FindCurrentGame(_prev);
             var (bounds, dpiScale) = _prev != 0 ? DisplayArea.MonitorForWindow(_prev) : DisplayArea.MonitorForCursor();
 
             // While our window is still hidden, so the screenshot is of the game (about 25 ms, memory only).
@@ -224,6 +232,45 @@ internal sealed class OverlayController : IDisposable
         }
     }
 
+    /// <summary>
+    /// Looks up, in the background, which library game owns <paramref name="window"/> (process image path match) and
+    /// when its process started; the Home eyebrow shows it with the play time. No match or any failure: app name.
+    /// </summary>
+    void FindCurrentGame(nint window)
+    {
+        var version = ++_gameLookup;
+        _currentGame = null;
+        if (window == 0) return;
+        var games = _content.KnownGames; // read here, on the UI thread
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                if (ForegroundProcess.Describe(window) is not { } process) return;
+                if (CurrentGame.Match(process.ExePath, games) is not { } game) return;
+                OnUi(() =>
+                {
+                    if (version != _gameLookup || !_open) return; // closed or reopened meanwhile
+                    _currentGame = game;
+                    _currentStartUtc = process.StartUtc;
+                    Render();
+                });
+            }
+            catch (Exception e)
+            {
+                Log.Error("Overlay current game", e);
+            }
+        });
+    }
+
+    /// <summary>Home: "title · play time" of the game that was in front; elsewhere, and without a match, the app name.</summary>
+    string EyebrowText()
+    {
+        if (_currentGame is { } game && _navigator.Page == OverlayPage.Tabs && _navigator.CurrentTab.Id == OverlayContent.HomeTabId)
+            return Loc.T("Overlay.Eyebrow.Game", game.Title, CurrentGame.PlayTime(DateTime.UtcNow - _currentStartUtc));
+        return AppPaths.AppName;
+    }
+
     public void Hide(bool restoreFocus = true)
     {
         if (!_app.Dispatcher.CheckAccess())
@@ -237,6 +284,7 @@ internal sealed class OverlayController : IDisposable
             // Focus first, then hide: hidden first, Windows activates another window and refuses the hand-back.
             if (restoreFocus && WindowFocus.IsAlive(_prev)) WindowFocus.Force(_prev);
             _open = false;
+            _gameLookup++; // a lookup still running is stale now
             RaiseOpenChanged(false);
             _focusTimer.Stop();
             _clockTimer.Stop();
@@ -386,6 +434,7 @@ internal sealed class OverlayController : IDisposable
         {
             // Always: a row that became hidden must not stay selected until the next clock tick.
             RunCancel(_navigator.Refresh());
+            _vm.Eyebrow = EyebrowText();
             _vm.Refresh(_navigator, DateTime.Now.ToString("HH:mm"), _content.OutputDevice, _padConnected, _battery,
                 BatteryPercent);
         }

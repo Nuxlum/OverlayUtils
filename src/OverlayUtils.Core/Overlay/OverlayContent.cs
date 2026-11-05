@@ -101,6 +101,9 @@ public sealed class OverlayContent
     /// <summary>Columns of the Games grid; the UI sets it from the frame's cover columns.</summary>
     public int GameColumns { get; set; } = 3;
 
+    /// <summary>The games of the visible sources as last read (empty without a library); for matching the running game.</summary>
+    public IReadOnlyList<GameEntry> KnownGames => _games?.Games ?? [];
+
     public IReadOnlyList<OverlayItem> Games()
     {
         var games = _games?.Games ?? [];
