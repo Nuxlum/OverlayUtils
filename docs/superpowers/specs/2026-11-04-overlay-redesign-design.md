@@ -72,7 +72,7 @@ was rejected: it covers the middle of the screen and wastes both sides.
    - a **hero** at the top: the selected game's title, large, its source
      badge, and a Play button hint;
    - the **source filter** as a row of pills (All, Steam, Epic, …) above the
-     covers, the current one lit; X still cycles it, as now (the filter pill
+     covers, the current one lit; Y still cycles it, as now (the filter pill
      in the grid header goes away);
    - the **cover shelf**: more columns than today (about 8 on the TV, more
      at the desk, the builder fits it to the width), the selected cover lifts

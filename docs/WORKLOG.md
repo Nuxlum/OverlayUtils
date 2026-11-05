@@ -209,7 +209,10 @@ The stage checklist lives in `PORTING.md`.
   to the status corner.
 - 2026-11-05 - **Current game** in the Home eyebrow: foreground exe matched
   to library install folders (`GameEntry.InstallDir`), session play time;
-  other pages keep the app name. Pad battery shown as a percent.
+  other pages keep the app name. Pad battery shown as a percent. Never a
+  system or library folder (review fix): the Windows tree, a Program Files
+  root, the Steam root and any `steamapps\common` are excluded, so a Steam
+  shortcut to explorer.exe or cmd.exe does not name File Explorer a game.
 - 2026-11-05 - **Motion deviations, pending owner sign-off:** selection
   highlight drawn behind the list (no text tint); close fades the frame but
   not the backdrop (the window is opaque); page change is 90 ms out then
@@ -251,6 +254,12 @@ The stage checklist lives in `PORTING.md`.
 
 ## Session log
 
+- 2026-11-05 - Overlay redesign final review fixes: current game skips
+  system / library folders, Games hero width follows the frame and the status
+  corner (no overlap at Large on 1280 DIP), a failed open hides the window,
+  `WM_DISPLAYCHANGE` relayouts, page always drawn after a failed refresh,
+  Home skips a missing key, cover tint errors logged, dead DWM interop
+  removed, docs corrected (Frame, capture thread, 180 ms, Y filter).
 - 2026-11-05 - Overlay redesign written in 13 tasks (full-screen Focus layout,
   Home, stage context, Games page, frosted backdrop and Appearance sliders,
   current game, motion), docs. Builds with 0 warnings, self-test 1375/1375;

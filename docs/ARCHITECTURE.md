@@ -92,7 +92,7 @@ covered by the self-test.
 |---|---|
 | `OverlayContent`: tabs and rows (Home, Controls, Audio, Games, Settings, Info) | `OverlayController`: open / close, focus, placement, runs effects |
 | `OverlayNavigator`: selection, pages (incl. Home tiles and Games), expanders, Power confirm | `OverlayWindow` + `OverlayViewModel`: drawing, key and mouse input |
-| `OverlayLayout`: size factor and `Place` (monitor rectangle) | `OverlayTheme.xaml`: full-screen frame, frosted backdrop, motion; `WindowEffects`: tool window, dark mode, square corners |
+| `OverlayLayout`: size factor and `Frame` (rail, column, gutter, cover columns) | `OverlayTheme.xaml`: full-screen frame, frosted backdrop, motion; `WindowEffects`: tool window, dark mode, square corners |
 | `IOverlayHost` (implemented by `TrayController`) | |
 | `WindowFocus`, `DisplayArea`, `PowerActions`, `ShellOpen`, `AccentPalette` | |
 
@@ -136,10 +136,12 @@ Settings as a gear at the bottom, outside the LT / RT page cycle), the
 **column** (eyebrow, page title, rows, footer hints) and the **stage** on the
 right (status corner: output device, pad battery as a percent, clock; and the
 context card). `OverlayLayout.SizeFactor` maps `overlay_size` (Auto looks at
-the active monitor profile) to a factor; `Place` returns the monitor rectangle
-and the column width scales with the factor. Per-monitor DPI aware, follows
-`WM_DPICHANGED`. The window opens on the monitor of the foreground window
-(`DisplayArea`, cursor as fallback). When a setting changes while it is open
+the active monitor profile) to a factor; `OverlayLayout.Frame` turns the
+monitor width (DIPs) and the factor into rail, column, gutter and cover
+columns. Per-monitor DPI aware, follows `WM_DPICHANGED` and, for a resolution
+change while open, `WM_DISPLAYCHANGE`. The window covers the monitor of the
+foreground window (`DisplayArea.MonitorForWindow`, `MonitorForCursor` as
+fallback). When a setting changes while it is open
 (size, Appearance sliders, monitor profile) the controller recomputes layout
 and, for the sliders, re-processes the backdrop. The old left / right side
 setting is gone; an old `overlay_side` just lands in `Extra`.
@@ -151,16 +153,17 @@ drawn as tiles in a 2-column grid with wide tiles; an item that is not visible
 is left out. **Stage context** per selected row: the description card by
 default, the Desk / TV monitor picture, the audio mixer bars, large album art.
 The **Games page** uses column and stage together: hero, source filter pills
-(X cycles), cover shelf with lift on the selected cover, and a backdrop tint
+(Y cycles; X is play / pause), cover shelf with lift on the selected cover, and a backdrop tint
 from the selected art's dominant colour (taken when the cover is decoded).
 
 ### Frosted backdrop
 
 On open the monitor is captured once (GDI `BitBlt`, in memory only, never
-saved) on a worker. The window shows at once with opaque #080A10 and the UI;
-`Frost` (Core, from `overlay_blur` / `overlay_frost` / `overlay_dim`) is
+saved) on the UI thread in `Show`, while the window is still hidden (so the
+image is of the game); only the processing runs on a worker. The window
+shows at once with opaque #080A10 and the UI; `Frost` (Core, from `overlay_blur` / `overlay_frost` / `overlay_dim`) is
 processed off the UI thread (1/4 downscale, 3-pass box blur, saturation 1.3,
-brightness x1.08) and the image fades in over 150 ms when ready (measured at
+brightness x1.08) and the image fades in over 180 ms when ready (measured at
 2560x1440: capture ~25 ms, processing ~20 ms). Layers on top: white frost,
 static grain, dark gradient. The UI thread only receives the finished bitmap.
 Capture failed or black (exclusive fullscreen, protected content) keeps the

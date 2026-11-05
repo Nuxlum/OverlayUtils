@@ -120,7 +120,7 @@ On the TV and at the desk:
 2. Each page (Home, Controls, Audio, Games, Settings, Info): layout, stage
    context, tiles behave like their rows. LT / RT feel instant.
 3. Games: the cover lifts and the backdrop tints on selection; source pills
-   and X cycle the filter.
+   and Y cycle the filter.
 4. Appearance sliders (Settings) preview live on the backdrop.
 5. A click on the backdrop closes the overlay (on mouse-up); a click on the
    gaps between the filter pills does not.
